@@ -1,0 +1,40 @@
+# Binaries
+bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+api
+worker
+
+# Test binaries
+*.test
+*.out
+*.prof
+
+# Dependencies
+# (Keep go.sum in git, but ignore vendor if using go modules)
+vendor/
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# IDEs and editors
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+*~
+
+# Operating System files
+Thumbs.db
+db.webproj
+[Dd]ebug/
+[Rr]elease/
+.DS_Store

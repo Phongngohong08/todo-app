@@ -1,0 +1,6 @@
+DROP TABLE IF EXISTS chat_messages;
+DROP TABLE IF EXISTS daily_plans;
+DROP TABLE IF EXISTS task_logs;
+DROP TABLE IF EXISTS tasks;
+DROP TABLE IF EXISTS user_preferences;
+DROP TABLE IF EXISTS users;

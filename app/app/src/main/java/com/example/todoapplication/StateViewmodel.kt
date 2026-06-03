@@ -1,4 +1,7 @@
 package com.example.todoapplication
 
-class StateViewmodel {
+import androidx.lifecycle.ViewModel
+
+class StateViewmodel : ViewModel() {
+
 }

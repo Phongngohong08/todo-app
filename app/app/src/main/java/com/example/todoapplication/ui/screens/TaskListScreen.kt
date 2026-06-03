@@ -48,13 +48,20 @@ fun Task.isOverdue(): Boolean {
 @Composable
 fun TaskListScreen(navController: NavController) {
     val context = LocalContext.current
+    val repo = LocalTodoRepository.current
     val coroutineScope = rememberCoroutineScope()
     val sessionManager = remember { SessionManager(context) }
     val apiService = remember { NetworkClient.getApiService(context) }
 
     var tasks by remember { mutableStateOf<List<Task>>(emptyList()) }
-    var isLoading by remember { mutableStateOf(true) }
     var selectedStatusFilter by remember { mutableStateOf("ALL") }
+
+    val filteredTasks = remember(tasks, selectedStatusFilter) {
+        if (selectedStatusFilter == "ALL") tasks
+        else tasks.filter { it.status == selectedStatusFilter }
+    }
+    var isLoading by remember { mutableStateOf(true) }
+    var isLogoutInProgress by remember { mutableStateOf(false) }
 
     // State for Postpone Dialog
     var showPostponeDialog by remember { mutableStateOf(false) }
@@ -64,21 +71,21 @@ fun TaskListScreen(navController: NavController) {
 
     val calendar = remember { Calendar.getInstance() }
 
-    fun loadTasks() {
+    LaunchedEffect(Unit) {
         isLoading = true
+        repo.fetchTasksIfEmpty()
+        repo.allTasks.collect {
+            tasks = it
+            isLoading = false
+        }
+    }
+    fun loadTasks() {
+        // We can still use this to refresh from network if needed
         coroutineScope.launch {
             try {
-                val filter = if (selectedStatusFilter == "ALL") null else selectedStatusFilter
-                val response = apiService.listTasks(status = filter)
-                if (response.isSuccessful) {
-                    tasks = response.body() ?: emptyList()
-                } else {
-                    Toast.makeText(context, "Không thể tải danh sách công việc", Toast.LENGTH_SHORT).show()
-                }
+                repo.refreshTasks()
             } catch (e: Exception) {
-                Toast.makeText(context, "Lỗi kết nối: ${e.message}", Toast.LENGTH_SHORT).show()
-            } finally {
-                isLoading = false
+                // Handle error
             }
         }
     }
@@ -107,12 +114,24 @@ fun TaskListScreen(navController: NavController) {
                 },
                 actions = {
                     IconButton(onClick = {
-                        sessionManager.logout()
-                        navController.navigate(Screen.Login.route) {
-                            popUpTo(Screen.TaskList.route) { inclusive = true }
+                        val job = coroutineScope.launch {
+                            isLogoutInProgress = true
+                            repo.clearAllTasks()
                         }
+                        if(job.isCompleted) {
+                            isLogoutInProgress = false
+                            sessionManager.logout()
+                            navController.navigate(Screen.Login.route) {
+                                popUpTo(Screen.TaskList.route) { inclusive = true }
+                            }
+                        }else{
+                            isLogoutInProgress = false
+                            Toast.makeText(context,"Thất bại",Toast.LENGTH_SHORT).show()
+                        }
+
                     }) {
-                        Icon(Icons.Default.ExitToApp, contentDescription = "Log out", tint = Color.LightGray)
+                        if(isLogoutInProgress) CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                        else Icon(Icons.Default.ExitToApp, contentDescription = "Log out", tint = Color.LightGray)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = BackgroundObsidian)
@@ -124,6 +143,7 @@ fun TaskListScreen(navController: NavController) {
                 containerColor = PrimaryIndigo,
                 contentColor = Color.White
             ) {
+
                 Icon(Icons.Default.Add, contentDescription = "Add Task")
             }
         },
@@ -170,7 +190,7 @@ fun TaskListScreen(navController: NavController) {
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                     modifier = Modifier.fillMaxSize()
                 ) {
-                    items(tasks) { task ->
+                    items(filteredTasks) { task ->
                         TaskCard(
                             task = task,
                             onCardClick = {

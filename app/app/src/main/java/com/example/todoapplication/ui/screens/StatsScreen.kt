@@ -40,7 +40,7 @@ fun StatsScreen(navController: NavController) {
     val coroutineScope = rememberCoroutineScope()
     val apiService = remember { NetworkClient.getApiService(context) }
 
-    var selectedTab by remember { mutableStateOf(0) }
+    var selectedTab by remember { mutableIntStateOf(0) }
     val tabTitles = listOf("Thống kê", "Trí nhớ AI", "Thiết lập")
 
     // Tab 1: Stats states

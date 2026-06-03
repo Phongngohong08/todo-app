@@ -3,7 +3,10 @@ package com.example.todoapplication.data.repository
 import android.content.Context
 import android.content.SharedPreferences
 
-class SessionManager(context: Context) {
+import androidx.core.content.edit
+
+class SessionManager  (
+     context: Context) {
     private val prefs: SharedPreferences = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
 
     companion object {
@@ -15,7 +18,7 @@ class SessionManager(context: Context) {
     }
 
     fun saveAuthToken(token: String) {
-        prefs.edit().putString(KEY_TOKEN, token).apply()
+        prefs.edit { putString(KEY_TOKEN, token) }
     }
 
     fun getAuthToken(): String? {
@@ -35,12 +38,16 @@ class SessionManager(context: Context) {
         return prefs.getString(KEY_USER_NAME, "") ?: ""
     }
 
+    fun getUserId(): String {
+        return prefs.getString(KEY_USER_ID, "") ?: ""
+    }
+
     fun getUserEmail(): String {
         return prefs.getString(KEY_USER_EMAIL, "") ?: ""
     }
 
     fun logout() {
-        prefs.edit().clear().apply()
+        prefs.edit { clear() }
     }
 
     fun isLoggedIn(): Boolean {

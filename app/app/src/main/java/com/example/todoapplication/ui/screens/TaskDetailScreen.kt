@@ -1,7 +1,9 @@
 package com.example.todoapplication.ui.screens
 
+import android.annotation.SuppressLint
 import android.app.DatePickerDialog
 import android.app.TimePickerDialog
+import android.util.Log
 import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -21,28 +23,37 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.example.todoapplication.data.api.NetworkClient
+import com.example.todoapplication.data.model.AlarmItem
 import com.example.todoapplication.data.model.CreateTaskInput
+import com.example.todoapplication.data.model.Task
 import com.example.todoapplication.data.model.UpdateTaskInput
 import com.example.todoapplication.ui.theme.BackgroundObsidian
 import com.example.todoapplication.ui.theme.PrimaryIndigo
 import com.example.todoapplication.ui.theme.SecondaryTeal
 import com.example.todoapplication.ui.theme.SurfaceGlass
 import com.example.todoapplication.ui.theme.BorderLight
+import com.example.todoapplication.ui.theme.LocalScheduler
+import com.example.todoapplication.ui.theme.LocalTodoRepository
 import com.example.todoapplication.ui.utils.formatUtcToLocal
 import com.example.todoapplication.ui.utils.parseIso8601
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
+import java.time.LocalDateTime
 import java.util.*
 
+@SuppressLint("DefaultLocale")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TaskDetailScreen(navController: NavController, taskId: String) {
     val context = LocalContext.current
+    val localDb = LocalTodoRepository.current
     val coroutineScope = rememberCoroutineScope()
     val apiService = remember { NetworkClient.getApiService(context) }
 
     val isNewTask = taskId == "new"
-
+    var now by remember{
+        mutableStateOf<LocalDateTime>(LocalDateTime.now())
+    }
     var title by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
     var priority by remember { mutableStateOf("MEDIUM") }
@@ -203,7 +214,9 @@ fun TaskDetailScreen(navController: NavController, taskId: String) {
                                     { _, hourOfDay, minute ->
                                         calendar.set(Calendar.HOUR_OF_DAY, hourOfDay)
                                         calendar.set(Calendar.MINUTE, minute)
+                                        now = LocalDateTime.of(year, month+1, dayOfMonth, hourOfDay, minute, 0)
 
+                                        Log.d("DUCLUONG","${AlarmItem.formatLocalDateTime(now)}")
                                         val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.getDefault())
                                         sdf.timeZone = TimeZone.getTimeZone("UTC")
                                         dueDate = sdf.format(calendar.time)
@@ -312,20 +325,20 @@ fun TaskDetailScreen(navController: NavController, taskId: String) {
                         isLoading = true
                         coroutineScope.launch {
                             try {
-                                val success = if (isNewTask) {
-                                    val response = apiService.createTask(
-                                        CreateTaskInput(title, description, priority, dateString, estimatedMinutes, timeStart, timeEnd)
-                                    )
-                                    response.isSuccessful
+                                val response = if (isNewTask) {
+                                    localDb.addTask(
+                                        CreateTaskInput(title, description, priority, dateString, estimatedMinutes, timeStart, timeEnd),
+                                        time = now,
+                                        )
                                 } else {
-                                    val response = apiService.updateTask(
+                                    localDb.updateTask(
                                         taskId,
-                                        UpdateTaskInput(title, description, priority, dateString, estimatedMinutes, timeStart, timeEnd)
+                                        UpdateTaskInput(title, description, priority, dateString, estimatedMinutes, timeStart, timeEnd),
+                                        now
                                     )
-                                    response.isSuccessful
                                 }
 
-                                if (success) {
+                                if (response.isSuccessful) {
                                     Toast.makeText(context, "Đã lưu công việc thành công!", Toast.LENGTH_SHORT).show()
                                     navController.popBackStack()
                                 } else {

@@ -37,4 +37,7 @@ interface TaskDao {
 
     @Query("DELETE FROM tasks")
     suspend fun clearAllTasks()
+
+    @Query("SELECT COUNT(*) FROM tasks")
+    suspend fun getTaskCount(): Int
 }

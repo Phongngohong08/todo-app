@@ -1,6 +1,8 @@
 package com.example.todoapplication.data.model
 
 import com.google.gson.annotations.SerializedName
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 
 data class User(
     val id: String,
@@ -30,7 +32,15 @@ data class Task(
     @SerializedName("created_at") val createdAt: String,
     @SerializedName("updated_at") val updatedAt: String
 )
-
+data class CreateTaskInput(
+    val title: String,
+    val description: String,
+    val priority: String,
+    @SerializedName("due_date") val dueDate: String?,
+    @SerializedName("estimated_duration") val estimatedDuration: Int,
+    @SerializedName("preferred_time_start") val preferredTimeStart: String?,
+    @SerializedName("preferred_time_end") val preferredTimeEnd: String?
+)
 data class TaskLog(
     val id: String,
     @SerializedName("task_id") val taskId: String,
@@ -91,15 +101,7 @@ data class LoginInput(
     val password: String
 )
 
-data class CreateTaskInput(
-    val title: String,
-    val description: String,
-    val priority: String,
-    @SerializedName("due_date") val dueDate: String?,
-    @SerializedName("estimated_duration") val estimatedDuration: Int,
-    @SerializedName("preferred_time_start") val preferredTimeStart: String?,
-    @SerializedName("preferred_time_end") val preferredTimeEnd: String?
-)
+
 
 data class UpdateTaskInput(
     val title: String,
@@ -132,3 +134,21 @@ data class MemoryItem(
     val source: String,
     @SerializedName("created_at") val createdAt: String
 )
+fun CreateTaskInput.toTask(userId:String): Task{
+    val currentTimeString = LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+
+    return Task(
+        id = "", // Thường ID này sẽ do Database (Room/Firebase) hoặc Server tự sinh ra
+        userId = userId, // Bạn sẽ gán ID của User hiện tại đang đăng nhập vào đây
+        title = this.title,
+        description = this.description,
+        priority = this.priority,
+        dueDate = this.dueDate,
+        estimatedDuration = this.estimatedDuration,
+        preferredTimeStart = this.preferredTimeStart,
+        preferredTimeEnd = this.preferredTimeEnd,
+        status = "TODO", // Khi mới tạo Task, trạng thái mặc định luôn là TODO
+        createdAt = currentTimeString,
+        updatedAt = currentTimeString
+    )
+}

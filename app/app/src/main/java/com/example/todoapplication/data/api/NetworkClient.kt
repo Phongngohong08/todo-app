@@ -9,7 +9,7 @@ import retrofit2.converter.gson.GsonConverterFactory
 import java.util.concurrent.TimeUnit
 
 object NetworkClient {
-    private const val BASE_URL = "http://10.0.2.2:8080/api/v1/"
+    private const val BASE_URL = "https://todo.phongngohong.online/api/v1/"
     private var retrofit: Retrofit? = null
 
     fun getApiService(context: Context): ApiService {

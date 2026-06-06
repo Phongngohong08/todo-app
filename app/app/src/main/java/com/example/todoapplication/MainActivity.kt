@@ -7,12 +7,14 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.example.todoapplication.data.repository.SessionEvents
 import com.example.todoapplication.data.repository.SessionManager
 import com.example.todoapplication.ui.navigation.Screen
 import com.example.todoapplication.ui.screens.*
@@ -30,7 +32,17 @@ class MainActivity : ComponentActivity() {
                 ) {
                     val navController = rememberNavController()
                     val sessionManager = SessionManager(this)
-                    
+
+                    // Khi phiên hết hiệu lực (refresh thất bại), đưa người dùng về màn Login và xóa backstack
+                    LaunchedEffect(Unit) {
+                        SessionEvents.forcedLogout.collect {
+                            navController.navigate(Screen.Login.route) {
+                                popUpTo(navController.graph.id) { inclusive = true }
+                                launchSingleTop = true
+                            }
+                        }
+                    }
+
                     // Determine start destination
                     val startDestination = if (sessionManager.isLoggedIn()) {
                         Screen.TaskList.route
@@ -68,6 +80,9 @@ class MainActivity : ComponentActivity() {
                         }
                         composable(Screen.Stats.route) {
                             StatsScreen(navController)
+                        }
+                        composable(Screen.Settings.route) {
+                            SettingsScreen(navController)
                         }
                     }
                 }

@@ -18,6 +18,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -25,6 +26,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import androidx.navigation.NavGraph.Companion.findStartDestination
 import com.example.todoapplication.data.api.NetworkClient
 import com.example.todoapplication.data.model.PostponeTaskInput
 import com.example.todoapplication.data.model.Task
@@ -33,6 +35,8 @@ import com.example.todoapplication.ui.navigation.Screen
 import com.example.todoapplication.ui.theme.*
 import com.example.todoapplication.ui.utils.formatUtcToLocal
 import com.example.todoapplication.ui.utils.parseIso8601
+import com.example.todoapplication.ui.utils.priorityLabel
+import com.example.todoapplication.ui.utils.statusLabel
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
@@ -61,6 +65,10 @@ fun TaskListScreen(navController: NavController) {
     var selectedTaskForPostpone by remember { mutableStateOf<Task?>(null) }
     var postponeReason by remember { mutableStateOf("") }
     var postponeDueDate by remember { mutableStateOf("") }
+
+    // State for destructive confirmation dialogs
+    var taskToDelete by remember { mutableStateOf<Task?>(null) }
+    var taskToCancel by remember { mutableStateOf<Task?>(null) }
 
     val calendar = remember { Calendar.getInstance() }
 
@@ -101,7 +109,7 @@ fun TaskListScreen(navController: NavController) {
                         Text(
                             text = "Hôm nay bạn có ${tasks.filter { it.status != "COMPLETED" }.size} việc cần làm",
                             fontSize = 12.sp,
-                            color = Color.Gray
+                            color = TextSecondary
                         )
                     }
                 },
@@ -150,7 +158,7 @@ fun TaskListScreen(navController: NavController) {
                 filters.forEach { filterName ->
                     val isSelected = selectedStatusFilter == filterName
                     StatusFilterChip(
-                        text = filterName,
+                        text = statusLabel(filterName),
                         selected = isSelected,
                         onClick = { selectedStatusFilter = filterName }
                     )
@@ -163,14 +171,50 @@ fun TaskListScreen(navController: NavController) {
                 }
             } else if (tasks.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("Không tìm thấy công việc nào", color = Color.Gray, fontSize = 16.sp)
+                    Text("Không tìm thấy công việc nào", color = TextSecondary, fontSize = 16.sp)
                 }
             } else {
                 LazyColumn(
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                     modifier = Modifier.fillMaxSize()
                 ) {
-                    items(tasks) { task ->
+                    items(tasks, key = { it.id }) { task ->
+                        val isDone = task.status == "COMPLETED" || task.status == "CANCELLED"
+                        val dismissState = rememberSwipeToDismissBoxState(
+                            confirmValueChange = { value ->
+                                if (value == SwipeToDismissBoxValue.StartToEnd) {
+                                    coroutineScope.launch {
+                                        val resp = apiService.completeTask(task.id)
+                                        if (resp.isSuccessful) {
+                                            Toast.makeText(context, "Đã hoàn thành: ${task.title}", Toast.LENGTH_SHORT).show()
+                                            loadTasks()
+                                        }
+                                    }
+                                }
+                                false // Không xóa khỏi danh sách, chỉ trượt trả về và để loadTasks() làm mới
+                            }
+                        )
+                        SwipeToDismissBox(
+                            state = dismissState,
+                            enableDismissFromStartToEnd = !isDone,
+                            enableDismissFromEndToStart = false,
+                            backgroundContent = {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .clip(RoundedCornerShape(16.dp))
+                                        .background(StateCompleted.copy(alpha = 0.25f))
+                                        .padding(horizontal = 20.dp),
+                                    contentAlignment = Alignment.CenterStart
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(Icons.Default.Check, contentDescription = null, tint = StateCompleted)
+                                        Spacer(Modifier.width(8.dp))
+                                        Text("Hoàn thành", color = StateCompleted, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
+                        ) {
                         TaskCard(
                             task = task,
                             onCardClick = {
@@ -202,25 +246,10 @@ fun TaskListScreen(navController: NavController) {
                                 }
                                 showPostponeDialog = true
                             },
-                            onCancelClick = {
-                                coroutineScope.launch {
-                                    val resp = apiService.cancelTask(task.id)
-                                    if (resp.isSuccessful) {
-                                        Toast.makeText(context, "Đã hủy công việc", Toast.LENGTH_SHORT).show()
-                                        loadTasks()
-                                    }
-                                }
-                            },
-                            onDeleteClick = {
-                                coroutineScope.launch {
-                                    val resp = apiService.deleteTask(task.id)
-                                    if (resp.isSuccessful) {
-                                        Toast.makeText(context, "Đã xóa công việc", Toast.LENGTH_SHORT).show()
-                                        loadTasks()
-                                    }
-                                }
-                            }
+                            onCancelClick = { taskToCancel = task },
+                            onDeleteClick = { taskToDelete = task }
                         )
+                        }
                     }
                 }
             }
@@ -234,7 +263,7 @@ fun TaskListScreen(navController: NavController) {
             title = { Text("Trì hoãn công việc", color = Color.White) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text("Chọn hạn chót mới cho công việc và lý do hoãn.", color = Color.Gray)
+                    Text("Chọn hạn chót mới cho công việc và lý do hoãn.", color = TextSecondary)
 
                     // Due Date Picker Button
                     Button(
@@ -284,9 +313,9 @@ fun TaskListScreen(navController: NavController) {
                         modifier = Modifier.fillMaxWidth(),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = PrimaryIndigo,
-                            unfocusedBorderColor = Color.Gray,
+                            unfocusedBorderColor = TextSecondary,
                             focusedLabelColor = PrimaryIndigo,
-                            unfocusedLabelColor = Color.Gray,
+                            unfocusedLabelColor = TextSecondary,
                             focusedTextColor = Color.White,
                             unfocusedTextColor = Color.White
                         ),
@@ -322,7 +351,65 @@ fun TaskListScreen(navController: NavController) {
             },
             dismissButton = {
                 TextButton(onClick = { showPostponeDialog = false }) {
-                    Text("Hủy", color = Color.Gray)
+                    Text("Hủy", color = TextSecondary)
+                }
+            },
+            containerColor = SurfaceGlass
+        )
+    }
+
+    // Cancel Confirmation Dialog
+    taskToCancel?.let { task ->
+        AlertDialog(
+            onDismissRequest = { taskToCancel = null },
+            title = { Text("Hủy công việc?", color = Color.White) },
+            text = { Text("Bạn có chắc muốn hủy \"${task.title}\"? Công việc sẽ chuyển sang trạng thái đã hủy.", color = TextSecondary) },
+            confirmButton = {
+                TextButton(onClick = {
+                    coroutineScope.launch {
+                        val resp = apiService.cancelTask(task.id)
+                        if (resp.isSuccessful) {
+                            Toast.makeText(context, "Đã hủy công việc", Toast.LENGTH_SHORT).show()
+                            loadTasks()
+                        }
+                    }
+                    taskToCancel = null
+                }) {
+                    Text("Hủy việc", color = StateCancelled)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { taskToCancel = null }) {
+                    Text("Quay lại", color = TextSecondary)
+                }
+            },
+            containerColor = SurfaceGlass
+        )
+    }
+
+    // Delete Confirmation Dialog
+    taskToDelete?.let { task ->
+        AlertDialog(
+            onDismissRequest = { taskToDelete = null },
+            title = { Text("Xóa công việc?", color = Color.White) },
+            text = { Text("Bạn có chắc muốn xóa vĩnh viễn \"${task.title}\"? Hành động này không thể hoàn tác.", color = TextSecondary) },
+            confirmButton = {
+                TextButton(onClick = {
+                    coroutineScope.launch {
+                        val resp = apiService.deleteTask(task.id)
+                        if (resp.isSuccessful) {
+                            Toast.makeText(context, "Đã xóa công việc", Toast.LENGTH_SHORT).show()
+                            loadTasks()
+                        }
+                    }
+                    taskToDelete = null
+                }) {
+                    Text("Xóa", color = PriorityHighColor)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { taskToDelete = null }) {
+                    Text("Quay lại", color = TextSecondary)
                 }
             },
             containerColor = SurfaceGlass
@@ -374,7 +461,7 @@ fun TaskCard(
                     text = task.title,
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
-                    color = if (isCompleted || isCancelled) Color.Gray else Color.White,
+                    color = if (isCompleted || isCancelled) TextSecondary else Color.White,
                     textDecoration = if (isCompleted || isCancelled) TextDecoration.LineThrough else null,
                     modifier = Modifier.weight(1f)
                 )
@@ -396,7 +483,7 @@ fun TaskCard(
             if (!task.description.isNullOrEmpty()) {
                 Text(
                     text = task.description,
-                    color = Color.Gray,
+                    color = TextSecondary,
                     fontSize = 13.sp,
                     modifier = Modifier.padding(top = 6.dp, bottom = 12.dp)
                 )
@@ -413,51 +500,93 @@ fun TaskCard(
                 Column {
                     task.dueDate?.let { dateStr ->
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.DateRange, contentDescription = "Due", tint = Color.Gray, modifier = Modifier.size(14.dp))
+                            Icon(Icons.Default.DateRange, contentDescription = "Due", tint = TextSecondary, modifier = Modifier.size(14.dp))
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text(text = formatUtcToLocal(dateStr), color = Color.Gray, fontSize = 12.sp)
+                            Text(text = formatUtcToLocal(dateStr), color = TextSecondary, fontSize = 12.sp)
                         }
                     }
                     if (task.estimatedDuration > 0) {
                         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 2.dp)) {
-                            Icon(Icons.Default.Info, contentDescription = "Duration", tint = Color.Gray, modifier = Modifier.size(14.dp))
+                            Icon(Icons.Default.Info, contentDescription = "Duration", tint = TextSecondary, modifier = Modifier.size(14.dp))
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text(text = "${task.estimatedDuration} phút", color = Color.Gray, fontSize = 12.sp)
+                            Text(text = "${task.estimatedDuration} phút", color = TextSecondary, fontSize = 12.sp)
                         }
                     }
                 }
 
-                // Action Buttons
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                // Action area: one primary action + overflow menu
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     if (!isCompleted && !isCancelled) {
-                        // Start Action
-                        if (task.status == "TODO" || task.status == "POSTPONED" || isOverdue) {
-                            IconButton(onClick = onStartClick, modifier = Modifier.size(36.dp)) {
-                                Icon(Icons.Default.PlayArrow, contentDescription = "Start", tint = StateInProgress)
+                        // Primary action depends on status
+                        when {
+                            task.status == "IN_PROGRESS" -> {
+                                FilledTonalButton(
+                                    onClick = onCompleteClick,
+                                    colors = ButtonDefaults.filledTonalButtonColors(
+                                        containerColor = StateCompleted.copy(alpha = 0.2f),
+                                        contentColor = StateCompleted
+                                    ),
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+                                ) {
+                                    Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(Modifier.width(4.dp))
+                                    Text("Hoàn thành", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                                }
                             }
-                        }
-
-                        // Complete Action
-                        if (task.status == "IN_PROGRESS") {
-                            IconButton(onClick = onCompleteClick, modifier = Modifier.size(36.dp)) {
-                                Icon(Icons.Default.Check, contentDescription = "Complete", tint = StateCompleted)
+                            else -> {
+                                FilledTonalButton(
+                                    onClick = onStartClick,
+                                    colors = ButtonDefaults.filledTonalButtonColors(
+                                        containerColor = StateInProgress.copy(alpha = 0.2f),
+                                        contentColor = StateInProgress
+                                    ),
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+                                ) {
+                                    Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(Modifier.width(4.dp))
+                                    Text("Bắt đầu", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                                }
                             }
-                        }
-
-                        // Postpone Action
-                        IconButton(onClick = onPostponeClick, modifier = Modifier.size(36.dp)) {
-                            Icon(Icons.Default.Refresh, contentDescription = "Postpone", tint = StatePostponed)
-                        }
-
-                        // Cancel Action
-                        IconButton(onClick = onCancelClick, modifier = Modifier.size(36.dp)) {
-                            Icon(Icons.Default.Close, contentDescription = "Cancel", tint = StateCancelled)
                         }
                     }
 
-                    // Delete Action
-                    IconButton(onClick = onDeleteClick, modifier = Modifier.size(36.dp)) {
-                        Icon(Icons.Default.Delete, contentDescription = "Delete", tint = PriorityHighColor)
+                    // Overflow menu for the remaining actions
+                    var menuExpanded by remember { mutableStateOf(false) }
+                    Box {
+                        IconButton(onClick = { menuExpanded = true }, modifier = Modifier.size(36.dp)) {
+                            Icon(Icons.Default.MoreVert, contentDescription = "Thêm", tint = TextSecondary)
+                        }
+                        DropdownMenu(
+                            expanded = menuExpanded,
+                            onDismissRequest = { menuExpanded = false },
+                            modifier = Modifier.background(SurfaceGlass)
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("Chỉnh sửa", color = Color.White) },
+                                leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null, tint = TextSecondary) },
+                                onClick = { menuExpanded = false; onCardClick() }
+                            )
+                            if (!isCompleted && !isCancelled) {
+                                DropdownMenuItem(
+                                    text = { Text("Hoãn", color = Color.White) },
+                                    leadingIcon = { Icon(Icons.Default.Refresh, contentDescription = null, tint = StatePostponed) },
+                                    onClick = { menuExpanded = false; onPostponeClick() }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Hủy việc", color = Color.White) },
+                                    leadingIcon = { Icon(Icons.Default.Close, contentDescription = null, tint = StateCancelled) },
+                                    onClick = { menuExpanded = false; onCancelClick() }
+                                )
+                            }
+                            DropdownMenuItem(
+                                text = { Text("Xóa", color = PriorityHighColor) },
+                                leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null, tint = PriorityHighColor) },
+                                onClick = { menuExpanded = false; onDeleteClick() }
+                            )
+                        }
                     }
                 }
             }
@@ -513,7 +642,7 @@ fun PriorityPill(priority: String) {
         border = BorderStroke(1.dp, color.copy(alpha = 0.5f))
     ) {
         Text(
-            text = priority,
+            text = priorityLabel(priority),
             color = color,
             fontSize = 10.sp,
             fontWeight = FontWeight.Bold,
@@ -525,55 +654,45 @@ fun PriorityPill(priority: String) {
 // Global Bottom Navigation Bar Composable
 @Composable
 fun BottomNavigationBar(navController: NavController, activeTab: Int) {
+    data class NavItem(val route: String, val icon: androidx.compose.ui.graphics.vector.ImageVector, val label: String)
+
+    val items = listOf(
+        NavItem(Screen.TaskList.route, Icons.Default.List, "Việc Cần Làm"),
+        NavItem(Screen.DailyPlan.route, Icons.Default.DateRange, "Lịch Trình"),
+        NavItem(Screen.AICoach.route, Icons.Default.Send, "AI Coach"),
+        NavItem(Screen.Stats.route, Icons.Default.AccountBox, "Thống Kê")
+    )
+
     NavigationBar(
         containerColor = SurfaceGlass,
         contentColor = Color.LightGray,
         tonalElevation = 8.dp
     ) {
-        NavigationBarItem(
-            selected = activeTab == 0,
-            onClick = { navController.navigate(Screen.TaskList.route) },
-            icon = { Icon(Icons.Default.List, contentDescription = "Tasks") },
-            label = { Text("Việc Cần Làm", fontSize = 10.sp) },
-            colors = NavigationBarItemDefaults.colors(
-                selectedIconColor = PrimaryIndigo,
-                selectedTextColor = PrimaryIndigo,
-                indicatorColor = BackgroundObsidian
+        items.forEachIndexed { index, item ->
+            NavigationBarItem(
+                selected = activeTab == index,
+                onClick = {
+                    // Bỏ qua nếu đang ở tab hiện tại để tránh tải lại không cần thiết
+                    if (activeTab != index) {
+                        navController.navigate(item.route) {
+                            // Quay về start destination và lưu trạng thái các tab, tránh chồng backstack
+                            popUpTo(navController.graph.findStartDestination().id) {
+                                saveState = true
+                            }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    }
+                },
+                icon = { Icon(item.icon, contentDescription = item.label) },
+                label = { Text(item.label, fontSize = 10.sp) },
+                colors = NavigationBarItemDefaults.colors(
+                    selectedIconColor = PrimaryIndigo,
+                    selectedTextColor = PrimaryIndigo,
+                    indicatorColor = BackgroundObsidian
+                )
             )
-        )
-        NavigationBarItem(
-            selected = activeTab == 1,
-            onClick = { navController.navigate(Screen.DailyPlan.route) },
-            icon = { Icon(Icons.Default.DateRange, contentDescription = "Plan") },
-            label = { Text("Lịch Trình", fontSize = 10.sp) },
-            colors = NavigationBarItemDefaults.colors(
-                selectedIconColor = PrimaryIndigo,
-                selectedTextColor = PrimaryIndigo,
-                indicatorColor = BackgroundObsidian
-            )
-        )
-        NavigationBarItem(
-            selected = activeTab == 2,
-            onClick = { navController.navigate(Screen.AICoach.route) },
-            icon = { Icon(Icons.Default.Send, contentDescription = "Coach") }, // Send icon matches a chat agent bubble
-            label = { Text("AI Coach", fontSize = 10.sp) },
-            colors = NavigationBarItemDefaults.colors(
-                selectedIconColor = PrimaryIndigo,
-                selectedTextColor = PrimaryIndigo,
-                indicatorColor = BackgroundObsidian
-            )
-        )
-        NavigationBarItem(
-            selected = activeTab == 3,
-            onClick = { navController.navigate(Screen.Stats.route) },
-            icon = { Icon(Icons.Default.AccountBox, contentDescription = "Profile") },
-            label = { Text("Thống Kê", fontSize = 10.sp) },
-            colors = NavigationBarItemDefaults.colors(
-                selectedIconColor = PrimaryIndigo,
-                selectedTextColor = PrimaryIndigo,
-                indicatorColor = BackgroundObsidian
-            )
-        )
+        }
     }
 }
 
@@ -585,7 +704,7 @@ fun StatusFilterChip(
     onClick: () -> Unit
 ) {
     val containerColor = if (selected) PrimaryIndigo else SurfaceGlass
-    val contentColor = if (selected) Color.White else Color.Gray
+    val contentColor = if (selected) Color.White else TextSecondary
     val borderColor = if (selected) PrimaryIndigo else BorderLight
 
     Surface(

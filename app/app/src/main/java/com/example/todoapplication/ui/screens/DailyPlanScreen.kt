@@ -2,12 +2,14 @@ package com.example.todoapplication.ui.screens
 
 import android.widget.Toast
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -28,6 +30,8 @@ import com.example.todoapplication.ui.theme.PrimaryIndigo
 import com.example.todoapplication.ui.theme.SecondaryTeal
 import com.example.todoapplication.ui.theme.SurfaceGlass
 import com.example.todoapplication.ui.theme.BorderLight
+import com.example.todoapplication.ui.theme.TextSecondary
+import com.example.todoapplication.ui.navigation.Screen
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
@@ -122,12 +126,12 @@ fun DailyPlanScreen(navController: NavController) {
                 ) {
                     Text(
                         text = "Bạn chưa có lịch trình hôm nay",
-                        color = Color.Gray,
+                        color = TextSecondary,
                         fontSize = 16.sp
                     )
                     Text(
                         text = "Hệ thống AI sẽ tự động sắp xếp các công việc của bạn dựa trên độ ưu tiên, hạn chót và thói quen làm việc.",
-                        color = Color.Gray,
+                        color = TextSecondary,
                         fontSize = 12.sp,
                         modifier = Modifier.padding(horizontal = 24.dp),
                         textAlign = androidx.compose.ui.text.style.TextAlign.Center
@@ -170,22 +174,43 @@ fun DailyPlanScreen(navController: NavController) {
                 item {
                     Text(
                         text = "Lịch biểu của bạn được tối ưu hóa bằng trí tuệ nhân tạo.",
-                        color = Color.Gray,
+                        color = TextSecondary,
                         fontSize = 12.sp,
                         modifier = Modifier.padding(bottom = 8.dp)
                     )
                 }
 
                 items(dailyPlan!!.planData) { slot ->
-                    TimelineSlotRow(slot)
+                    TimelineSlotRow(
+                        slot = slot,
+                        onClick = {
+                            if (slot.taskId.isNotEmpty()) {
+                                navController.navigate(Screen.TaskDetail.createRoute(slot.taskId))
+                            }
+                        }
+                    )
                 }
             }
         }
     }
 }
 
+/** Tính khoảng thời lượng (phút) giữa hai mốc "HH:mm", trả về null nếu không hợp lệ. */
+private fun slotDurationMinutes(start: String, end: String): Int? {
+    fun toMinutes(t: String): Int? {
+        val parts = t.split(":")
+        val h = parts.getOrNull(0)?.toIntOrNull() ?: return null
+        val m = parts.getOrNull(1)?.toIntOrNull() ?: return null
+        return h * 60 + m
+    }
+    val s = toMinutes(start) ?: return null
+    val e = toMinutes(end) ?: return null
+    val diff = e - s
+    return if (diff > 0) diff else null
+}
+
 @Composable
-fun TimelineSlotRow(slot: PlanSlot) {
+fun TimelineSlotRow(slot: PlanSlot, onClick: () -> Unit) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically
@@ -204,7 +229,7 @@ fun TimelineSlotRow(slot: PlanSlot) {
             Text(
                 text = slot.end,
                 fontSize = 12.sp,
-                color = Color.Gray
+                color = TextSecondary
             )
         }
 
@@ -230,10 +255,12 @@ fun TimelineSlotRow(slot: PlanSlot) {
         }
 
         // Schedule Slot Card
+        val durationMins = slotDurationMinutes(slot.start, slot.end)
         Card(
             modifier = Modifier
                 .weight(1f)
-                .padding(vertical = 4.dp),
+                .padding(vertical = 4.dp)
+                .clickable(onClick = onClick),
             shape = RoundedCornerShape(16.dp),
             colors = CardDefaults.cardColors(containerColor = SurfaceGlass)
         ) {
@@ -244,7 +271,7 @@ fun TimelineSlotRow(slot: PlanSlot) {
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Column {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = slot.title,
                         fontSize = 15.sp,
@@ -252,11 +279,17 @@ fun TimelineSlotRow(slot: PlanSlot) {
                         color = Color.White
                     )
                     Text(
-                        text = "Công việc sắp xếp",
+                        text = if (durationMins != null) "${slot.start} – ${slot.end} · $durationMins phút" else "${slot.start} – ${slot.end}",
                         fontSize = 11.sp,
-                        color = Color.Gray
+                        color = TextSecondary
                     )
                 }
+                Icon(
+                    Icons.Default.KeyboardArrowRight,
+                    contentDescription = "Mở công việc",
+                    tint = TextSecondary,
+                    modifier = Modifier.size(20.dp)
+                )
             }
         }
     }

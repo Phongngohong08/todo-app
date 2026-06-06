@@ -73,6 +73,7 @@ func (rm *RouteManager) SetupRouter() *gin.Engine {
 		{
 			authGroup.POST("/register", rm.handleRegister)
 			authGroup.POST("/login", rm.handleLogin)
+			authGroup.POST("/refresh", rm.handleRefresh)
 		}
 
 		// Protected Routes
@@ -148,6 +149,26 @@ func (rm *RouteManager) handleLogin(c *gin.Context) {
 	}
 
 	res, err := rm.authUC.Login(c.Request.Context(), input)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, res)
+}
+
+type RefreshInput struct {
+	RefreshToken string `json:"refresh_token" binding:"required"`
+}
+
+func (rm *RouteManager) handleRefresh(c *gin.Context) {
+	var input RefreshInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	res, err := rm.authUC.Refresh(c.Request.Context(), input.RefreshToken)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 		return
@@ -495,13 +516,18 @@ func (rm *RouteManager) handleTriggerMemoryExtraction(c *gin.Context) {
 		return
 	}
 
-	err := rm.memoryUC.ExtractAndStoreMemories(c.Request.Context(), userID)
+	// Phân tích thủ công nhìn lại 30 ngày để có đủ dữ liệu rút thói quen
+	res, err := rm.memoryUC.ExtractAndStoreMemories(c.Request.Context(), userID, 30*24*time.Hour)
 	if err != nil {
 		handleError(c, http.StatusInternalServerError, err)
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "memory extraction completed"})
+	c.JSON(http.StatusOK, gin.H{
+		"message":   "memory extraction completed",
+		"analyzed":  res.Analyzed,
+		"extracted": res.Saved,
+	})
 }
 
 func (rm *RouteManager) handleGetStatsSummary(c *gin.Context) {

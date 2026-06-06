@@ -11,6 +11,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -24,12 +25,13 @@ import androidx.navigation.NavController
 import com.example.todoapplication.data.api.NetworkClient
 import com.example.todoapplication.data.model.MemoryItem
 import com.example.todoapplication.data.model.StatsSummary
-import com.example.todoapplication.data.model.UserPreferences
+import com.example.todoapplication.ui.navigation.Screen
 import com.example.todoapplication.ui.theme.BackgroundObsidian
 import com.example.todoapplication.ui.theme.PrimaryIndigo
 import com.example.todoapplication.ui.theme.SecondaryTeal
 import com.example.todoapplication.ui.theme.SurfaceGlass
 import com.example.todoapplication.ui.theme.BorderLight
+import com.example.todoapplication.ui.theme.TextSecondary
 import com.example.todoapplication.ui.theme.PriorityHighColor
 import kotlinx.coroutines.launch
 
@@ -41,7 +43,7 @@ fun StatsScreen(navController: NavController) {
     val apiService = remember { NetworkClient.getApiService(context) }
 
     var selectedTab by remember { mutableStateOf(0) }
-    val tabTitles = listOf("Thống kê", "Trí nhớ AI", "Thiết lập")
+    val tabTitles = listOf("Thống kê", "Trí nhớ AI")
 
     // Tab 1: Stats states
     var statsSummary by remember { mutableStateOf<StatsSummary?>(null) }
@@ -51,12 +53,6 @@ fun StatsScreen(navController: NavController) {
     var memories by remember { mutableStateOf<List<MemoryItem>>(emptyList()) }
     var isLoadingMemories by remember { mutableStateOf(false) }
     var isTriggeringExtraction by remember { mutableStateOf(false) }
-
-    // Tab 3: Preference states
-    var morningStart by remember { mutableStateOf("08:00") }
-    var eveningEnd by remember { mutableStateOf("18:00") }
-    var workDuration by remember { mutableStateOf("60") }
-    var isLoadingPrefs by remember { mutableStateOf(false) }
 
     fun loadStats() {
         isLoadingStats = true
@@ -90,31 +86,11 @@ fun StatsScreen(navController: NavController) {
         }
     }
 
-    fun loadPreferences() {
-        isLoadingPrefs = true
-        coroutineScope.launch {
-            try {
-                val response = apiService.getPreferences()
-                if (response.isSuccessful && response.body() != null) {
-                    val prefs = response.body()!!
-                    morningStart = prefs.morningStartTime
-                    eveningEnd = prefs.eveningEndTime
-                    workDuration = prefs.workDurationPreference.toString()
-                }
-            } catch (e: Exception) {
-                Toast.makeText(context, "Lỗi tải cấu hình: ${e.message}", Toast.LENGTH_SHORT).show()
-            } finally {
-                isLoadingPrefs = false
-            }
-        }
-    }
-
     // Load data based on active tab
     LaunchedEffect(selectedTab) {
         when (selectedTab) {
             0 -> loadStats()
             1 -> loadMemories()
-            2 -> loadPreferences()
         }
     }
 
@@ -123,6 +99,11 @@ fun StatsScreen(navController: NavController) {
             Column(modifier = Modifier.background(BackgroundObsidian)) {
                 TopAppBar(
                     title = { Text("Trung tâm AI & Thống kê", color = Color.White, fontWeight = FontWeight.Bold) },
+                    actions = {
+                        IconButton(onClick = { navController.navigate(Screen.Settings.route) }) {
+                            Icon(Icons.Default.Settings, contentDescription = "Thiết lập", tint = Color.White)
+                        }
+                    },
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = BackgroundObsidian)
                 )
 
@@ -138,7 +119,7 @@ fun StatsScreen(navController: NavController) {
                             onClick = { selectedTab = index },
                             text = { Text(title, fontWeight = FontWeight.SemiBold, fontSize = 13.sp) },
                             selectedContentColor = PrimaryIndigo,
-                            unselectedContentColor = Color.Gray
+                            unselectedContentColor = TextSecondary
                         )
                     }
                 }
@@ -180,7 +161,7 @@ fun StatsScreen(navController: NavController) {
                                         colors = CardDefaults.cardColors(containerColor = SurfaceGlass)
                                     ) {
                                         Column(modifier = Modifier.padding(16.dp)) {
-                                            Text("Hoàn thành", color = Color.Gray, fontSize = 12.sp)
+                                            Text("Hoàn thành", color = TextSecondary, fontSize = 12.sp)
                                             Text(
                                                 "${statsSummary?.completedTasks ?: 0}",
                                                 color = SecondaryTeal,
@@ -198,7 +179,7 @@ fun StatsScreen(navController: NavController) {
                                         colors = CardDefaults.cardColors(containerColor = SurfaceGlass)
                                     ) {
                                         Column(modifier = Modifier.padding(16.dp)) {
-                                            Text("Hoãn công việc", color = Color.Gray, fontSize = 12.sp)
+                                            Text("Hoãn công việc", color = TextSecondary, fontSize = 12.sp)
                                             Text(
                                                 "${statsSummary?.postponedTasks ?: 0}",
                                                 color = PriorityHighColor,
@@ -218,7 +199,7 @@ fun StatsScreen(navController: NavController) {
                                     colors = CardDefaults.cardColors(containerColor = SurfaceGlass)
                                 ) {
                                     Column(modifier = Modifier.padding(16.dp)) {
-                                        Text("Thời gian thực hiện tích lũy", color = Color.Gray, fontSize = 12.sp)
+                                        Text("Thời gian thực hiện tích lũy", color = TextSecondary, fontSize = 12.sp)
                                         Text(
                                             "${statsSummary?.totalTimeSpentMins ?: 0} phút",
                                             color = Color.White,
@@ -278,17 +259,18 @@ fun StatsScreen(navController: NavController) {
                                             try {
                                                 val response = apiService.triggerMemoryExtraction()
                                                 if (response.isSuccessful) {
+                                                    val extracted = response.body()?.extracted ?: 0
+                                                    val analyzed = response.body()?.analyzed ?: 0
                                                     val responseList = apiService.listMemories()
                                                     if (responseList.isSuccessful) {
                                                         memories = responseList.body() ?: emptyList()
-                                                        if (memories.isEmpty()) {
-                                                            Toast.makeText(context, "Phân tích xong. Cần thêm hoạt động công việc hoặc trò chuyện với AI Coach để đúc rút thói quen.", Toast.LENGTH_LONG).show()
-                                                        } else {
-                                                            Toast.makeText(context, "Đã phân tích và cập nhật thói quen thành công!", Toast.LENGTH_SHORT).show()
-                                                        }
-                                                    } else {
-                                                        Toast.makeText(context, "Tải trí nhớ thất bại", Toast.LENGTH_SHORT).show()
                                                     }
+                                                    val msg = when {
+                                                        extracted > 0 -> "Đã phân tích $analyzed hoạt động và rút ra $extracted thói quen mới."
+                                                        analyzed == 0 -> "Chưa có hoạt động hay trò chuyện nào trong 30 ngày để phân tích. Hãy tạo/hoàn thành/hoãn vài công việc hoặc nhắn với AI Coach rồi thử lại."
+                                                        else -> "Đã phân tích $analyzed hoạt động nhưng chưa rút ra thói quen mới (hoặc đã trùng với trí nhớ cũ)."
+                                                    }
+                                                    Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
                                                 } else {
                                                     Toast.makeText(context, "Phân tích thất bại: ${response.code()}", Toast.LENGTH_SHORT).show()
                                                 }
@@ -334,7 +316,7 @@ fun StatsScreen(navController: NavController) {
                                             .padding(top = 40.dp),
                                         contentAlignment = Alignment.Center
                                     ) {
-                                        Text("AI chưa ghi nhận thói quen nào của bạn.", color = Color.Gray)
+                                        Text("AI chưa ghi nhận thói quen nào của bạn.", color = TextSecondary)
                                     }
                                 }
                             } else {
@@ -381,105 +363,6 @@ fun StatsScreen(navController: NavController) {
                                         }
                                     }
                                 }
-                            }
-                        }
-                    }
-                }
-
-                2 -> { // Preferences tab
-                    if (isLoadingPrefs) {
-                        CircularProgressIndicator(color = PrimaryIndigo, modifier = Modifier.align(Alignment.Center))
-                    } else {
-                        Column(
-                            verticalArrangement = Arrangement.spacedBy(16.dp),
-                            modifier = Modifier.fillMaxSize()
-                        ) {
-                            Text("Cài đặt cá nhân cho lập lịch AI", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-
-                            // Morning Start Time
-                            OutlinedTextField(
-                                value = morningStart,
-                                onValueChange = { morningStart = it },
-                                label = { Text("Thời gian bắt đầu buổi sáng (HH:MM)") },
-                                modifier = Modifier.fillMaxWidth(),
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = PrimaryIndigo,
-                                    unfocusedBorderColor = Color.Gray,
-                                    focusedLabelColor = PrimaryIndigo,
-                                    focusedTextColor = Color.White,
-                                    unfocusedTextColor = Color.White
-                                ),
-                                singleLine = true
-                            )
-
-                            // Evening End Time
-                            OutlinedTextField(
-                                value = eveningEnd,
-                                onValueChange = { eveningEnd = it },
-                                label = { Text("Thời gian kết thúc buổi tối (HH:MM)") },
-                                modifier = Modifier.fillMaxWidth(),
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = PrimaryIndigo,
-                                    unfocusedBorderColor = Color.Gray,
-                                    focusedLabelColor = PrimaryIndigo,
-                                    focusedTextColor = Color.White,
-                                    unfocusedTextColor = Color.White
-                                ),
-                                singleLine = true
-                            )
-
-                            // Work Duration Block
-                            OutlinedTextField(
-                                value = workDuration,
-                                onValueChange = { workDuration = it },
-                                label = { Text("Thời lượng phiên làm việc mong muốn (phút)") },
-                                modifier = Modifier.fillMaxWidth(),
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = PrimaryIndigo,
-                                    unfocusedBorderColor = Color.Gray,
-                                    focusedLabelColor = PrimaryIndigo,
-                                    focusedTextColor = Color.White,
-                                    unfocusedTextColor = Color.White
-                                ),
-                                singleLine = true
-                            )
-
-                            Spacer(modifier = Modifier.weight(1f))
-
-                            // Save Preferences Button
-                            Button(
-                                onClick = {
-                                    val durationInt = workDuration.toIntOrNull() ?: 60
-                                    isLoadingPrefs = true
-                                    coroutineScope.launch {
-                                        try {
-                                            val response = apiService.updatePreferences(
-                                                UserPreferences(
-                                                    userId = "", // Handled on backend side via JWT claims
-                                                    morningStartTime = morningStart,
-                                                    eveningEndTime = eveningEnd,
-                                                    workDurationPreference = durationInt
-                                                )
-                                            )
-                                            if (response.isSuccessful) {
-                                                Toast.makeText(context, "Cấu hình lập lịch đã được lưu!", Toast.LENGTH_SHORT).show()
-                                            } else {
-                                                Toast.makeText(context, "Lưu cấu hình thất bại", Toast.LENGTH_SHORT).show()
-                                            }
-                                        } catch (e: Exception) {
-                                            Toast.makeText(context, "Lỗi: ${e.message}", Toast.LENGTH_LONG).show()
-                                        } finally {
-                                            isLoadingPrefs = false
-                                        }
-                                    }
-                                },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(50.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = SecondaryTeal),
-                                shape = RoundedCornerShape(12.dp)
-                            ) {
-                                Text("LƯU CẤU HÌNH THIẾT LẬP", fontWeight = FontWeight.Bold)
                             }
                         }
                     }

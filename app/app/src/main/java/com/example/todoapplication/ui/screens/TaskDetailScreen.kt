@@ -6,6 +6,9 @@ import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
@@ -17,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
@@ -28,8 +32,10 @@ import com.example.todoapplication.ui.theme.PrimaryIndigo
 import com.example.todoapplication.ui.theme.SecondaryTeal
 import com.example.todoapplication.ui.theme.SurfaceGlass
 import com.example.todoapplication.ui.theme.BorderLight
+import com.example.todoapplication.ui.theme.TextSecondary
 import com.example.todoapplication.ui.utils.formatUtcToLocal
 import com.example.todoapplication.ui.utils.parseIso8601
+import com.example.todoapplication.ui.utils.priorityLabel
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
@@ -98,6 +104,61 @@ fun TaskDetailScreen(navController: NavController, taskId: String) {
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = BackgroundObsidian)
             )
         },
+        bottomBar = {
+            Surface(color = BackgroundObsidian) {
+                Button(
+                    onClick = {
+                        if (title.isBlank()) {
+                            Toast.makeText(context, "Tiêu đề không được để trống", Toast.LENGTH_SHORT).show()
+                            return@Button
+                        }
+
+                        val estimatedMinutes = duration.toIntOrNull() ?: 30
+                        val dateString = if (dueDate.isEmpty()) null else dueDate
+                        val timeStart = if (preferredTimeStart.isEmpty()) null else preferredTimeStart
+                        val timeEnd = if (preferredTimeEnd.isEmpty()) null else preferredTimeEnd
+
+                        isLoading = true
+                        coroutineScope.launch {
+                            try {
+                                val success = if (isNewTask) {
+                                    val response = apiService.createTask(
+                                        CreateTaskInput(title, description, priority, dateString, estimatedMinutes, timeStart, timeEnd)
+                                    )
+                                    response.isSuccessful
+                                } else {
+                                    val response = apiService.updateTask(
+                                        taskId,
+                                        UpdateTaskInput(title, description, priority, dateString, estimatedMinutes, timeStart, timeEnd)
+                                    )
+                                    response.isSuccessful
+                                }
+
+                                if (success) {
+                                    Toast.makeText(context, "Đã lưu công việc thành công!", Toast.LENGTH_SHORT).show()
+                                    navController.popBackStack()
+                                } else {
+                                    Toast.makeText(context, "Không thể lưu công việc", Toast.LENGTH_LONG).show()
+                                }
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "Lỗi: ${e.message}", Toast.LENGTH_LONG).show()
+                            } finally {
+                                isLoading = false
+                            }
+                        }
+                    },
+                    enabled = !isLoading,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp)
+                        .height(50.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = SecondaryTeal),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text("LƯU CÔNG VIỆC", fontWeight = FontWeight.Bold)
+                }
+            }
+        },
         containerColor = BackgroundObsidian
     ) { innerPadding ->
         if (isLoading) {
@@ -109,6 +170,7 @@ fun TaskDetailScreen(navController: NavController, taskId: String) {
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding)
+                    .verticalScroll(rememberScrollState())
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
@@ -120,9 +182,9 @@ fun TaskDetailScreen(navController: NavController, taskId: String) {
                     modifier = Modifier.fillMaxWidth(),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = PrimaryIndigo,
-                        unfocusedBorderColor = Color.Gray,
+                        unfocusedBorderColor = TextSecondary,
                         focusedLabelColor = PrimaryIndigo,
-                        unfocusedLabelColor = Color.Gray,
+                        unfocusedLabelColor = TextSecondary,
                         focusedTextColor = Color.White,
                         unfocusedTextColor = Color.White
                     ),
@@ -139,9 +201,9 @@ fun TaskDetailScreen(navController: NavController, taskId: String) {
                         .height(120.dp),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = PrimaryIndigo,
-                        unfocusedBorderColor = Color.Gray,
+                        unfocusedBorderColor = TextSecondary,
                         focusedLabelColor = PrimaryIndigo,
-                        unfocusedLabelColor = Color.Gray,
+                        unfocusedLabelColor = TextSecondary,
                         focusedTextColor = Color.White,
                         unfocusedTextColor = Color.White
                     )
@@ -165,22 +227,50 @@ fun TaskDetailScreen(navController: NavController, taskId: String) {
                             border = BorderStroke(1.dp, if (isSelected) PrimaryIndigo else BorderLight),
                             modifier = Modifier.weight(1f)
                         ) {
-                            Text(p, color = if (isSelected) Color.White else Color.Gray, fontSize = 12.sp)
+                            Text(priorityLabel(p), color = if (isSelected) Color.White else TextSecondary, fontSize = 12.sp)
                         }
                     }
                 }
 
-                // Estimated Duration Input
+                // Estimated Duration Input + quick presets
+                Text("Thời gian ước tính (phút)", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    listOf(15, 30, 60, 90).forEach { preset ->
+                        val isSelected = duration == preset.toString()
+                        FilterChip(
+                            selected = isSelected,
+                            onClick = { duration = preset.toString() },
+                            label = { Text("$preset", fontSize = 12.sp) },
+                            modifier = Modifier.weight(1f),
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = PrimaryIndigo,
+                                selectedLabelColor = Color.White,
+                                labelColor = TextSecondary,
+                                containerColor = SurfaceGlass
+                            ),
+                            border = FilterChipDefaults.filterChipBorder(
+                                enabled = true,
+                                selected = isSelected,
+                                borderColor = BorderLight,
+                                selectedBorderColor = PrimaryIndigo
+                            )
+                        )
+                    }
+                }
                 OutlinedTextField(
                     value = duration,
-                    onValueChange = { duration = it },
-                    label = { Text("Thời gian ước tính (phút)") },
+                    onValueChange = { input -> duration = input.filter { it.isDigit() } },
+                    label = { Text("Tùy chỉnh (phút)") },
                     modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = PrimaryIndigo,
-                        unfocusedBorderColor = Color.Gray,
+                        unfocusedBorderColor = TextSecondary,
                         focusedLabelColor = PrimaryIndigo,
-                        unfocusedLabelColor = Color.Gray,
+                        unfocusedLabelColor = TextSecondary,
                         focusedTextColor = Color.White,
                         unfocusedTextColor = Color.White
                     ),
@@ -289,63 +379,12 @@ fun TaskDetailScreen(navController: NavController, taskId: String) {
                             },
                             modifier = Modifier.size(48.dp)
                         ) {
-                            Icon(Icons.Default.Clear, contentDescription = "Xóa khung giờ", tint = Color.Gray)
+                            Icon(Icons.Default.Clear, contentDescription = "Xóa khung giờ", tint = TextSecondary)
                         }
                     }
                 }
 
-                Spacer(modifier = Modifier.weight(1f))
-
-                // Save Button
-                Button(
-                    onClick = {
-                        if (title.isBlank()) {
-                            Toast.makeText(context, "Tiêu đề không được để trống", Toast.LENGTH_SHORT).show()
-                            return@Button
-                        }
-
-                        val estimatedMinutes = duration.toIntOrNull() ?: 30
-                        val dateString = if (dueDate.isEmpty()) null else dueDate
-                        val timeStart = if (preferredTimeStart.isEmpty()) null else preferredTimeStart
-                        val timeEnd = if (preferredTimeEnd.isEmpty()) null else preferredTimeEnd
-
-                        isLoading = true
-                        coroutineScope.launch {
-                            try {
-                                val success = if (isNewTask) {
-                                    val response = apiService.createTask(
-                                        CreateTaskInput(title, description, priority, dateString, estimatedMinutes, timeStart, timeEnd)
-                                    )
-                                    response.isSuccessful
-                                } else {
-                                    val response = apiService.updateTask(
-                                        taskId,
-                                        UpdateTaskInput(title, description, priority, dateString, estimatedMinutes, timeStart, timeEnd)
-                                    )
-                                    response.isSuccessful
-                                }
-
-                                if (success) {
-                                    Toast.makeText(context, "Đã lưu công việc thành công!", Toast.LENGTH_SHORT).show()
-                                    navController.popBackStack()
-                                } else {
-                                    Toast.makeText(context, "Không thể lưu công việc", Toast.LENGTH_LONG).show()
-                                }
-                            } catch (e: Exception) {
-                                Toast.makeText(context, "Lỗi: ${e.message}", Toast.LENGTH_LONG).show()
-                            } finally {
-                                isLoading = false
-                            }
-                        }
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(50.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = SecondaryTeal),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Text("LƯU CÔNG VIỆC", fontWeight = FontWeight.Bold)
-                }
+                Spacer(modifier = Modifier.height(8.dp))
             }
         }
     }

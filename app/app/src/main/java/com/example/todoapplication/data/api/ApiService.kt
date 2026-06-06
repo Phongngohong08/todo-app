@@ -12,6 +12,10 @@ interface ApiService {
     @POST("auth/login")
     suspend fun login(@Body input: LoginInput): Response<AuthResponse>
 
+    // Đổi refresh token lấy cặp token mới. Dùng Call (đồng bộ) để gọi trong OkHttp Authenticator.
+    @POST("auth/refresh")
+    fun refreshToken(@Body input: RefreshTokenInput): retrofit2.Call<AuthResponse>
+
     // Preferences
     @GET("preferences")
     suspend fun getPreferences(): Response<UserPreferences>
@@ -70,7 +74,7 @@ interface ApiService {
     suspend fun listMemories(): Response<List<MemoryItem>>
 
     @POST("ai/memories/trigger-extraction")
-    suspend fun triggerMemoryExtraction(): Response<Unit>
+    suspend fun triggerMemoryExtraction(): Response<MemoryExtractionResult>
 
     @DELETE("ai/memories/{id}")
     suspend fun deleteMemory(@Path("id") id: String): Response<Unit>

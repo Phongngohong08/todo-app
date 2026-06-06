@@ -20,8 +20,7 @@
 ```
 /backend
   /cmd
-    /api              # Điểm khởi chạy API Gateway RESTful
-    /worker           # Điểm khởi chạy tiến trình chạy ngầm (scheduler worker)
+    /api              # Điểm khởi chạy API Gateway RESTful (bao gồm cả scheduler chạy ngầm)
   /internal
     /domain           # Định nghĩa thực thể (Entities), giá trị (Value Objects) và giao diện lưu trữ (Repository Interfaces)
     /usecase          # Hiện thực hóa các nghiệp vụ chính (Auth, Task, Plan, Coach, Memory)
@@ -51,7 +50,28 @@ Tạo một tệp tin `.env` trong thư mục gốc của dự án (hoặc thi�
 | `QDRANT_HOST` | Địa chỉ máy chủ Vector DB Qdrant | `localhost` |
 | `QDRANT_PORT` | Cổng dịch vụ Qdrant | `6333` |
 | `GEMINI_API_KEY`| Khóa bí mật Google Gemini (Bắt buộc đối với các tính năng AI) | *Không có* |
-| `JWT_SECRET` | Khóa bí mật dùng để mã hóa mã đăng nhập JWT | *super_secret_key_change_me* |
+| `JWT_SECRET` | Khóa bí mật dùng để ký mã đăng nhập JWT | *super_secret_key_change_me* |
+| `ACCESS_TOKEN_TTL` | Thời gian sống của access token (định dạng Go duration, vd `15m`, `1h`) | `15m` |
+| `REFRESH_TOKEN_TTL` | Thời gian sống của refresh token (định dạng Go duration, vd `720h`) | `720h` (30 ngày) |
+
+---
+
+## 🔐 Xác thực (JWT: Access & Refresh Token)
+
+Hệ thống dùng mô hình **access token + refresh token** (JWT HS256, không lưu trạng thái ở server):
+
+- **Access token**: sống ngắn (mặc định `15m`), đính kèm ở header `Authorization: Bearer <token>` cho mọi request được bảo vệ. Mỗi token mang claim `typ` để phân biệt loại; middleware chỉ chấp nhận token `typ=access`.
+- **Refresh token**: sống dài (mặc định `720h`), chỉ dùng để lấy cặp token mới khi access token hết hạn.
+
+| Phương thức | Endpoint | Mô tả |
+| :--- | :--- | :--- |
+| `POST` | `/api/v1/auth/register` | Đăng ký tài khoản mới |
+| `POST` | `/api/v1/auth/login` | Đăng nhập, trả về `token`, `refresh_token`, `expires_in` và thông tin `user` |
+| `POST` | `/api/v1/auth/refresh` | Gửi `{ "refresh_token": "..." }`, nhận về cặp `token` + `refresh_token` mới (sliding expiration) |
+
+Khi gặp `401` ở bất kỳ endpoint được bảo vệ nào, client nên tự động gọi `/auth/refresh` để lấy access token mới rồi phát lại request; nếu refresh token cũng hết hạn/không hợp lệ thì buộc người dùng đăng nhập lại. (Ứng dụng Android đã hiện thực luồng này tự động qua OkHttp `Authenticator`.)
+
+> **Lưu ý:** refresh token là JWT không lưu DB nên **không thể thu hồi riêng lẻ** trước khi hết hạn. Nếu cần tính năng "đăng xuất tất cả thiết bị"/thu hồi, hãy chuyển sang lưu refresh token (đã hash) trong cơ sở dữ liệu.
 
 ---
 
@@ -82,11 +102,7 @@ go run ./cmd/api/main.go
 ```
 Dịch vụ REST API sẽ chạy tại `http://localhost:8080/api/v1`.
 
-### 5. Chạy Background Worker (Scheduler)
-```bash
-go run ./cmd/worker/main.go
-```
-Tiến trình worker sẽ chạy ở chế độ foreground để lên lịch các tác vụ chạy ngầm hàng ngày (tự động lập kế hoạch và phân tích hành vi).
+Scheduler chạy ngầm (trích xuất trí nhớ lúc `01:00`, tạo sẵn lịch trình ngày lúc `04:00`) được khởi động **bên trong chính tiến trình API** dưới dạng goroutine — không cần chạy thêm tiến trình riêng.
 
 ---
 
@@ -101,7 +117,7 @@ go test -v ./...
 
 ## 🚢 Triển khai Production trên Ubuntu 22.04
 
-Hệ thống hỗ trợ đóng gói Docker toàn phần cho cả dịch vụ API và Worker bằng tệp [Dockerfile](file:///v:/Project/todo/backend/Dockerfile) đa giai đoạn (multi-stage) và tệp [docker-compose.prod.yml](file:///v:/Project/todo/backend/docker-compose.prod.yml).
+Hệ thống hỗ trợ đóng gói Docker toàn phần cho dịch vụ API (đã bao gồm scheduler chạy ngầm) bằng tệp [Dockerfile](file:///v:/Project/todo/backend/Dockerfile) đa giai đoạn (multi-stage) và tệp [docker-compose.prod.yml](file:///v:/Project/todo/backend/docker-compose.prod.yml).
 
 ### Bước 1: Cài đặt Docker trên Ubuntu 22.04
 Nếu máy chủ chưa có Docker, hãy chạy các lệnh sau để cài đặt:
@@ -131,7 +147,7 @@ newgrp docker
 
 ### Bước 3: Khởi chạy các container bằng Docker Compose Production
 ```bash
-# Khởi chạy tất cả các dịch vụ (PostgreSQL, Qdrant, API, Worker) ở chế độ chạy ngầm
+# Khởi chạy tất cả các dịch vụ (PostgreSQL, Qdrant, API) ở chế độ chạy ngầm
 docker compose -f docker-compose.prod.yml up -d --build
 ```
 

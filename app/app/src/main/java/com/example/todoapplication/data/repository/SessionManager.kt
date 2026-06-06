@@ -9,6 +9,7 @@ class SessionManager(context: Context) {
     companion object {
         private const val PREF_NAME = "todo_app_prefs"
         private const val KEY_TOKEN = "jwt_token"
+        private const val KEY_REFRESH_TOKEN = "refresh_token"
         private const val KEY_USER_ID = "user_id"
         private const val KEY_USER_EMAIL = "user_email"
         private const val KEY_USER_NAME = "user_name"
@@ -18,8 +19,21 @@ class SessionManager(context: Context) {
         prefs.edit().putString(KEY_TOKEN, token).apply()
     }
 
+    /** Lưu cả access token và refresh token trong một lần ghi. */
+    fun saveTokens(accessToken: String, refreshToken: String) {
+        prefs.edit().apply {
+            putString(KEY_TOKEN, accessToken)
+            putString(KEY_REFRESH_TOKEN, refreshToken)
+            apply()
+        }
+    }
+
     fun getAuthToken(): String? {
         return prefs.getString(KEY_TOKEN, null)
+    }
+
+    fun getRefreshToken(): String? {
+        return prefs.getString(KEY_REFRESH_TOKEN, null)
     }
 
     fun saveUser(id: String, email: String, name: String) {

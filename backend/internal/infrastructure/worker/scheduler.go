@@ -69,9 +69,12 @@ func (s *Scheduler) RunMemoryExtraction(ctx context.Context) {
 
 	for _, userID := range userIDs {
 		log.Printf("Extracting memories for user %s...", userID)
-		err := s.memoryUC.ExtractAndStoreMemories(ctx, userID)
+		// Job ngầm chạy mỗi đêm nên chỉ phân tích phần phát sinh trong 24h gần nhất
+		res, err := s.memoryUC.ExtractAndStoreMemories(ctx, userID, 24*time.Hour)
 		if err != nil {
 			log.Printf("Error extracting memories for user %s: %v", userID, err)
+		} else {
+			log.Printf("Memory extraction for user %s: analyzed %d, saved %d", userID, res.Analyzed, res.Saved)
 		}
 	}
 }

@@ -139,7 +139,7 @@ fun LoginScreen(navController: NavController) {
                                     val response = apiService.login(LoginInput(email, password))
                                     if (response.isSuccessful && response.body() != null) {
                                         val body = response.body()!!
-                                        sessionManager.saveAuthToken(body.token)
+                                        sessionManager.saveTokens(body.token, body.refreshToken)
                                         sessionManager.saveUser(body.user.id, body.user.email, body.user.name)
                                         
                                         Toast.makeText(context, "Chào mừng quay trở lại, ${body.user.name}!", Toast.LENGTH_SHORT).show()

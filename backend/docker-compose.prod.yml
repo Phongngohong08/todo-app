@@ -38,29 +38,8 @@ services:
     environment:
       - PORT=8080
       - JWT_SECRET=${JWT_SECRET}
-      - DB_HOST=postgres
-      - DB_PORT=5432
-      - DB_USER=${DB_USER}
-      - DB_PASSWORD=${DB_PASSWORD}
-      - DB_NAME=${DB_NAME}
-      - QDRANT_HOST=qdrant
-      - QDRANT_PORT=6333
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
-    restart: unless-stopped
-    depends_on:
-      postgres:
-        condition: service_healthy
-      qdrant:
-        condition: service_started
-
-  worker:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: prod-worker
-    command: ["/app/worker"]
-    environment:
-      - JWT_SECRET=${JWT_SECRET}
+      - ACCESS_TOKEN_TTL=${ACCESS_TOKEN_TTL:-15m}
+      - REFRESH_TOKEN_TTL=${REFRESH_TOKEN_TTL:-720h}
       - DB_HOST=postgres
       - DB_PORT=5432
       - DB_USER=${DB_USER}

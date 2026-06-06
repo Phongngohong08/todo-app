@@ -9,6 +9,10 @@ import (
 	"github.com/google/uuid"
 )
 
+// Ngưỡng tương đồng Cosine: insight mới có điểm giống cao hơn mức này so với trí nhớ đã có
+// sẽ bị coi là trùng và bỏ qua (1.0 = giống hệt).
+const duplicateSimilarityThreshold = 0.90
+
 type MemoryClient interface {
 	ExtractMemories(ctx context.Context, logs []*domain.TaskLog, messages []*domain.ChatMessage) ([]string, error)
 }
@@ -37,36 +41,57 @@ func NewMemoryUseCase(
 	}
 }
 
-func (u *MemoryUseCase) ExtractAndStoreMemories(ctx context.Context, userID string) error {
-	// 1. Fetch activities from the last 24 hours
-	since := time.Now().Add(-24 * time.Hour)
+// ExtractionResult tóm tắt một lượt phân tích trí nhớ.
+type ExtractionResult struct {
+	Analyzed int // số bản ghi đầu vào (log hoạt động + tin nhắn chat) được đưa vào phân tích
+	Saved    int // số trí nhớ mới (không trùng) thực sự được lưu
+}
+
+// ExtractAndStoreMemories phân tích hoạt động trong khoảng lookback gần nhất và lưu các thói quen rút ra.
+func (u *MemoryUseCase) ExtractAndStoreMemories(ctx context.Context, userID string, lookback time.Duration) (ExtractionResult, error) {
+	// 1. Fetch activities within the lookback window
+	since := time.Now().Add(-lookback)
 	logs, err := u.taskRepo.ListLogs(ctx, userID, since)
 	if err != nil {
-		return err
+		return ExtractionResult{}, err
 	}
 
 	// 2. Fetch latest chat history (up to 30 messages)
 	messages, err := u.chatRepo.GetHistory(ctx, userID, 30)
 	if err != nil {
-		return err
+		return ExtractionResult{}, err
 	}
 
+	analyzed := len(logs) + len(messages)
+
 	// If no activities occurred, skip extraction
-	if len(logs) == 0 && len(messages) == 0 {
-		return nil
+	if analyzed == 0 {
+		return ExtractionResult{}, nil
 	}
 
 	// 3. Extract insights using LLM
 	insights, err := u.aiClient.ExtractMemories(ctx, logs, messages)
 	if err != nil {
-		return err
+		return ExtractionResult{Analyzed: analyzed}, err
 	}
 
-	// 4. Create vector embedding and store each insight in Qdrant
+	// 4. Create vector embedding and store each insight in Qdrant (bỏ qua các quan sát trùng lặp)
+	saved := 0
 	for _, insight := range insights {
 		vector, err := u.embedService.CreateEmbedding(ctx, insight)
 		if err != nil {
 			log.Printf("Failed to generate embedding for memory insight '%s': %v", insight, err)
+			continue
+		}
+
+		// Khử trùng theo ngữ nghĩa: nếu đã tồn tại trí nhớ rất giống thì bỏ qua.
+		// Lưu wait=true nên các insight vừa lưu trong cùng lượt cũng được tính (chống trùng nội bộ batch).
+		similarity, simErr := u.memoryRepo.MaxSimilarity(ctx, userID, vector)
+		if simErr != nil {
+			// Không chặn việc lưu chỉ vì bước kiểm tra trùng lỗi (vd Qdrant tạm thời trục trặc)
+			log.Printf("Similarity check failed for insight '%s': %v. Proceeding to save.", insight, simErr)
+		} else if similarity >= duplicateSimilarityThreshold {
+			log.Printf("Skipping duplicate memory insight (similarity %.3f): %s", similarity, insight)
 			continue
 		}
 
@@ -85,7 +110,8 @@ func (u *MemoryUseCase) ExtractAndStoreMemories(ctx context.Context, userID stri
 			log.Printf("Failed to save memory item to Qdrant: %v", err)
 			continue
 		}
+		saved++
 	}
 
-	return nil
+	return ExtractionResult{Analyzed: analyzed, Saved: saved}, nil
 }

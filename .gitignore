@@ -1,0 +1,23 @@
+# Root-level ignores. Mỗi module (app/, backend/) còn có .gitignore riêng.
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor / IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Logs & temp
+*.log
+*.tmp
+*.bak
+
+# Secrets / environment (phòng hờ; backend/.env đã được ignore riêng)
+.env
+.env.*
+!.env.example

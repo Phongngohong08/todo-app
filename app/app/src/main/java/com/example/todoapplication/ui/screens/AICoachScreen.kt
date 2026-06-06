@@ -2,6 +2,8 @@ package com.example.todoapplication.ui.screens
 
 import android.widget.Toast
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -24,6 +26,8 @@ import com.example.todoapplication.data.model.ChatInput
 import com.example.todoapplication.ui.theme.BackgroundObsidian
 import com.example.todoapplication.ui.theme.PrimaryIndigo
 import com.example.todoapplication.ui.theme.SurfaceGlass
+import com.example.todoapplication.ui.theme.TextSecondary
+import com.example.todoapplication.ui.theme.BorderLight
 import kotlinx.coroutines.launch
 
 // Client side representation of chat messages
@@ -32,6 +36,25 @@ data class ChatUIModel(
     val isUser: Boolean
 )
 
+// Lời chào mở đầu cố định
+private const val COACH_GREETING =
+    "Xin chào! Tôi là AI Coach của bạn. Tôi có thể giúp bạn sắp xếp kế hoạch, tìm động lực hoặc phân tích các thói quen trì hoãn. Hôm nay bạn muốn chia sẻ điều gì?"
+
+// Gợi ý câu hỏi mẫu để người dùng bắt đầu nhanh
+private val SUGGESTED_PROMPTS = listOf(
+    "Giúp tôi sắp xếp công việc hôm nay",
+    "Tôi hay trì hoãn, làm sao khắc phục?",
+    "Cho tôi lời khuyên giữ tập trung",
+    "Phân tích thói quen làm việc của tôi"
+)
+
+/**
+ * Giữ lịch sử trò chuyện ở cấp ứng dụng để không bị mất khi chuyển tab.
+ */
+object ChatHistory {
+    val messages = mutableStateListOf(ChatUIModel(COACH_GREETING, isUser = false))
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AICoachScreen(navController: NavController) {
@@ -39,19 +62,36 @@ fun AICoachScreen(navController: NavController) {
     val coroutineScope = rememberCoroutineScope()
     val apiService = remember { NetworkClient.getApiService(context) }
 
-    val messages = remember {
-        mutableStateListOf(
-            ChatUIModel(
-                "Xin chào! Tôi là AI Coach của bạn. Tôi có thể giúp bạn sắp xếp kế hoạch, tìm động lực hoặc phân tích các thói quen trì hoãn. Hôm nay bạn muốn chia sẻ điều gì?",
-                isUser = false
-            )
-        )
-    }
+    // Lịch sử được giữ ở holder cấp ứng dụng nên không mất khi rời/ vào lại tab
+    val messages = ChatHistory.messages
 
     var messageText by remember { mutableStateOf("") }
     var isThinking by remember { mutableStateOf(false) }
 
     val listState = rememberLazyListState()
+
+    // Gửi một tin nhắn tới AI Coach
+    fun sendMessage(text: String) {
+        val trimmed = text.trim()
+        if (trimmed.isBlank() || isThinking) return
+        messageText = ""
+        messages.add(ChatUIModel(trimmed, isUser = true))
+        isThinking = true
+        coroutineScope.launch {
+            try {
+                val response = apiService.chat(ChatInput(trimmed))
+                if (response.isSuccessful && response.body() != null) {
+                    messages.add(ChatUIModel(response.body()!!.reply, isUser = false))
+                } else {
+                    messages.add(ChatUIModel("Tôi gặp sự cố kết nối tới máy chủ AI. Vui lòng thử lại sau.", isUser = false))
+                }
+            } catch (e: Exception) {
+                messages.add(ChatUIModel("Lỗi: ${e.message}", isUser = false))
+            } finally {
+                isThinking = false
+            }
+        }
+    }
 
     // Scroll to bottom when new messages arrive
     LaunchedEffect(messages.size) {
@@ -69,6 +109,25 @@ fun AICoachScreen(navController: NavController) {
         },
         bottomBar = {
             Column {
+                // Gợi ý câu hỏi mẫu - chỉ hiện khi cuộc trò chuyện chưa bắt đầu
+                if (messages.size <= 1 && !isThinking) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState())
+                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        SUGGESTED_PROMPTS.forEach { prompt ->
+                            SuggestionChip(
+                                onClick = { sendMessage(prompt) },
+                                label = { Text(prompt, fontSize = 12.sp, color = Color.White) },
+                                colors = SuggestionChipDefaults.suggestionChipColors(containerColor = SurfaceGlass),
+                                border = SuggestionChipDefaults.suggestionChipBorder(enabled = true, borderColor = BorderLight)
+                            )
+                        }
+                    }
+                }
                 // Text Input Bar
                 Row(
                     modifier = Modifier
@@ -80,7 +139,7 @@ fun AICoachScreen(navController: NavController) {
                     OutlinedTextField(
                         value = messageText,
                         onValueChange = { messageText = it },
-                        placeholder = { Text("Trò chuyện với AI Coach...", color = Color.Gray) },
+                        placeholder = { Text("Trò chuyện với AI Coach...", color = TextSecondary) },
                         modifier = Modifier
                             .weight(1f)
                             .padding(end = 8.dp),
@@ -96,28 +155,7 @@ fun AICoachScreen(navController: NavController) {
                     )
 
                     IconButton(
-                        onClick = {
-                            if (messageText.isBlank()) return@IconButton
-                            val userMsg = messageText
-                            messageText = ""
-                            messages.add(ChatUIModel(userMsg, isUser = true))
-                            
-                            isThinking = true
-                            coroutineScope.launch {
-                                try {
-                                    val response = apiService.chat(ChatInput(userMsg))
-                                    if (response.isSuccessful && response.body() != null) {
-                                        messages.add(ChatUIModel(response.body()!!.reply, isUser = false))
-                                    } else {
-                                        messages.add(ChatUIModel("Tôi gặp sự cố kết nối tới máy chủ AI. Vui lòng thử lại sau.", isUser = false))
-                                    }
-                                } catch (e: Exception) {
-                                    messages.add(ChatUIModel("Lỗi: ${e.message}", isUser = false))
-                                } finally {
-                                    isThinking = false
-                                }
-                            }
-                        },
+                        onClick = { sendMessage(messageText) },
                         enabled = messageText.isNotBlank() && !isThinking,
                         colors = IconButtonDefaults.iconButtonColors(contentColor = PrimaryIndigo)
                     ) {
@@ -159,7 +197,7 @@ fun AICoachScreen(navController: NavController) {
                                 strokeWidth = 2.dp
                             )
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("AI Coach đang suy nghĩ...", color = Color.Gray, fontSize = 12.sp)
+                            Text("AI Coach đang suy nghĩ...", color = TextSecondary, fontSize = 12.sp)
                         }
                     }
                 }

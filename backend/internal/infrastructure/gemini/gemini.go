@@ -222,14 +222,17 @@ func (c *GeminiClient) ExtractMemories(ctx context.Context, logs []*domain.TaskL
 	}
 
 	systemPrompt := `You are a background behavioral analyst. Analyze the following user logs (events, status changes, postponements) and chat messages.
-Your objective is to extract long-term behavioral patterns, habits, or strong preferences.
+Your objective is to extract useful, durable observations about the user's habits, work style, preferences, or recurring behaviors.
+Be generous: even a single clear signal from the data is worth recording (e.g. the kind of tasks they create, when they work, what they postpone or complete, stated preferences from chat). You do NOT need many repetitions to record an observation.
 Examples of good extractions:
 - "User frequently postpones writing reports."
 - "User works best on coding tasks in the early morning."
-- "User tends to complete short tasks successfully but struggles with tasks exceeding 2 hours."
-- "User tends to feel unmotivated on Friday afternoons."
+- "User tends to create high-priority tasks with tight deadlines."
+- "User mentioned they prefer focusing in the morning."
+- "User completed several short tasks but cancelled a long one."
 
-Output a JSON array of strings containing the extracted statements. If no meaningful behavioral pattern is found, output an empty array: [].
+Write each statement in the same language the user predominantly uses in their chat messages (default to Vietnamese if unsure).
+Output a JSON array of strings containing the extracted statements. Only output an empty array [] if the data is truly empty or contains no usable signal whatsoever.
 Return ONLY the JSON array.`
 
 	logsJSON, _ := json.Marshal(logs)

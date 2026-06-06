@@ -4,19 +4,22 @@ import (
 	"bufio"
 	"os"
 	"strings"
+	"time"
 )
 
 type Config struct {
-	Port         string
-	DBHost       string
-	DBPort       string
-	DBUser       string
-	DBPassword   string
-	DBName       string
-	QdrantHost   string
-	QdrantPort   string
-	GeminiKey    string
-	JWTSecret    string
+	Port            string
+	DBHost          string
+	DBPort          string
+	DBUser          string
+	DBPassword      string
+	DBName          string
+	QdrantHost      string
+	QdrantPort      string
+	GeminiKey       string
+	JWTSecret       string
+	AccessTokenTTL  time.Duration
+	RefreshTokenTTL time.Duration
 }
 
 func Load() *Config {
@@ -24,17 +27,29 @@ func Load() *Config {
 	loadEnv(".env")
 
 	return &Config{
-		Port:       getEnv("PORT", "8080"),
-		DBHost:     getEnv("DB_HOST", "localhost"),
-		DBPort:     getEnv("DB_PORT", "5432"),
-		DBUser:     getEnv("DB_USER", "postgres"),
-		DBPassword: getEnv("DB_PASSWORD", "postgrespassword"),
-		DBName:     getEnv("DB_NAME", "todo_db"),
-		QdrantHost: getEnv("QDRANT_HOST", "localhost"),
-		QdrantPort: getEnv("QDRANT_PORT", "6333"),
-		GeminiKey:  getEnv("GEMINI_API_KEY", ""),
-		JWTSecret:  getEnv("JWT_SECRET", "super_secret_key_change_me"),
+		Port:            getEnv("PORT", "8080"),
+		DBHost:          getEnv("DB_HOST", "localhost"),
+		DBPort:          getEnv("DB_PORT", "5432"),
+		DBUser:          getEnv("DB_USER", "postgres"),
+		DBPassword:      getEnv("DB_PASSWORD", "postgrespassword"),
+		DBName:          getEnv("DB_NAME", "todo_db"),
+		QdrantHost:      getEnv("QDRANT_HOST", "localhost"),
+		QdrantPort:      getEnv("QDRANT_PORT", "6333"),
+		GeminiKey:       getEnv("GEMINI_API_KEY", ""),
+		JWTSecret:       getEnv("JWT_SECRET", "super_secret_key_change_me"),
+		AccessTokenTTL:  getEnvDuration("ACCESS_TOKEN_TTL", 15*time.Minute),
+		RefreshTokenTTL: getEnvDuration("REFRESH_TOKEN_TTL", 30*24*time.Hour),
 	}
+}
+
+// getEnvDuration đọc một biến môi trường dạng Go duration (vd "15m", "720h"), trả về fallback nếu trống/không hợp lệ.
+func getEnvDuration(key string, fallback time.Duration) time.Duration {
+	if value, ok := os.LookupEnv(key); ok && value != "" {
+		if d, err := time.ParseDuration(value); err == nil {
+			return d
+		}
+	}
+	return fallback
 }
 
 func getEnv(key, fallback string) string {

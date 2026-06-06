@@ -10,6 +10,7 @@ import (
 	"todo-backend/internal/infrastructure/gemini"
 	"todo-backend/internal/infrastructure/qdrant"
 	"todo-backend/internal/infrastructure/router"
+	"todo-backend/internal/infrastructure/worker"
 	"todo-backend/internal/usecase/auth"
 	"todo-backend/internal/usecase/coach"
 	"todo-backend/internal/usecase/memory"
@@ -59,7 +60,7 @@ func main() {
 	statsRepo := db.NewPostgresStatsRepository(pgDB)
 
 	// 5. Setup usecases
-	authUC := auth.NewAuthUseCase(userRepo, cfg.JWTSecret)
+	authUC := auth.NewAuthUseCase(userRepo, cfg.JWTSecret, cfg.AccessTokenTTL, cfg.RefreshTokenTTL)
 	taskUC := task.NewTaskUseCase(taskRepo)
 	planUC := plan.NewPlanUseCase(planRepo, taskRepo, userRepo, qdrantClient, geminiClient)
 	coachUC := coach.NewCoachUseCase(chatRepo, taskRepo, qdrantClient, geminiClient, geminiClient)
@@ -77,6 +78,13 @@ func main() {
 		userRepo,
 	)
 	r := routeManager.SetupRouter()
+
+	// 7. Khởi động scheduler chạy ngầm ngay trong tiến trình API
+	//    (trích xuất trí nhớ 01:00, tạo sẵn lịch trình ngày 04:00)
+	scheduler := worker.NewScheduler(userRepo, planUC, memoryUC)
+	schedulerCtx, schedulerCancel := context.WithCancel(context.Background())
+	defer schedulerCancel()
+	go scheduler.Start(schedulerCtx)
 
 	log.Printf("Server is starting on port %s...", cfg.Port)
 	if err := http.ListenAndServe(":"+cfg.Port, r); err != nil {

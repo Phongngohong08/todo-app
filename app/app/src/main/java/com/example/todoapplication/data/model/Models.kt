@@ -12,8 +12,13 @@ data class User(
 
 data class AuthResponse(
     val token: String,
+    @SerializedName("refresh_token") val refreshToken: String,
     @SerializedName("expires_in") val expiresIn: Long,
     val user: User
+)
+
+data class RefreshTokenInput(
+    @SerializedName("refresh_token") val refreshToken: String
 )
 
 data class Task(
@@ -122,6 +127,12 @@ data class ChatInput(
 
 data class ChatResponse(
     val reply: String
+)
+
+data class MemoryExtractionResult(
+    val message: String? = null,
+    val analyzed: Int = 0,
+    val extracted: Int = 0
 )
 
 data class MemoryItem(

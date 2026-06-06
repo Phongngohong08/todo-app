@@ -178,6 +178,54 @@ func (c *QdrantClient) Search(ctx context.Context, userID string, vector []float
 	return memories, nil
 }
 
+// MaxSimilarity tìm điểm tương đồng cao nhất giữa vector và các trí nhớ của user.
+func (c *QdrantClient) MaxSimilarity(ctx context.Context, userID string, vector []float32) (float64, error) {
+	url := fmt.Sprintf("%s/collections/%s/points/search", c.baseURL, c.collection)
+
+	searchReq := qdrantSearchQuery{
+		Vector:      vector,
+		Limit:       1,
+		WithPayload: false,
+		Filter: map[string]interface{}{
+			"must": []map[string]interface{}{
+				{
+					"key": "user_id",
+					"match": map[string]interface{}{
+						"value": userID,
+					},
+				},
+			},
+		},
+	}
+	bodyBytes, _ := json.Marshal(searchReq)
+
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(bodyBytes))
+	if err != nil {
+		return 0, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return 0, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return 0, fmt.Errorf("qdrant similarity search failed, status: %d", resp.StatusCode)
+	}
+
+	var searchRes qdrantSearchResult
+	if err := json.NewDecoder(resp.Body).Decode(&searchRes); err != nil {
+		return 0, err
+	}
+
+	if len(searchRes.Result) == 0 {
+		return 0, nil
+	}
+	return searchRes.Result[0].Score, nil
+}
+
 func (c *QdrantClient) Delete(ctx context.Context, id string) error {
 	url := fmt.Sprintf("%s/collections/%s/points/delete?wait=true", c.baseURL, c.collection)
 

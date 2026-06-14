@@ -15,6 +15,7 @@ import (
 	"todo-backend/internal/usecase/coach"
 	"todo-backend/internal/usecase/memory"
 	"todo-backend/internal/usecase/plan"
+	"todo-backend/internal/usecase/quickadd"
 	"todo-backend/internal/usecase/task"
 )
 
@@ -65,6 +66,7 @@ func main() {
 	planUC := plan.NewPlanUseCase(planRepo, taskRepo, userRepo, qdrantClient, geminiClient)
 	coachUC := coach.NewCoachUseCase(chatRepo, taskRepo, qdrantClient, geminiClient, geminiClient)
 	memoryUC := memory.NewMemoryUseCase(taskRepo, chatRepo, qdrantClient, geminiClient, geminiClient)
+	quickAddUC := quickadd.NewQuickAddUseCase(geminiClient)
 
 	// 6. Setup HTTP router
 	routeManager := router.NewRouteManager(
@@ -73,6 +75,7 @@ func main() {
 		planUC,
 		coachUC,
 		memoryUC,
+		quickAddUC,
 		qdrantClient,
 		statsRepo,
 		userRepo,

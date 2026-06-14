@@ -10,6 +10,7 @@ import (
 	"todo-backend/internal/usecase/coach"
 	"todo-backend/internal/usecase/memory"
 	"todo-backend/internal/usecase/plan"
+	"todo-backend/internal/usecase/quickadd"
 	"todo-backend/internal/usecase/task"
 
 	"github.com/gin-gonic/gin"
@@ -21,6 +22,7 @@ type RouteManager struct {
 	planUC     *plan.PlanUseCase
 	coachUC    *coach.CoachUseCase
 	memoryUC   *memory.MemoryUseCase
+	quickAddUC *quickadd.QuickAddUseCase
 	memoryRepo domain.MemoryRepository
 	statsRepo  domain.StatsRepository
 	userRepo   domain.UserRepository
@@ -32,6 +34,7 @@ func NewRouteManager(
 	planUC *plan.PlanUseCase,
 	coachUC *coach.CoachUseCase,
 	memoryUC *memory.MemoryUseCase,
+	quickAddUC *quickadd.QuickAddUseCase,
 	memoryRepo domain.MemoryRepository,
 	statsRepo domain.StatsRepository,
 	userRepo domain.UserRepository,
@@ -42,6 +45,7 @@ func NewRouteManager(
 		planUC:     planUC,
 		coachUC:    coachUC,
 		memoryUC:   memoryUC,
+		quickAddUC: quickAddUC,
 		memoryRepo: memoryRepo,
 		statsRepo:  statsRepo,
 		userRepo:   userRepo,
@@ -110,6 +114,7 @@ func (rm *RouteManager) SetupRouter() *gin.Engine {
 			aiGroup := protected.Group("/ai")
 			{
 				aiGroup.POST("/chat", rm.handleAIChat)
+				aiGroup.POST("/parse-task", rm.handleParseTask)
 				aiGroup.GET("/memories", rm.handleListMemories)
 				aiGroup.DELETE("/memories/:id", rm.handleDeleteMemory)
 				aiGroup.POST("/memories/trigger-extraction", rm.handleTriggerMemoryExtraction) // Dev/Admin endpoint to manually trigger background extraction
@@ -242,7 +247,9 @@ func (rm *RouteManager) handleCreateTask(c *gin.Context) {
 func (rm *RouteManager) handleListTasks(c *gin.Context) {
 	userID := c.GetString("userID")
 	status := c.Query("status")
-	
+	query := c.Query("q")
+	tag := c.Query("tag")
+
 	var dueDateBefore *time.Time
 	dueDateBeforeStr := c.Query("due_date_before")
 	if dueDateBeforeStr != "" {
@@ -252,7 +259,7 @@ func (rm *RouteManager) handleListTasks(c *gin.Context) {
 		}
 	}
 
-	tasks, err := rm.taskUC.List(c.Request.Context(), userID, status, dueDateBefore)
+	tasks, err := rm.taskUC.List(c.Request.Context(), userID, status, dueDateBefore, query, tag)
 	if err != nil {
 		handleError(c, http.StatusInternalServerError, err)
 		return
@@ -475,6 +482,32 @@ func (rm *RouteManager) handleAIChat(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, coach.ChatResponse{Reply: reply})
+}
+
+type ParseTaskInput struct {
+	Text      string `json:"text" binding:"required"`
+	LocalTime string `json:"local_time"` // RFC3339 thời điểm hiện tại của user (tùy chọn)
+}
+
+func (rm *RouteManager) handleParseTask(c *gin.Context) {
+	var input ParseTaskInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	nowContext := input.LocalTime
+	if nowContext == "" {
+		nowContext = time.Now().Format(time.RFC3339)
+	}
+
+	parsed, err := rm.quickAddUC.Parse(c.Request.Context(), input.Text, nowContext)
+	if err != nil {
+		handleError(c, http.StatusInternalServerError, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, parsed)
 }
 
 func (rm *RouteManager) handleListMemories(c *gin.Context) {

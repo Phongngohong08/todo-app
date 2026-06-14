@@ -344,3 +344,34 @@ Do not start coding immediately.
 First produce the complete software architecture, database schema, API specification, AI memory design, and implementation roadmap.
 
 Only after architecture approval should implementation begin.
+
+---
+
+# Cập nhật v2 (Phụ lục — phản ánh hiện trạng đã triển khai)
+
+> Phần trên là đề bài/thiết kế ban đầu. Phụ lục này ghi lại các thay đổi đã được triển khai sau đó so với spec gốc. Xem chi tiết API trong `README.md`.
+
+## Xác thực: Access + Refresh Token
+- Chuyển từ JWT 24h đơn lẻ sang **access token ngắn hạn** (mặc định `15m`) + **refresh token dài hạn** (mặc định `720h`), JWT HS256 stateless, có claim `typ` (`access`/`refresh`).
+- Thêm endpoint `POST /api/v1/auth/refresh`; middleware chỉ chấp nhận `typ=access`.
+- TTL cấu hình qua `ACCESS_TOKEN_TTL`, `REFRESH_TOKEN_TTL`.
+- Client (Android) tự refresh khi gặp `401` qua OkHttp `Authenticator`; refresh thất bại → buộc đăng nhập lại.
+
+## Scheduler chạy ngầm
+- Gộp scheduler (trích xuất trí nhớ `01:00`, tạo sẵn lịch trình `04:00`) **vào trong tiến trình API** (goroutine) — bỏ tiến trình/worker container riêng.
+
+## Tính năng task mới
+1. **Tags & Search**: cột `tags JSONB` (+ GIN index), lọc theo `?tag=` và tìm kiếm `?q=` (ILIKE tiêu đề/mô tả).
+2. **Recurring**: cột `recurrence` (`NONE`/`DAILY`/`WEEKLY`/`MONTHLY`); khi `complete` task lặp có hạn chót → tự sinh occurrence kế tiếp.
+3. **AI Quick Add**: `POST /api/v1/ai/parse-task` — Gemini tách câu ngôn ngữ tự nhiên thành task có cấu trúc (không tự lưu, client xác nhận trước).
+
+## Trí nhớ dài hạn
+- Cửa sổ phân tích thủ công mở rộng lên **30 ngày**; trả về `{ analyzed, extracted }`.
+- **Khử trùng lặp theo ngữ nghĩa** trước khi lưu (Qdrant cosine ≥ 0.90 thì bỏ qua).
+
+## Migrations
+- `000001_init.up.sql` (schema gốc) → `000002_add_tags_recurrence.up.sql` (tags + recurrence). Áp lần lượt theo thứ tự.
+
+## Phía ứng dụng Android (client-side)
+- **Reminders**: WorkManager lập lịch local notification theo `due_date` (không dùng FCM).
+- UI: ô tìm kiếm, nhập tag dạng chip, selector lặp lại, bottom sheet AI Quick Add, tự điều hướng về Login khi phiên hết hạn.

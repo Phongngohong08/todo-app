@@ -24,6 +24,15 @@ const (
 	StatusPostponed  TaskStatus = "POSTPONED"
 )
 
+type Recurrence string
+
+const (
+	RecurrenceNone    Recurrence = "NONE"
+	RecurrenceDaily   Recurrence = "DAILY"
+	RecurrenceWeekly  Recurrence = "WEEKLY"
+	RecurrenceMonthly Recurrence = "MONTHLY"
+)
+
 type Task struct {
 	ID                string     `json:"id"`
 	UserID            string     `json:"user_id"`
@@ -35,6 +44,8 @@ type Task struct {
 	PreferredTimeStart *string    `json:"preferred_time_start"`
 	PreferredTimeEnd   *string    `json:"preferred_time_end"`
 	Status            TaskStatus `json:"status"`
+	Tags              []string   `json:"tags"`
+	Recurrence        Recurrence `json:"recurrence"`
 	CreatedAt         time.Time  `json:"created_at"`
 	UpdatedAt         time.Time  `json:"updated_at"`
 }
@@ -59,18 +70,36 @@ type TaskLog struct {
 	CreatedAt time.Time     `json:"created_at"`
 }
 
+// ParsedTask là kết quả tách task từ câu ngôn ngữ tự nhiên (AI Quick Add).
+type ParsedTask struct {
+	Title             string     `json:"title"`
+	Description       string     `json:"description"`
+	Priority          string     `json:"priority"`
+	DueDate           *time.Time `json:"due_date"`
+	EstimatedDuration int        `json:"estimated_duration"`
+	Tags              []string   `json:"tags"`
+}
+
 var (
 	ErrTaskNotFound       = errors.New("task not found")
 	ErrInvalidStatusTrans = errors.New("invalid status transition")
 )
 
+// TaskFilter gom các điều kiện lọc danh sách task.
+type TaskFilter struct {
+	Status        TaskStatus
+	Query         string // tìm trong title/description (ILIKE)
+	Tag           string // lọc theo một nhãn
+	DueDateBefore *time.Time
+}
+
 type TaskRepository interface {
 	Create(ctx context.Context, task *Task) error
 	GetByID(ctx context.Context, id string) (*Task, error)
-	List(ctx context.Context, userID string, status TaskStatus, dueDateBefore *time.Time) ([]*Task, error)
+	List(ctx context.Context, userID string, filter TaskFilter) ([]*Task, error)
 	Update(ctx context.Context, task *Task) error
 	Delete(ctx context.Context, id string) error
-	
+
 	CreateLog(ctx context.Context, log *TaskLog) error
 	ListLogs(ctx context.Context, userID string, since time.Time) ([]*TaskLog, error)
 }

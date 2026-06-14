@@ -25,6 +25,8 @@ type CreateTaskInput struct {
 	EstimatedDuration  int        `json:"estimated_duration"` // in minutes
 	PreferredTimeStart *string    `json:"preferred_time_start"`
 	PreferredTimeEnd   *string    `json:"preferred_time_end"`
+	Tags               []string   `json:"tags"`
+	Recurrence         string     `json:"recurrence"`
 }
 
 type UpdateTaskInput struct {
@@ -35,6 +37,18 @@ type UpdateTaskInput struct {
 	EstimatedDuration  int        `json:"estimated_duration"`
 	PreferredTimeStart *string    `json:"preferred_time_start"`
 	PreferredTimeEnd   *string    `json:"preferred_time_end"`
+	Tags               []string   `json:"tags"`
+	Recurrence         string     `json:"recurrence"`
+}
+
+// normalizeRecurrence trả về giá trị recurrence hợp lệ, mặc định NONE.
+func normalizeRecurrence(r string) domain.Recurrence {
+	switch domain.Recurrence(r) {
+	case domain.RecurrenceDaily, domain.RecurrenceWeekly, domain.RecurrenceMonthly:
+		return domain.Recurrence(r)
+	default:
+		return domain.RecurrenceNone
+	}
 }
 
 type PostponeTaskInput struct {
@@ -55,6 +69,8 @@ func (u *TaskUseCase) Create(ctx context.Context, userID string, input CreateTas
 		PreferredTimeStart: input.PreferredTimeStart,
 		PreferredTimeEnd:   input.PreferredTimeEnd,
 		Status:             domain.StatusTodo,
+		Tags:               input.Tags,
+		Recurrence:         normalizeRecurrence(input.Recurrence),
 		CreatedAt:          now,
 		UpdatedAt:          now,
 	}
@@ -89,8 +105,13 @@ func (u *TaskUseCase) GetByID(ctx context.Context, id string, userID string) (*d
 	return task, nil
 }
 
-func (u *TaskUseCase) List(ctx context.Context, userID string, status string, dueDateBefore *time.Time) ([]*domain.Task, error) {
-	return u.taskRepo.List(ctx, userID, domain.TaskStatus(status), dueDateBefore)
+func (u *TaskUseCase) List(ctx context.Context, userID string, status string, dueDateBefore *time.Time, query string, tag string) ([]*domain.Task, error) {
+	return u.taskRepo.List(ctx, userID, domain.TaskFilter{
+		Status:        domain.TaskStatus(status),
+		DueDateBefore: dueDateBefore,
+		Query:         query,
+		Tag:           tag,
+	})
 }
 
 func (u *TaskUseCase) Update(ctx context.Context, id string, userID string, input UpdateTaskInput) (*domain.Task, error) {
@@ -106,6 +127,8 @@ func (u *TaskUseCase) Update(ctx context.Context, id string, userID string, inpu
 	task.EstimatedDuration = input.EstimatedDuration
 	task.PreferredTimeStart = input.PreferredTimeStart
 	task.PreferredTimeEnd = input.PreferredTimeEnd
+	task.Tags = input.Tags
+	task.Recurrence = normalizeRecurrence(input.Recurrence)
 	task.UpdatedAt = time.Now()
 
 	err = u.taskRepo.Update(ctx, task)
@@ -185,7 +208,63 @@ func (u *TaskUseCase) Complete(ctx context.Context, id string, userID string) (*
 	}
 	_ = u.taskRepo.CreateLog(ctx, log)
 
+	// Task lặp lại: sinh occurrence kế tiếp khi hoàn thành (cần có hạn chót để dời chu kỳ).
+	u.spawnNextOccurrence(ctx, task)
+
 	return task, nil
+}
+
+// spawnNextOccurrence tạo bản sao của task lặp lại với hạn chót dời theo chu kỳ.
+// Lỗi không làm hỏng thao tác Complete (chỉ bỏ qua occurrence).
+func (u *TaskUseCase) spawnNextOccurrence(ctx context.Context, completed *domain.Task) {
+	if completed.Recurrence == domain.RecurrenceNone || completed.Recurrence == "" || completed.DueDate == nil {
+		return
+	}
+
+	nextDue := nextOccurrenceDate(*completed.DueDate, completed.Recurrence)
+	now := time.Now()
+	next := &domain.Task{
+		ID:                 uuid.New().String(),
+		UserID:             completed.UserID,
+		Title:              completed.Title,
+		Description:        completed.Description,
+		Priority:           completed.Priority,
+		DueDate:            &nextDue,
+		EstimatedDuration:  completed.EstimatedDuration,
+		PreferredTimeStart: completed.PreferredTimeStart,
+		PreferredTimeEnd:   completed.PreferredTimeEnd,
+		Status:             domain.StatusTodo,
+		Tags:               completed.Tags,
+		Recurrence:         completed.Recurrence,
+		CreatedAt:          now,
+		UpdatedAt:          now,
+	}
+
+	if err := u.taskRepo.Create(ctx, next); err != nil {
+		return
+	}
+	_ = u.taskRepo.CreateLog(ctx, &domain.TaskLog{
+		ID:        uuid.New().String(),
+		TaskID:    next.ID,
+		UserID:    next.UserID,
+		Action:    domain.ActionCreated,
+		Details:   "Recurring task occurrence created",
+		CreatedAt: now,
+	})
+}
+
+// nextOccurrenceDate dời mốc hạn chót theo chu kỳ lặp.
+func nextOccurrenceDate(from time.Time, r domain.Recurrence) time.Time {
+	switch r {
+	case domain.RecurrenceDaily:
+		return from.AddDate(0, 0, 1)
+	case domain.RecurrenceWeekly:
+		return from.AddDate(0, 0, 7)
+	case domain.RecurrenceMonthly:
+		return from.AddDate(0, 1, 0)
+	default:
+		return from
+	}
 }
 
 func (u *TaskUseCase) Postpone(ctx context.Context, id string, userID string, input PostponeTaskInput) (*domain.Task, error) {

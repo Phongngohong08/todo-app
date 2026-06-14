@@ -71,6 +71,69 @@ func (c *GeminiClient) CreateEmbedding(ctx context.Context, text string) ([]floa
 	return resp.Embeddings[0].Values, nil
 }
 
+// ParseTask tách một câu ngôn ngữ tự nhiên thành task có cấu trúc.
+// nowContext là thời điểm hiện tại của người dùng (RFC3339) để suy ra các mốc tương đối ("ngày mai", "thứ 6").
+func (c *GeminiClient) ParseTask(ctx context.Context, text string, nowContext string) (*domain.ParsedTask, error) {
+	if c == nil || c.client == nil {
+		return nil, fmt.Errorf("Gemini client is not initialized. Please set a valid GEMINI_API_KEY in your .env file")
+	}
+
+	systemPrompt := `You convert a user's natural-language note into ONE structured to-do task as JSON.
+Extract:
+- "title": short imperative title (required).
+- "description": any extra detail, else empty string.
+- "priority": one of "LOW", "MEDIUM", "HIGH" (infer urgency; default "MEDIUM").
+- "due_date": absolute RFC3339 timestamp (e.g. "2026-06-20T15:00:00+07:00") resolved from the provided current time, or null if the note has no time/date. Keep the user's timezone offset from the current time.
+- "estimated_duration": integer minutes if implied (e.g. "1 tiếng" = 60), else 0.
+- "tags": array of short lowercase tags inferred from context (e.g. ["công việc"], ["sức khỏe"]). Empty array if none.
+
+Write title/description in the SAME language as the user's note (Vietnamese stays Vietnamese).
+Return ONLY a JSON object with exactly these keys. No markdown.`
+
+	userPrompt := fmt.Sprintf("Current time: %s\n\nUser note:\n%s", nowContext, text)
+
+	config := &genai.GenerateContentConfig{
+		SystemInstruction: &genai.Content{
+			Parts: []*genai.Part{
+				{
+					Text: systemPrompt,
+				},
+			},
+		},
+		ResponseMIMEType: "application/json",
+		Temperature:      genai.Ptr[float32](0.2),
+	}
+
+	contents := []*genai.Content{
+		{
+			Parts: []*genai.Part{
+				{
+					Text: userPrompt,
+				},
+			},
+		},
+	}
+
+	resp, err := c.client.Models.GenerateContent(ctx, c.model, contents, config)
+	if err != nil {
+		return nil, fmt.Errorf("gemini parse task error: %w", err)
+	}
+
+	raw := resp.Text()
+	var parsed domain.ParsedTask
+	if err := json.Unmarshal([]byte(raw), &parsed); err != nil {
+		cleaned := stripCodeBlocks(raw)
+		if err := json.Unmarshal([]byte(cleaned), &parsed); err != nil {
+			return nil, fmt.Errorf("failed to parse Gemini quick-add response: %w. Raw: %s", err, raw)
+		}
+	}
+
+	if parsed.Title == "" {
+		return nil, fmt.Errorf("could not extract a task title from the note")
+	}
+	return &parsed, nil
+}
+
 func (c *GeminiClient) GenerateDailyPlan(ctx context.Context, tasks []*domain.Task, prefs *domain.UserPreferences, memories []*domain.MemoryItem, localTime string) ([]domain.PlanSlot, error) {
 	if c == nil || c.client == nil {
 		return nil, fmt.Errorf("Gemini client is not initialized. Please set a valid GEMINI_API_KEY in your .env file")

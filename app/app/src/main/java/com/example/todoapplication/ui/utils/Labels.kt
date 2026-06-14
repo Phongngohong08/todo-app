@@ -21,3 +21,13 @@ fun priorityLabel(priority: String): String = when (priority) {
     "LOW" -> "Thấp"
     else -> priority
 }
+
+fun recurrenceLabel(recurrence: String): String = when (recurrence) {
+    "DAILY" -> "Hằng ngày"
+    "WEEKLY" -> "Hằng tuần"
+    "MONTHLY" -> "Hằng tháng"
+    else -> "Không lặp"
+}
+
+// Các lựa chọn lặp lại theo thứ tự hiển thị (value enum)
+val RECURRENCE_OPTIONS = listOf("NONE", "DAILY", "WEEKLY", "MONTHLY")

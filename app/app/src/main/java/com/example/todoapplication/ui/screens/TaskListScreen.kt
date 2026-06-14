@@ -30,6 +30,7 @@ import androidx.navigation.NavGraph.Companion.findStartDestination
 import com.example.todoapplication.data.api.NetworkClient
 import com.example.todoapplication.data.model.PostponeTaskInput
 import com.example.todoapplication.data.model.Task
+import com.example.todoapplication.data.notifications.ReminderScheduler
 import com.example.todoapplication.data.repository.SessionManager
 import com.example.todoapplication.ui.navigation.Screen
 import com.example.todoapplication.ui.theme.*
@@ -59,6 +60,7 @@ fun TaskListScreen(navController: NavController) {
     var tasks by remember { mutableStateOf<List<Task>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var selectedStatusFilter by remember { mutableStateOf("ALL") }
+    var searchQuery by remember { mutableStateOf("") }
 
     // State for Postpone Dialog
     var showPostponeDialog by remember { mutableStateOf(false) }
@@ -70,6 +72,11 @@ fun TaskListScreen(navController: NavController) {
     var taskToDelete by remember { mutableStateOf<Task?>(null) }
     var taskToCancel by remember { mutableStateOf<Task?>(null) }
 
+    // State for AI Quick Add
+    var showQuickAdd by remember { mutableStateOf(false) }
+    var quickAddText by remember { mutableStateOf("") }
+    var quickAddLoading by remember { mutableStateOf(false) }
+
     val calendar = remember { Calendar.getInstance() }
 
     fun loadTasks() {
@@ -77,9 +84,11 @@ fun TaskListScreen(navController: NavController) {
         coroutineScope.launch {
             try {
                 val filter = if (selectedStatusFilter == "ALL") null else selectedStatusFilter
-                val response = apiService.listTasks(status = filter)
+                val q = searchQuery.trim().ifEmpty { null }
+                val response = apiService.listTasks(status = filter, query = q)
                 if (response.isSuccessful) {
                     tasks = response.body() ?: emptyList()
+                    ReminderScheduler.syncAll(context, tasks)
                 } else {
                     Toast.makeText(context, "Không thể tải danh sách công việc", Toast.LENGTH_SHORT).show()
                 }
@@ -91,7 +100,9 @@ fun TaskListScreen(navController: NavController) {
         }
     }
 
-    LaunchedEffect(selectedStatusFilter) {
+    LaunchedEffect(selectedStatusFilter, searchQuery) {
+        // Debounce nhẹ để không gọi API mỗi ký tự khi gõ tìm kiếm
+        kotlinx.coroutines.delay(300)
         loadTasks()
     }
 
@@ -114,6 +125,9 @@ fun TaskListScreen(navController: NavController) {
                     }
                 },
                 actions = {
+                    IconButton(onClick = { showQuickAdd = true }) {
+                        Icon(Icons.Default.Star, contentDescription = "Thêm nhanh bằng AI", tint = SecondaryTeal)
+                    }
                     IconButton(onClick = {
                         sessionManager.logout()
                         navController.navigate(Screen.Login.route) {
@@ -146,6 +160,31 @@ fun TaskListScreen(navController: NavController) {
                 .padding(innerPadding)
                 .padding(horizontal = 16.dp)
         ) {
+            // Search box
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                placeholder = { Text("Tìm công việc...", color = TextSecondary) },
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = TextSecondary) },
+                trailingIcon = {
+                    if (searchQuery.isNotEmpty()) {
+                        IconButton(onClick = { searchQuery = "" }) {
+                            Icon(Icons.Default.Close, contentDescription = "Xóa", tint = TextSecondary)
+                        }
+                    }
+                },
+                singleLine = true,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = PrimaryIndigo,
+                    unfocusedBorderColor = BorderLight,
+                    focusedTextColor = Color.White,
+                    unfocusedTextColor = Color.White
+                )
+            )
+
             // Horizontal Status Filter Scroll
             Row(
                 modifier = Modifier
@@ -398,6 +437,7 @@ fun TaskListScreen(navController: NavController) {
                     coroutineScope.launch {
                         val resp = apiService.deleteTask(task.id)
                         if (resp.isSuccessful) {
+                            ReminderScheduler.cancel(context, task.id)
                             Toast.makeText(context, "Đã xóa công việc", Toast.LENGTH_SHORT).show()
                             loadTasks()
                         }
@@ -414,6 +454,75 @@ fun TaskListScreen(navController: NavController) {
             },
             containerColor = SurfaceGlass
         )
+    }
+
+    // AI Quick Add bottom sheet
+    if (showQuickAdd) {
+        ModalBottomSheet(
+            onDismissRequest = { showQuickAdd = false },
+            containerColor = SurfaceGlass
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+                    .padding(bottom = 32.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text("Thêm nhanh bằng AI", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                Text("Gõ một câu mô tả, AI sẽ tự tách thành công việc.", color = TextSecondary, fontSize = 12.sp)
+                OutlinedTextField(
+                    value = quickAddText,
+                    onValueChange = { quickAddText = it },
+                    placeholder = { Text("VD: Họp với sếp thứ 6 lúc 3h chiều, khoảng 1 tiếng", color = TextSecondary) },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 2,
+                    enabled = !quickAddLoading,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = PrimaryIndigo,
+                        unfocusedBorderColor = BorderLight,
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White
+                    )
+                )
+                Button(
+                    onClick = {
+                        if (quickAddText.isBlank()) return@Button
+                        quickAddLoading = true
+                        coroutineScope.launch {
+                            try {
+                                val nowRfc = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", Locale.getDefault()).format(Date())
+                                val resp = apiService.parseTask(com.example.todoapplication.data.model.ParseTaskInput(quickAddText, nowRfc))
+                                if (resp.isSuccessful && resp.body() != null) {
+                                    com.example.todoapplication.data.repository.QuickAddDraft.set(resp.body()!!)
+                                    showQuickAdd = false
+                                    quickAddText = ""
+                                    navController.navigate(Screen.TaskDetail.createRoute("new"))
+                                } else {
+                                    Toast.makeText(context, "Không phân tích được. Hãy thử mô tả rõ hơn.", Toast.LENGTH_LONG).show()
+                                }
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "Lỗi: ${e.message}", Toast.LENGTH_LONG).show()
+                            } finally {
+                                quickAddLoading = false
+                            }
+                        }
+                    },
+                    enabled = !quickAddLoading && quickAddText.isNotBlank(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryIndigo),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    if (quickAddLoading) {
+                        CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                    } else {
+                        Text("Phân tích", fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -470,6 +579,14 @@ fun TaskCard(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    if (task.recurrence != "NONE") {
+                        Icon(
+                            Icons.Default.Refresh,
+                            contentDescription = "Lặp lại",
+                            tint = SecondaryTeal,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
                     if (isOverdue) {
                         OverduePill()
                     } else if (isCancelled) {
@@ -489,6 +606,33 @@ fun TaskCard(
                 )
             } else {
                 Spacer(modifier = Modifier.height(8.dp))
+            }
+
+            // Tags
+            if (task.tags.isNotEmpty()) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState())
+                        .padding(bottom = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    task.tags.forEach { tag ->
+                        Card(
+                            shape = RoundedCornerShape(8.dp),
+                            colors = CardDefaults.cardColors(containerColor = PrimaryIndigo.copy(alpha = 0.15f)),
+                            border = BorderStroke(1.dp, PrimaryIndigo.copy(alpha = 0.4f))
+                        ) {
+                            Text(
+                                text = "#$tag",
+                                color = PrimaryIndigo,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                            )
+                        }
+                    }
+                }
             }
 
             // Info row: Due Date, Duration, Status

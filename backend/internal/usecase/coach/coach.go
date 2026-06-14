@@ -56,7 +56,7 @@ func (u *CoachUseCase) Chat(ctx context.Context, userID string, messageText stri
 	_ = u.chatRepo.Save(ctx, userMsg) // Ignore database insert error for resilience
 
 	// 2. Fetch active tasks
-	tasks, err := u.taskRepo.List(ctx, userID, "", nil)
+	tasks, err := u.taskRepo.List(ctx, userID, domain.TaskFilter{})
 	var activeTasks []*domain.Task
 	if err == nil {
 		for _, t := range tasks {

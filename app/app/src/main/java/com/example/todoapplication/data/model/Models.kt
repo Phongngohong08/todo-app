@@ -32,6 +32,8 @@ data class Task(
     @SerializedName("preferred_time_start") val preferredTimeStart: String?,
     @SerializedName("preferred_time_end") val preferredTimeEnd: String?,
     val status: String, // "TODO", "IN_PROGRESS", "COMPLETED", "CANCELLED", "POSTPONED"
+    val tags: List<String> = emptyList(),
+    val recurrence: String = "NONE", // "NONE", "DAILY", "WEEKLY", "MONTHLY"
     @SerializedName("created_at") val createdAt: String,
     @SerializedName("updated_at") val updatedAt: String
 )
@@ -103,7 +105,9 @@ data class CreateTaskInput(
     @SerializedName("due_date") val dueDate: String?,
     @SerializedName("estimated_duration") val estimatedDuration: Int,
     @SerializedName("preferred_time_start") val preferredTimeStart: String?,
-    @SerializedName("preferred_time_end") val preferredTimeEnd: String?
+    @SerializedName("preferred_time_end") val preferredTimeEnd: String?,
+    val tags: List<String> = emptyList(),
+    val recurrence: String = "NONE"
 )
 
 data class UpdateTaskInput(
@@ -113,7 +117,23 @@ data class UpdateTaskInput(
     @SerializedName("due_date") val dueDate: String?,
     @SerializedName("estimated_duration") val estimatedDuration: Int,
     @SerializedName("preferred_time_start") val preferredTimeStart: String?,
-    @SerializedName("preferred_time_end") val preferredTimeEnd: String?
+    @SerializedName("preferred_time_end") val preferredTimeEnd: String?,
+    val tags: List<String> = emptyList(),
+    val recurrence: String = "NONE"
+)
+
+data class ParseTaskInput(
+    val text: String,
+    @SerializedName("local_time") val localTime: String
+)
+
+data class ParsedTask(
+    val title: String = "",
+    val description: String = "",
+    val priority: String = "MEDIUM",
+    @SerializedName("due_date") val dueDate: String? = null,
+    @SerializedName("estimated_duration") val estimatedDuration: Int = 0,
+    val tags: List<String> = emptyList()
 )
 
 data class PostponeTaskInput(

@@ -57,7 +57,7 @@ func (u *PlanUseCase) Generate(ctx context.Context, userID string, date time.Tim
 	}
 
 	// 2. Fetch active tasks (TODO, IN_PROGRESS, POSTPONED)
-	tasks, err := u.taskRepo.List(ctx, userID, "", nil)
+	tasks, err := u.taskRepo.List(ctx, userID, domain.TaskFilter{})
 	if err != nil {
 		return nil, err
 	}

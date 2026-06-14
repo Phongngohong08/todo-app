@@ -30,7 +30,9 @@ interface ApiService {
     @GET("tasks")
     suspend fun listTasks(
         @Query("status") status: String? = null,
-        @Query("due_date_before") dueDateBefore: String? = null
+        @Query("due_date_before") dueDateBefore: String? = null,
+        @Query("q") query: String? = null,
+        @Query("tag") tag: String? = null
     ): Response<List<Task>>
 
     @GET("tasks/{id}")
@@ -69,6 +71,10 @@ interface ApiService {
     // AI Coach
     @POST("ai/chat")
     suspend fun chat(@Body input: ChatInput): Response<ChatResponse>
+
+    // AI Quick Add: tách câu ngôn ngữ tự nhiên thành task có cấu trúc (chưa lưu)
+    @POST("ai/parse-task")
+    suspend fun parseTask(@Body input: ParseTaskInput): Response<ParsedTask>
 
     @GET("ai/memories")
     suspend fun listMemories(): Response<List<MemoryItem>>

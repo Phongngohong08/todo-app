@@ -33,11 +33,11 @@ func (m *MockTaskRepository) GetByID(ctx context.Context, id string) (*domain.Ta
 	return t, nil
 }
 
-func (m *MockTaskRepository) List(ctx context.Context, userID string, status domain.TaskStatus, dueDateBefore *time.Time) ([]*domain.Task, error) {
+func (m *MockTaskRepository) List(ctx context.Context, userID string, filter domain.TaskFilter) ([]*domain.Task, error) {
 	var result []*domain.Task
 	for _, t := range m.tasks {
 		if t.UserID == userID {
-			if status != "" && t.Status != status {
+			if filter.Status != "" && t.Status != filter.Status {
 				continue
 			}
 			result = append(result, t)

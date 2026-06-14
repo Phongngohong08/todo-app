@@ -1,9 +1,13 @@
 package com.example.todoapplication
 
+import android.Manifest
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -32,6 +36,16 @@ class MainActivity : ComponentActivity() {
                 ) {
                     val navController = rememberNavController()
                     val sessionManager = SessionManager(this)
+
+                    // Xin quyền thông báo (Android 13+) để gửi nhắc nhở công việc
+                    val notifPermissionLauncher = rememberLauncherForActivityResult(
+                        ActivityResultContracts.RequestPermission()
+                    ) { /* kết quả không cần xử lý: nếu từ chối thì đơn giản không nhắc */ }
+                    LaunchedEffect(Unit) {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                            notifPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                        }
+                    }
 
                     // Khi phiên hết hiệu lực (refresh thất bại), đưa người dùng về màn Login và xóa backstack
                     LaunchedEffect(Unit) {

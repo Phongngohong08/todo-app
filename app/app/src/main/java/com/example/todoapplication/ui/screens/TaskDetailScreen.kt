@@ -6,6 +6,7 @@ import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -27,15 +28,20 @@ import androidx.navigation.NavController
 import com.example.todoapplication.data.api.NetworkClient
 import com.example.todoapplication.data.model.CreateTaskInput
 import com.example.todoapplication.data.model.UpdateTaskInput
+import com.example.todoapplication.data.notifications.ReminderScheduler
 import com.example.todoapplication.ui.theme.BackgroundObsidian
 import com.example.todoapplication.ui.theme.PrimaryIndigo
 import com.example.todoapplication.ui.theme.SecondaryTeal
 import com.example.todoapplication.ui.theme.SurfaceGlass
 import com.example.todoapplication.ui.theme.BorderLight
 import com.example.todoapplication.ui.theme.TextSecondary
+import com.example.todoapplication.ui.theme.PriorityMediumColor
+import com.example.todoapplication.data.repository.QuickAddDraft
 import com.example.todoapplication.ui.utils.formatUtcToLocal
 import com.example.todoapplication.ui.utils.parseIso8601
 import com.example.todoapplication.ui.utils.priorityLabel
+import com.example.todoapplication.ui.utils.recurrenceLabel
+import com.example.todoapplication.ui.utils.RECURRENCE_OPTIONS
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
@@ -56,6 +62,9 @@ fun TaskDetailScreen(navController: NavController, taskId: String) {
     var dueDate by remember { mutableStateOf("") }
     var preferredTimeStart by remember { mutableStateOf("") }
     var preferredTimeEnd by remember { mutableStateOf("") }
+    var tags by remember { mutableStateOf<List<String>>(emptyList()) }
+    var tagInput by remember { mutableStateOf("") }
+    var recurrence by remember { mutableStateOf("NONE") }
 
     var isLoading by remember { mutableStateOf(false) }
     val calendar = remember { Calendar.getInstance() }
@@ -75,6 +84,8 @@ fun TaskDetailScreen(navController: NavController, taskId: String) {
                     dueDate = task.dueDate ?: ""
                     preferredTimeStart = task.preferredTimeStart ?: ""
                     preferredTimeEnd = task.preferredTimeEnd ?: ""
+                    tags = task.tags
+                    recurrence = task.recurrence
                     if (dueDate.isNotEmpty()) {
                         val parsedDate = parseIso8601(dueDate)
                         if (parsedDate != null) {
@@ -88,6 +99,19 @@ fun TaskDetailScreen(navController: NavController, taskId: String) {
                 Toast.makeText(context, "Lỗi: ${e.message}", Toast.LENGTH_SHORT).show()
             } finally {
                 isLoading = false
+            }
+        } else {
+            // AI Quick Add: nếu có draft thì điền sẵn form
+            QuickAddDraft.consume()?.let { draft ->
+                title = draft.title
+                description = draft.description
+                priority = draft.priority.ifBlank { "MEDIUM" }
+                if (draft.estimatedDuration > 0) duration = draft.estimatedDuration.toString()
+                dueDate = draft.dueDate ?: ""
+                tags = draft.tags
+                if (dueDate.isNotEmpty()) {
+                    parseIso8601(dueDate)?.let { calendar.time = it }
+                }
             }
         }
     }
@@ -112,6 +136,10 @@ fun TaskDetailScreen(navController: NavController, taskId: String) {
                             Toast.makeText(context, "Tiêu đề không được để trống", Toast.LENGTH_SHORT).show()
                             return@Button
                         }
+                        if (recurrence != "NONE" && dueDate.isEmpty()) {
+                            Toast.makeText(context, "Vui lòng đặt hạn chót cho công việc lặp lại", Toast.LENGTH_SHORT).show()
+                            return@Button
+                        }
 
                         val estimatedMinutes = duration.toIntOrNull() ?: 30
                         val dateString = if (dueDate.isEmpty()) null else dueDate
@@ -121,20 +149,21 @@ fun TaskDetailScreen(navController: NavController, taskId: String) {
                         isLoading = true
                         coroutineScope.launch {
                             try {
-                                val success = if (isNewTask) {
+                                val savedTask = if (isNewTask) {
                                     val response = apiService.createTask(
-                                        CreateTaskInput(title, description, priority, dateString, estimatedMinutes, timeStart, timeEnd)
+                                        CreateTaskInput(title, description, priority, dateString, estimatedMinutes, timeStart, timeEnd, tags, recurrence)
                                     )
-                                    response.isSuccessful
+                                    if (response.isSuccessful) response.body() else null
                                 } else {
                                     val response = apiService.updateTask(
                                         taskId,
-                                        UpdateTaskInput(title, description, priority, dateString, estimatedMinutes, timeStart, timeEnd)
+                                        UpdateTaskInput(title, description, priority, dateString, estimatedMinutes, timeStart, timeEnd, tags, recurrence)
                                     )
-                                    response.isSuccessful
+                                    if (response.isSuccessful) response.body() else null
                                 }
 
-                                if (success) {
+                                if (savedTask != null) {
+                                    ReminderScheduler.schedule(context, savedTask)
                                     Toast.makeText(context, "Đã lưu công việc thành công!", Toast.LENGTH_SHORT).show()
                                     navController.popBackStack()
                                 } else {
@@ -382,6 +411,103 @@ fun TaskDetailScreen(navController: NavController, taskId: String) {
                             Icon(Icons.Default.Clear, contentDescription = "Xóa khung giờ", tint = TextSecondary)
                         }
                     }
+                }
+
+                // Tags / Nhãn
+                Text("Nhãn", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    OutlinedTextField(
+                        value = tagInput,
+                        onValueChange = { tagInput = it },
+                        label = { Text("Thêm nhãn") },
+                        modifier = Modifier.weight(1f),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = PrimaryIndigo,
+                            unfocusedBorderColor = TextSecondary,
+                            focusedLabelColor = PrimaryIndigo,
+                            unfocusedLabelColor = TextSecondary,
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White
+                        ),
+                        singleLine = true
+                    )
+                    val addTag = {
+                        val t = tagInput.trim().lowercase()
+                        if (t.isNotEmpty() && !tags.contains(t)) tags = tags + t
+                        tagInput = ""
+                    }
+                    Button(
+                        onClick = addTag,
+                        colors = ButtonDefaults.buttonColors(containerColor = PrimaryIndigo),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("Thêm")
+                    }
+                }
+                if (tags.isNotEmpty()) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        tags.forEach { tag ->
+                            InputChip(
+                                selected = false,
+                                onClick = { tags = tags - tag },
+                                label = { Text(tag, fontSize = 12.sp) },
+                                trailingIcon = {
+                                    Icon(Icons.Default.Clear, contentDescription = "Xóa nhãn", modifier = Modifier.size(16.dp))
+                                },
+                                colors = InputChipDefaults.inputChipColors(
+                                    containerColor = SurfaceGlass,
+                                    labelColor = Color.White,
+                                    trailingIconColor = TextSecondary
+                                )
+                            )
+                        }
+                    }
+                }
+
+                // Lặp lại (Recurring)
+                Text("Lặp lại", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    RECURRENCE_OPTIONS.forEach { r ->
+                        val isSelected = recurrence == r
+                        FilterChip(
+                            selected = isSelected,
+                            onClick = { recurrence = r },
+                            label = { Text(recurrenceLabel(r), fontSize = 12.sp) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = PrimaryIndigo,
+                                selectedLabelColor = Color.White,
+                                labelColor = TextSecondary,
+                                containerColor = SurfaceGlass
+                            ),
+                            border = FilterChipDefaults.filterChipBorder(
+                                enabled = true,
+                                selected = isSelected,
+                                borderColor = BorderLight,
+                                selectedBorderColor = PrimaryIndigo
+                            )
+                        )
+                    }
+                }
+                if (recurrence != "NONE" && dueDate.isEmpty()) {
+                    Text(
+                        "Cần đặt hạn chót để dùng lặp lại.",
+                        color = PriorityMediumColor,
+                        fontSize = 12.sp
+                    )
                 }
 
                 Spacer(modifier = Modifier.height(8.dp))

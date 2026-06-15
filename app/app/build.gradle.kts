@@ -62,6 +62,9 @@ dependencies {
     // Background reminders / notifications
     implementation(libs.androidx.work.runtime.ktx)
 
+    // Drag & drop reordering for LazyColumn
+    implementation("sh.calvin.reorderable:reorderable:2.4.3")
+
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)

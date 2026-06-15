@@ -106,6 +106,8 @@ Tất cả endpoint dưới đây (trừ nhóm `/auth`) yêu cầu header `Autho
 
 > Các endpoint khác: `GET/PUT /preferences`, `GET/POST /plans/daily`, `GET /stats/summary`.
 
+> **Lưu ý client-side:** Biểu đồ năng suất 7 ngày và tính điểm ưu tiên AI trên ứng dụng Android đều tính **client-side** từ dữ liệu đã có (`GET /tasks?status=COMPLETED`) — không cần endpoint riêng.
+
 ---
 
 ## 🚀 Hướng dẫn Cài đặt & Chạy ứng dụng

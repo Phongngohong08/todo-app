@@ -18,8 +18,10 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import java.net.URLDecoder
 import com.example.todoapplication.data.repository.SessionEvents
 import com.example.todoapplication.data.repository.SessionManager
+import com.example.todoapplication.data.repository.ThemeController
 import com.example.todoapplication.ui.navigation.Screen
 import com.example.todoapplication.ui.screens.*
 import com.example.todoapplication.ui.theme.TodoApplicationTheme
@@ -27,6 +29,7 @@ import com.example.todoapplication.ui.theme.TodoApplicationTheme
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        ThemeController.init(this)
         enableEdgeToEdge()
         setContent {
             TodoApplicationTheme {
@@ -97,6 +100,20 @@ class MainActivity : ComponentActivity() {
                         }
                         composable(Screen.Settings.route) {
                             SettingsScreen(navController)
+                        }
+                        composable(
+                            route = Screen.Pomodoro.route,
+                            arguments = listOf(
+                                navArgument("taskId") { type = NavType.StringType },
+                                navArgument("taskTitle") { type = NavType.StringType }
+                            )
+                        ) { backStackEntry ->
+                            val taskId = backStackEntry.arguments?.getString("taskId") ?: ""
+                            val taskTitle = URLDecoder.decode(
+                                backStackEntry.arguments?.getString("taskTitle") ?: "",
+                                "UTF-8"
+                            )
+                            PomodoroScreen(navController, taskId, taskTitle)
                         }
                     }
                 }

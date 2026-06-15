@@ -2,17 +2,22 @@ package com.example.todoapplication.ui.screens
 
 import android.app.TimePickerDialog
 import android.widget.Toast
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -22,12 +27,8 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.example.todoapplication.data.api.NetworkClient
 import com.example.todoapplication.data.model.UserPreferences
-import com.example.todoapplication.ui.theme.BackgroundObsidian
-import com.example.todoapplication.ui.theme.BorderLight
-import com.example.todoapplication.ui.theme.PrimaryIndigo
-import com.example.todoapplication.ui.theme.SecondaryTeal
-import com.example.todoapplication.ui.theme.SurfaceGlass
-import com.example.todoapplication.ui.theme.TextSecondary
+import com.example.todoapplication.data.repository.ThemeController
+import com.example.todoapplication.data.repository.ThemeMode
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -41,6 +42,10 @@ fun SettingsScreen(navController: NavController) {
     var eveningEnd by remember { mutableStateOf("18:00") }
     var workDuration by remember { mutableStateOf("60") }
     var isLoading by remember { mutableStateOf(true) }
+    var isSaving by remember { mutableStateOf(false) }
+
+    val primary = MaterialTheme.colorScheme.primary
+    val tertiary = MaterialTheme.colorScheme.tertiary
 
     LaunchedEffect(Unit) {
         isLoading = true
@@ -60,110 +65,212 @@ fun SettingsScreen(navController: NavController) {
     }
 
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Thiết lập", color = Color.White, fontWeight = FontWeight.Bold) },
-                navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Quay lại", tint = Color.White)
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = BackgroundObsidian)
-            )
-        },
-        containerColor = BackgroundObsidian
+        containerColor = MaterialTheme.colorScheme.background
     ) { innerPadding ->
-        if (isLoading) {
-            Box(modifier = Modifier.fillMaxSize().padding(innerPadding), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = PrimaryIndigo)
-            }
-        } else {
-            Column(
-                verticalArrangement = Arrangement.spacedBy(16.dp),
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+        ) {
+            // Header
+            Row(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding)
-                    .padding(16.dp)
+                    .fillMaxWidth()
+                    .statusBarsPadding()
+                    .padding(horizontal = 8.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("Cài đặt cá nhân cho lập lịch AI", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                IconButton(onClick = { navController.popBackStack() }) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Quay lại",
+                        tint = MaterialTheme.colorScheme.onSurface
+                    )
+                }
                 Text(
-                    "AI dùng các thông số này để sắp xếp lịch trình phù hợp với nhịp sinh hoạt của bạn.",
-                    color = TextSecondary,
-                    fontSize = 12.sp
+                    "Thiết lập",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
                 )
+            }
 
-                TimePickerField(
-                    label = "Thời gian bắt đầu buổi sáng",
-                    value = morningStart,
-                    onValueChange = { morningStart = it }
-                )
+            if (isLoading) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = primary)
+                }
+            } else {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 20.dp)
+                        .navigationBarsPadding()
+                        .imePadding(),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Spacer(Modifier.height(4.dp))
 
-                TimePickerField(
-                    label = "Thời gian kết thúc buổi tối",
-                    value = eveningEnd,
-                    onValueChange = { eveningEnd = it }
-                )
-
-                OutlinedTextField(
-                    value = workDuration,
-                    onValueChange = { input -> workDuration = input.filter { it.isDigit() } },
-                    label = { Text("Thời lượng phiên làm việc mong muốn (phút)") },
-                    modifier = Modifier.fillMaxWidth(),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = PrimaryIndigo,
-                        unfocusedBorderColor = TextSecondary,
-                        focusedLabelColor = PrimaryIndigo,
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White
-                    ),
-                    singleLine = true
-                )
-
-                Spacer(modifier = Modifier.weight(1f))
-
-                Button(
-                    onClick = {
-                        val durationInt = workDuration.toIntOrNull() ?: 60
-                        isLoading = true
-                        coroutineScope.launch {
-                            try {
-                                val response = apiService.updatePreferences(
-                                    UserPreferences(
-                                        userId = "",
-                                        morningStartTime = morningStart,
-                                        eveningEndTime = eveningEnd,
-                                        workDurationPreference = durationInt
+                    // Theme section
+                    SettingsSection(title = "🌗 Giao diện") {
+                        val themeOptions = listOf(
+                            ThemeMode.LIGHT to "☀️ Sáng",
+                            ThemeMode.DARK to "🌙 Tối",
+                            ThemeMode.SYSTEM to "📱 Hệ thống"
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            themeOptions.forEach { (mode, label) ->
+                                val selected = ThemeController.mode == mode
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(
+                                            if (selected) primary else MaterialTheme.colorScheme.surfaceVariant
+                                        )
+                                        .clickable { ThemeController.setMode(context, mode) }
+                                        .padding(vertical = 12.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        label,
+                                        color = if (selected) MaterialTheme.colorScheme.onPrimary
+                                                else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                                        fontSize = 13.sp
                                     )
-                                )
-                                if (response.isSuccessful) {
-                                    Toast.makeText(context, "Cấu hình lập lịch đã được lưu!", Toast.LENGTH_SHORT).show()
-                                } else {
-                                    Toast.makeText(context, "Lưu cấu hình thất bại", Toast.LENGTH_SHORT).show()
                                 }
-                            } catch (e: Exception) {
-                                Toast.makeText(context, "Lỗi: ${e.message}", Toast.LENGTH_LONG).show()
-                            } finally {
-                                isLoading = false
                             }
                         }
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(50.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = SecondaryTeal),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Text("LƯU CẤU HÌNH THIẾT LẬP", fontWeight = FontWeight.Bold)
+                    }
+
+                    // Schedule section
+                    SettingsSection(title = "🕐 Nhịp sinh hoạt") {
+                        Text(
+                            "AI dùng các thông số này để sắp xếp lịch trình phù hợp với bạn.",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = 12.sp,
+                            modifier = Modifier.padding(bottom = 12.dp)
+                        )
+
+                        TimePickerField(
+                            label = "Bắt đầu buổi sáng",
+                            value = morningStart,
+                            onValueChange = { morningStart = it }
+                        )
+
+                        Spacer(Modifier.height(12.dp))
+
+                        TimePickerField(
+                            label = "Kết thúc buổi tối",
+                            value = eveningEnd,
+                            onValueChange = { eveningEnd = it }
+                        )
+
+                        Spacer(Modifier.height(12.dp))
+
+                        OutlinedTextField(
+                            value = workDuration,
+                            onValueChange = { input -> workDuration = input.filter { it.isDigit() } },
+                            label = { Text("Thời lượng phiên làm việc (phút)") },
+                            modifier = Modifier.fillMaxWidth(),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = primary,
+                                unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                                focusedLabelColor = primary,
+                                focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                unfocusedTextColor = MaterialTheme.colorScheme.onSurface
+                            ),
+                            shape = RoundedCornerShape(12.dp),
+                            singleLine = true
+                        )
+                    }
+
+                    // Save button
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(54.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(
+                                if (!isSaving)
+                                    Brush.horizontalGradient(listOf(primary, tertiary))
+                                else Brush.horizontalGradient(listOf(
+                                    MaterialTheme.colorScheme.surfaceVariant,
+                                    MaterialTheme.colorScheme.surfaceVariant
+                                ))
+                            )
+                            .clickable(enabled = !isSaving) {
+                                val durationInt = workDuration.toIntOrNull() ?: 60
+                                isSaving = true
+                                coroutineScope.launch {
+                                    try {
+                                        val response = apiService.updatePreferences(
+                                            UserPreferences(
+                                                userId = "",
+                                                morningStartTime = morningStart,
+                                                eveningEndTime = eveningEnd,
+                                                workDurationPreference = durationInt
+                                            )
+                                        )
+                                        if (response.isSuccessful) {
+                                            Toast.makeText(context, "Cấu hình đã được lưu!", Toast.LENGTH_SHORT).show()
+                                        } else {
+                                            Toast.makeText(context, "Lưu cấu hình thất bại", Toast.LENGTH_SHORT).show()
+                                        }
+                                    } catch (e: Exception) {
+                                        Toast.makeText(context, "Lỗi: ${e.message}", Toast.LENGTH_LONG).show()
+                                    } finally {
+                                        isSaving = false
+                                    }
+                                }
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (isSaving) {
+                            CircularProgressIndicator(color = Color.White, modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
+                        } else {
+                            Text(
+                                "Lưu thiết lập",
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 15.sp
+                            )
+                        }
+                    }
+
+                    Spacer(Modifier.height(8.dp))
                 }
             }
         }
     }
 }
 
-/**
- * Nút chọn giờ dùng TimePickerDialog, hiển thị giá trị "HH:MM". Tránh việc người dùng gõ tay sai định dạng.
- */
+@Composable
+private fun SettingsSection(title: String, content: @Composable ColumnScope.() -> Unit) {
+    Column {
+        Text(
+            title,
+            fontWeight = FontWeight.Bold,
+            fontSize = 14.sp,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            color = MaterialTheme.colorScheme.surface,
+            shadowElevation = 1.dp,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(16.dp), content = content)
+        }
+    }
+}
+
 @Composable
 fun TimePickerField(
     label: String,
@@ -171,31 +278,41 @@ fun TimePickerField(
     onValueChange: (String) -> Unit
 ) {
     val context = LocalContext.current
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(label, color = TextSecondary, fontSize = 12.sp)
-        Button(
-            onClick = {
-                val parts = value.split(":")
-                val initialHour = parts.getOrNull(0)?.toIntOrNull() ?: 8
-                val initialMinute = parts.getOrNull(1)?.toIntOrNull() ?: 0
-                TimePickerDialog(context, { _, hour, minute ->
-                    onValueChange(String.format("%02d:%02d", hour, minute))
-                }, initialHour, initialMinute, true).show()
-            },
-            colors = ButtonDefaults.buttonColors(containerColor = SurfaceGlass),
-            border = BorderStroke(1.dp, BorderLight),
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+        Surface(
             shape = RoundedCornerShape(12.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(50.dp)
+                .clickable {
+                    val parts = value.split(":")
+                    val initialHour = parts.getOrNull(0)?.toIntOrNull() ?: 8
+                    val initialMinute = parts.getOrNull(1)?.toIntOrNull() ?: 0
+                    TimePickerDialog(context, { _, hour, minute ->
+                        onValueChange(String.format("%02d:%02d", hour, minute))
+                    }, initialHour, initialMinute, true).show()
+                }
         ) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 14.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(value.ifEmpty { "Chọn giờ" }, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-                Icon(Icons.Default.DateRange, contentDescription = null, tint = PrimaryIndigo, modifier = Modifier.size(20.dp))
+                Text(
+                    value.ifEmpty { "Chọn giờ" },
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Icon(
+                    Icons.Default.DateRange,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp)
+                )
             }
         }
     }

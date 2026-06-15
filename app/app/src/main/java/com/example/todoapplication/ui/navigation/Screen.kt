@@ -11,4 +11,8 @@ sealed class Screen(val route: String) {
     object AICoach : Screen("ai_coach")
     object Stats : Screen("stats")
     object Settings : Screen("settings")
+    object Pomodoro : Screen("pomodoro/{taskId}/{taskTitle}") {
+        fun createRoute(taskId: String, taskTitle: String) =
+            "pomodoro/${taskId}/${java.net.URLEncoder.encode(taskTitle, "UTF-8")}"
+    }
 }

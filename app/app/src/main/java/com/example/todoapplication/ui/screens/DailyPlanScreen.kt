@@ -15,23 +15,20 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.example.todoapplication.data.api.NetworkClient
 import com.example.todoapplication.data.model.DailyPlan
 import com.example.todoapplication.data.model.PlanSlot
-import com.example.todoapplication.ui.theme.BackgroundObsidian
-import com.example.todoapplication.ui.theme.PrimaryIndigo
-import com.example.todoapplication.ui.theme.SecondaryTeal
-import com.example.todoapplication.ui.theme.SurfaceGlass
-import com.example.todoapplication.ui.theme.BorderLight
-import com.example.todoapplication.ui.theme.TextSecondary
 import com.example.todoapplication.ui.navigation.Screen
+import com.example.todoapplication.ui.theme.*
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
@@ -46,6 +43,9 @@ fun DailyPlanScreen(navController: NavController) {
     var dailyPlan by remember { mutableStateOf<DailyPlan?>(null) }
     var isLoading by remember { mutableStateOf(true) }
 
+    val primary = MaterialTheme.colorScheme.primary
+    val primaryContainer = MaterialTheme.colorScheme.primaryContainer
+
     fun loadPlan() {
         isLoading = true
         coroutineScope.launch {
@@ -53,11 +53,7 @@ fun DailyPlanScreen(navController: NavController) {
                 val todayStr = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
                 val localTimeStr = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
                 val response = apiService.getDailyPlan(todayStr, localTimeStr)
-                if (response.isSuccessful) {
-                    dailyPlan = response.body()
-                } else {
-                    dailyPlan = null
-                }
+                dailyPlan = if (response.isSuccessful) response.body() else null
             } catch (e: Exception) {
                 Toast.makeText(context, "Lỗi tải lịch trình: ${e.message}", Toast.LENGTH_SHORT).show()
             } finally {
@@ -66,136 +62,180 @@ fun DailyPlanScreen(navController: NavController) {
         }
     }
 
-    LaunchedEffect(Unit) {
-        loadPlan()
+    fun regeneratePlan() {
+        isLoading = true
+        coroutineScope.launch {
+            try {
+                val localTimeStr = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
+                val response = apiService.generateDailyPlan(localTimeStr)
+                if (response.isSuccessful) {
+                    dailyPlan = response.body()
+                    Toast.makeText(context, "Đã tái tạo lịch trình!", Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(context, "Tái tạo thất bại", Toast.LENGTH_SHORT).show()
+                }
+            } catch (e: Exception) {
+                Toast.makeText(context, "Lỗi: ${e.message}", Toast.LENGTH_SHORT).show()
+            } finally {
+                isLoading = false
+            }
+        }
+    }
+
+    LaunchedEffect(Unit) { loadPlan() }
+
+    // Today's date display
+    val todayFormatted = remember {
+        SimpleDateFormat("EEEE, dd MMMM", Locale("vi", "VN")).format(Date())
     }
 
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Lịch Trình Hôm Nay", color = Color.White, fontWeight = FontWeight.Bold) },
-                actions = {
-                    if (dailyPlan != null) {
-                        IconButton(onClick = {
-                            isLoading = true
-                            coroutineScope.launch {
-                                try {
-                                    val localTimeStr = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
-                                    val response = apiService.generateDailyPlan(localTimeStr)
-                                    if (response.isSuccessful) {
-                                        dailyPlan = response.body()
-                                        Toast.makeText(context, "Đã tái tạo lịch trình!", Toast.LENGTH_SHORT).show()
-                                    } else {
-                                        Toast.makeText(context, "Tái tạo lịch trình thất bại", Toast.LENGTH_SHORT).show()
-                                    }
-                                } catch (e: Exception) {
-                                    Toast.makeText(context, "Lỗi: ${e.message}", Toast.LENGTH_SHORT).show()
-                                } finally {
-                                    isLoading = false
-                                }
-                            }
-                        }) {
-                            Icon(Icons.Default.Refresh, contentDescription = "Regenerate Plan", tint = PrimaryIndigo)
-                        }
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = BackgroundObsidian)
-            )
-        },
-        bottomBar = {
-            BottomNavigationBar(navController, activeTab = 1)
-        },
-        containerColor = BackgroundObsidian
+        bottomBar = { BottomNavigationBar(navController, activeTab = 1) },
+        containerColor = MaterialTheme.colorScheme.background
     ) { innerPadding ->
-        if (isLoading) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = PrimaryIndigo)
-            }
-        } else if (dailyPlan == null || dailyPlan!!.planData.isEmpty()) {
-            // Empy State: Button to generate plan
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+        ) {
+            // Gradient date hero header
             Box(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding)
-                    .padding(24.dp),
-                contentAlignment = Alignment.Center
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp))
+                    .background(Brush.verticalGradient(listOf(primary, primaryContainer)))
+                    .statusBarsPadding()
+                    .padding(horizontal = 20.dp, vertical = 20.dp)
             ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
+                Column {
                     Text(
-                        text = "Bạn chưa có lịch trình hôm nay",
-                        color = TextSecondary,
-                        fontSize = 16.sp
+                        "Lịch trình hôm nay",
+                        color = Color.White.copy(alpha = 0.8f),
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium
                     )
                     Text(
-                        text = "Hệ thống AI sẽ tự động sắp xếp các công việc của bạn dựa trên độ ưu tiên, hạn chót và thói quen làm việc.",
-                        color = TextSecondary,
-                        fontSize = 12.sp,
-                        modifier = Modifier.padding(horizontal = 24.dp),
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        todayFormatted.replaceFirstChar { it.uppercase() },
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 22.sp,
+                        modifier = Modifier.padding(top = 4.dp)
                     )
-                    Button(
-                        onClick = {
-                            isLoading = true
-                            coroutineScope.launch {
-                                try {
-                                    val localTimeStr = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
-                                    val response = apiService.generateDailyPlan(localTimeStr)
-                                    if (response.isSuccessful) {
-                                        dailyPlan = response.body()
-                                    } else {
-                                        Toast.makeText(context, "Không có công việc đang mở nào để lập kế hoạch", Toast.LENGTH_LONG).show()
-                                    }
-                                } catch (e: Exception) {
-                                    Toast.makeText(context, "Lỗi: ${e.message}", Toast.LENGTH_LONG).show()
-                                } finally {
-                                    isLoading = false
-                                }
-                            }
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = PrimaryIndigo),
-                        shape = RoundedCornerShape(12.dp)
+                    if (dailyPlan != null && dailyPlan!!.planData.isNotEmpty()) {
+                        Surface(
+                            shape = RoundedCornerShape(20.dp),
+                            color = Color.White.copy(alpha = 0.2f),
+                            modifier = Modifier.padding(top = 12.dp)
+                        ) {
+                            Text(
+                                "${dailyPlan!!.planData.size} khung giờ đã lên lịch",
+                                color = Color.White,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                            )
+                        }
+                    }
+                }
+
+                if (dailyPlan != null) {
+                    IconButton(
+                        onClick = { regeneratePlan() },
+                        modifier = Modifier.align(Alignment.TopEnd)
                     ) {
-                        Text("TẠO LỊCH TRÌNH BẰNG AI", fontWeight = FontWeight.Bold)
+                        Icon(
+                            Icons.Default.Refresh,
+                            contentDescription = "Tái tạo",
+                            tint = Color.White,
+                            modifier = Modifier.size(22.dp)
+                        )
                     }
                 }
             }
-        } else {
-            // List Timeline slots
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding)
-                    .padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                item {
-                    Text(
-                        text = "Lịch biểu của bạn được tối ưu hóa bằng trí tuệ nhân tạo.",
-                        color = TextSecondary,
-                        fontSize = 12.sp,
-                        modifier = Modifier.padding(bottom = 8.dp)
-                    )
-                }
 
-                items(dailyPlan!!.planData) { slot ->
-                    TimelineSlotRow(
-                        slot = slot,
-                        onClick = {
-                            if (slot.taskId.isNotEmpty()) {
-                                navController.navigate(Screen.TaskDetail.createRoute(slot.taskId))
+            // Content
+            when {
+                isLoading -> {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = primary)
+                    }
+                }
+                dailyPlan == null || dailyPlan!!.planData.isEmpty() -> {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(24.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            Text("📋", fontSize = 52.sp)
+                            Text(
+                                "Chưa có lịch trình hôm nay",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 18.sp,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                "AI sẽ tự sắp xếp các công việc của bạn theo độ ưu tiên, hạn chót và thói quen làm việc.",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontSize = 13.sp,
+                                textAlign = TextAlign.Center
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(52.dp)
+                                    .clip(RoundedCornerShape(16.dp))
+                                    .background(Brush.horizontalGradient(listOf(primary, MaterialTheme.colorScheme.tertiary)))
+                                    .clickable { regeneratePlan() },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    "Tạo lịch trình bằng AI",
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 15.sp
+                                )
                             }
                         }
-                    )
+                    }
+                }
+                else -> {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        item {
+                            Text(
+                                "Lịch biểu được tối ưu bởi AI ✨",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontSize = 12.sp,
+                                modifier = Modifier.padding(bottom = 4.dp)
+                            )
+                        }
+                        items(dailyPlan!!.planData) { slot ->
+                            ModernTimelineSlot(
+                                slot = slot,
+                                isFirst = slot == dailyPlan!!.planData.first(),
+                                isLast = slot == dailyPlan!!.planData.last(),
+                                onClick = {
+                                    if (slot.taskId.isNotEmpty()) {
+                                        navController.navigate(Screen.TaskDetail.createRoute(slot.taskId))
+                                    }
+                                }
+                            )
+                        }
+                    }
                 }
             }
         }
     }
 }
 
-/** Tính khoảng thời lượng (phút) giữa hai mốc "HH:mm", trả về null nếu không hợp lệ. */
 private fun slotDurationMinutes(start: String, end: String): Int? {
     fun toMinutes(t: String): Int? {
         val parts = t.split(":")
@@ -210,85 +250,106 @@ private fun slotDurationMinutes(start: String, end: String): Int? {
 }
 
 @Composable
-fun TimelineSlotRow(slot: PlanSlot, onClick: () -> Unit) {
+fun ModernTimelineSlot(slot: PlanSlot, isFirst: Boolean, isLast: Boolean, onClick: () -> Unit) {
+    val primary = MaterialTheme.colorScheme.primary
+
     Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(IntrinsicSize.Min),
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        // Time display
+        // Time column
         Column(
-            modifier = Modifier.width(90.dp),
-            verticalArrangement = Arrangement.Center
+            modifier = Modifier.width(52.dp),
+            horizontalAlignment = Alignment.End,
+            verticalArrangement = Arrangement.Top
         ) {
             Text(
-                text = slot.start,
-                fontSize = 16.sp,
+                slot.start,
+                fontSize = 13.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color.White
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.padding(top = 14.dp)
             )
             Text(
-                text = slot.end,
-                fontSize = 12.sp,
-                color = TextSecondary
+                slot.end,
+                fontSize = 11.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 2.dp)
             )
         }
 
-        // Vertical Line indicator
+        // Timeline indicator
         Box(
             modifier = Modifier
-                .width(16.dp)
-                .fillMaxHeight()
-                .padding(end = 8.dp),
-            contentAlignment = Alignment.Center
+                .width(20.dp)
+                .fillMaxHeight(),
+            contentAlignment = Alignment.TopCenter
         ) {
-            Spacer(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .width(2.dp)
-                    .background(BorderLight)
-            )
+            // Vertical line
+            if (!isLast) {
+                Box(
+                    modifier = Modifier
+                        .width(2.dp)
+                        .fillMaxHeight()
+                        .offset(y = 16.dp)
+                        .background(MaterialTheme.colorScheme.outlineVariant)
+                )
+            }
+            // Dot
             Box(
                 modifier = Modifier
-                    .size(10.dp)
-                    .background(PrimaryIndigo, shape = CircleShape)
+                    .size(14.dp)
+                    .offset(y = 14.dp)
+                    .background(
+                        Brush.linearGradient(
+                            listOf(primary, MaterialTheme.colorScheme.tertiary)
+                        ),
+                        CircleShape
+                    )
             )
         }
 
-        // Schedule Slot Card
+        // Slot card
         val durationMins = slotDurationMinutes(slot.start, slot.end)
-        Card(
+        Surface(
+            shape = RoundedCornerShape(14.dp),
+            color = MaterialTheme.colorScheme.surface,
+            shadowElevation = 2.dp,
             modifier = Modifier
                 .weight(1f)
-                .padding(vertical = 4.dp)
-                .clickable(onClick = onClick),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = SurfaceGlass)
+                .padding(bottom = 8.dp)
+                .clickable(onClick = onClick)
         ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp),
+                    .padding(14.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = slot.title,
-                        fontSize = 15.sp,
+                        slot.title,
+                        fontSize = 14.sp,
                         fontWeight = FontWeight.SemiBold,
-                        color = Color.White
+                        color = MaterialTheme.colorScheme.onSurface
                     )
-                    Text(
-                        text = if (durationMins != null) "${slot.start} – ${slot.end} · $durationMins phút" else "${slot.start} – ${slot.end}",
-                        fontSize = 11.sp,
-                        color = TextSecondary
-                    )
+                    if (durationMins != null) {
+                        Text(
+                            "$durationMins phút · ${slot.start}–${slot.end}",
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 3.dp)
+                        )
+                    }
                 }
                 Icon(
                     Icons.Default.KeyboardArrowRight,
-                    contentDescription = "Mở công việc",
-                    tint = TextSecondary,
-                    modifier = Modifier.size(20.dp)
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(18.dp)
                 )
             }
         }

@@ -23,66 +23,39 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
-import com.example.todoapplication.data.api.NetworkClient
-import com.example.todoapplication.data.model.DailyPlan
 import com.example.todoapplication.data.model.PlanSlot
 import com.example.todoapplication.ui.navigation.Screen
 import com.example.todoapplication.ui.theme.*
-import kotlinx.coroutines.launch
+import com.example.todoapplication.ui.viewmodel.DailyPlanViewModel
 import java.text.SimpleDateFormat
 import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DailyPlanScreen(navController: NavController) {
+fun DailyPlanScreen(
+    navController: NavController,
+    dailyPlanViewModel: DailyPlanViewModel = viewModel(factory = DailyPlanViewModel.Factory)
+) {
     val context = LocalContext.current
-    val coroutineScope = rememberCoroutineScope()
-    val apiService = remember { NetworkClient.getApiService(context) }
+    val state by dailyPlanViewModel.uiState.collectAsStateWithLifecycle()
 
-    var dailyPlan by remember { mutableStateOf<DailyPlan?>(null) }
-    var isLoading by remember { mutableStateOf(true) }
+    val dailyPlan = state.plan
+    val isLoading = state.isLoading
 
     val primary = MaterialTheme.colorScheme.primary
     val primaryContainer = MaterialTheme.colorScheme.primaryContainer
 
-    fun loadPlan() {
-        isLoading = true
-        coroutineScope.launch {
-            try {
-                val todayStr = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
-                val localTimeStr = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
-                val response = apiService.getDailyPlan(todayStr, localTimeStr)
-                dailyPlan = if (response.isSuccessful) response.body() else null
-            } catch (e: Exception) {
-                Toast.makeText(context, "Lỗi tải lịch trình: ${e.message}", Toast.LENGTH_SHORT).show()
-            } finally {
-                isLoading = false
-            }
+    fun regeneratePlan() = dailyPlanViewModel.regenerate()
+
+    LaunchedEffect(Unit) { dailyPlanViewModel.loadPlan() }
+    LaunchedEffect(Unit) {
+        dailyPlanViewModel.events.collect { msg ->
+            Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
         }
     }
-
-    fun regeneratePlan() {
-        isLoading = true
-        coroutineScope.launch {
-            try {
-                val localTimeStr = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
-                val response = apiService.generateDailyPlan(localTimeStr)
-                if (response.isSuccessful) {
-                    dailyPlan = response.body()
-                    Toast.makeText(context, "Đã tái tạo lịch trình!", Toast.LENGTH_SHORT).show()
-                } else {
-                    Toast.makeText(context, "Tái tạo thất bại", Toast.LENGTH_SHORT).show()
-                }
-            } catch (e: Exception) {
-                Toast.makeText(context, "Lỗi: ${e.message}", Toast.LENGTH_SHORT).show()
-            } finally {
-                isLoading = false
-            }
-        }
-    }
-
-    LaunchedEffect(Unit) { loadPlan() }
 
     // Today's date display
     val todayFormatted = remember {

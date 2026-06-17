@@ -14,6 +14,7 @@
 | Bất đồng bộ | Kotlin Coroutines |
 | Nhắc nhở nền | WorkManager |
 | Sắp xếp kéo-thả | `sh.calvin.reorderable:reorderable:2.4.3` |
+| Local DB (offline + gamification) | Room 2.7.1 (qua KSP) |
 | Lưu phiên | SharedPreferences |
 
 - `minSdk = 29`, `targetSdk = 36`, `compileSdk = 36`
@@ -32,16 +33,29 @@ app/src/main/java/com/example/todoapplication/
       ApiService.kt              # Khai báo các endpoint Retrofit
       NetworkClient.kt           # OkHttp + interceptor token + Authenticator tự refresh
     model/Models.kt              # Các data class request/response
-    repository/
+    local/                       # Room database (local DB)
+      AppDatabase.kt             # RoomDatabase singleton (2 bảng)
+      TaskCacheEntity.kt         # Bản sao offline của task
+      GamificationEntity.kt      # 1 dòng: XP, streak, huy hiệu
+      Daos.kt                    # TaskCacheDao + GamificationDao
+    repository/                  # Tầng Repository (MVVM) — nguồn dữ liệu duy nhất
+      TaskRepository.kt          # CRUD task + cache offline + gamification
+      Repositories.kt            # Auth/Preferences/Plan/Ai/Stats Repository
       SessionManager.kt          # Lưu/đọc access & refresh token, thông tin user
       SessionEvents.kt           # SharedFlow phát sự kiện buộc đăng xuất
       QuickAddDraft.kt           # Holder tạm cho kết quả AI Quick Add
       ThemeController.kt         # Singleton quản lý chế độ sáng/tối/hệ thống
+      TaskCacheRepository.kt     # Đọc/ghi cache task offline (map Task ↔ entity)
+      GamificationManager.kt     # Logic XP / streak / level / huy hiệu (state Compose)
     notifications/
       ReminderScheduler.kt       # Lập/huỷ lịch nhắc nhở bằng WorkManager
       ReminderWorker.kt          # Hiển thị notification khi đến hạn
+  di/
+    ServiceLocator.kt            # Manual DI: cung cấp ApiService/DB/Repository (lazy singleton)
   ui/
     navigation/Screen.kt         # Định nghĩa route (kể cả Pomodoro)
+    state/UiState.kt             # sealed Loading / Success / Error
+    viewmodel/                   # 9 ViewModel (StateFlow<UiState> + SharedFlow sự kiện)
     components/
       AppBottomBar.kt            # Floating pill navigation bar tái dùng
       CommonComponents.kt        # EmptyState, LoadingState
@@ -56,6 +70,7 @@ app/src/main/java/com/example/todoapplication/
       StatsScreen.kt             # Thống kê + Biểu đồ + Trí nhớ AI
       SettingsScreen.kt          # Cài đặt cá nhân
       PomodoroScreen.kt          # Pomodoro Timer
+      AchievementsScreen.kt      # Thành tích: cấp độ, streak, huy hiệu
     theme/
       Color.kt                   # Bảng màu pastel Light + Dark + AppAccent
       Theme.kt                   # LightColorScheme / DarkColorScheme
@@ -80,6 +95,25 @@ app/src/main/java/com/example/todoapplication/
 | `StatsScreen` | 3 tab: **Thống kê** (big numbers) · **Biểu đồ** (bar chart 7 ngày) · **Trí nhớ AI** |
 | `SettingsScreen` | Chọn giao diện Sáng/Tối/Hệ thống; cấu hình giờ giấc cho lập lịch AI |
 | `PomodoroScreen` | Pomodoro Timer: arc tiến độ Canvas, 3 pha làm việc/nghỉ, đếm phiên, vibration |
+| `AchievementsScreen` | Cấp độ + thanh XP, chuỗi ngày (streak), lưới huy hiệu thành tích |
+
+---
+
+## 🏛️ Kiến trúc MVVM
+
+Ứng dụng theo **MVVM** với luồng dữ liệu một chiều:
+
+```
+View (Composable) → ViewModel (StateFlow<UiState>) → Repository → REST / Room
+```
+
+- **View** chỉ render state + chuyển hành động cho ViewModel; không gọi API trực tiếp.
+- **ViewModel** (`ui/viewmodel/`, 9 cái): phơi `StateFlow<…UiState>` (View thu bằng `collectAsStateWithLifecycle()`), phát sự kiện một lần qua `SharedFlow` (toast/điều hướng/rung), chạy nghiệp vụ trong `viewModelScope` → sống sót qua xoay màn hình (vd timer Pomodoro).
+- **Repository** (`data/repository/`): `TaskRepository`, `AuthRepository`, `PreferencesRepository`, `PlanRepository`, `AiRepository`, `StatsRepository` — nguồn dữ liệu duy nhất, bọc REST + Room + side-effect, trả `Result<T>`.
+- **UiState** (`ui/state/UiState.kt`): sealed `Loading / Success / Error`.
+- **DI**: `di/ServiceLocator.kt` (manual DI, lazy singleton) cấp Repository cho ViewModel qua `ViewModelProvider.Factory`.
+
+> ⚠️ Định hướng ban đầu dùng **Hilt** nhưng Hilt Gradle plugin (≤ 2.57.1) **không tương thích AGP 9** (lỗi *"Android BaseExtension not found"*). Đã chuyển sang **ServiceLocator** để đạt cùng mục tiêu DI mà vẫn build được. Chi tiết công nghệ: [CONG-NGHE-SU-DUNG.md](CONG-NGHE-SU-DUNG.md).
 
 ---
 
@@ -112,6 +146,23 @@ Tab "📈 Biểu đồ" trong `StatsScreen`:
 - Chip "Tổng tuần" + "Ngày năng suất nhất"
 - Progress bar chi tiết từng ngày
 - Dữ liệu tính từ `GET /tasks?status=COMPLETED`, nhóm theo ngày trong tuần
+
+### 📴 Offline-first với Room
+Cache đọc offline qua local DB (Room) — [`TaskCacheRepository`](app/src/main/java/com/example/todoapplication/data/repository/TaskCacheRepository.kt):
+- Mỗi lần tải task từ API **thành công** (xem toàn bộ, không lọc) → ghi đè cache xuống bảng `task_cache`
+- Khi **mất mạng** (API ném exception) → tự đọc lại từ Room, hiển thị danh sách + **banner "📴 Chế độ offline"**
+- `AppDatabase` là RoomDatabase singleton, dùng KSP sinh mã DAO
+
+> ⚙️ AGP 9 dùng "built-in Kotlin" nên cần flag `android.disallowKotlinSourceSets=false` trong `gradle.properties` để KSP (Room) thêm được source set sinh mã.
+
+### 🔥 Gamification — Streak, XP, Huy hiệu
+[`GamificationManager`](app/src/main/java/com/example/todoapplication/data/repository/GamificationManager.kt) lưu trạng thái thuần client trong Room (bảng `gamification`, 1 dòng):
+- **XP**: mỗi việc hoàn thành +10, cộng thêm theo độ ưu tiên (HIGH +15, MEDIUM +5)
+- **Cấp độ**: tính từ tổng XP, mỗi cấp cần thêm 50 XP so với cấp trước
+- **Streak**: chuỗi ngày liên tiếp có hoàn thành việc (so sánh `lastCompletionDate` với hôm qua/hôm nay)
+- **7 huy hiệu**: Khởi đầu 🌱, Chăm chỉ ⭐, Bậc thầy 🏆, Bền bỉ 🔥, Không thể cản ⚡, Lên đỉnh 👑, Kho báu 💎
+- Hoàn thành việc → cộng thưởng + **Toast chúc mừng** khi mở khóa huy hiệu mới
+- Hiển thị: card streak trên `TaskListScreen` + màn `AchievementsScreen` đầy đủ (ring cấp độ, thanh XP, lưới huy hiệu)
 
 ### 🎨 Design System hiện đại
 - **Bảng màu pastel** Light + Dark — cả 2 mode qua Material3 `colorScheme`

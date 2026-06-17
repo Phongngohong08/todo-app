@@ -32,98 +32,46 @@ import androidx.navigation.NavController
 import com.example.todoapplication.data.api.NetworkClient
 import com.example.todoapplication.data.model.MemoryItem
 import com.example.todoapplication.data.model.StatsSummary
-import com.example.todoapplication.data.model.Task
 import com.example.todoapplication.ui.navigation.Screen
 import com.example.todoapplication.ui.theme.*
-import com.example.todoapplication.ui.utils.parseIso8601
-import kotlinx.coroutines.launch
+import com.example.todoapplication.ui.viewmodel.StatsViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun StatsScreen(navController: NavController) {
+fun StatsScreen(
+    navController: NavController,
+    statsViewModel: StatsViewModel = viewModel(factory = StatsViewModel.Factory)
+) {
     val context = LocalContext.current
-    val coroutineScope = rememberCoroutineScope()
-    val apiService = remember { NetworkClient.getApiService(context) }
+    val state by statsViewModel.uiState.collectAsStateWithLifecycle()
 
     var selectedTab by remember { mutableStateOf(0) }
     val tabTitles = listOf("📊 Thống kê", "📈 Biểu đồ", "🧠 Trí nhớ AI")
 
-    var statsSummary by remember { mutableStateOf<StatsSummary?>(null) }
-    var isLoadingStats by remember { mutableStateOf(true) }
-    var memories by remember { mutableStateOf<List<MemoryItem>>(emptyList()) }
-    var isLoadingMemories by remember { mutableStateOf(false) }
-    var isTriggeringExtraction by remember { mutableStateOf(false) }
-    var weeklyData by remember { mutableStateOf<List<Int>>(List(7) { 0 }) }
-    var isLoadingWeekly by remember { mutableStateOf(false) }
+    val statsSummary = state.summary
+    val isLoadingStats = state.isLoadingStats
+    val memories = state.memories
+    val isLoadingMemories = state.isLoadingMemories
+    val isTriggeringExtraction = state.isExtracting
+    val weeklyData = state.weekly
+    val isLoadingWeekly = state.isLoadingWeekly
 
     val primary = MaterialTheme.colorScheme.primary
     val tertiary = MaterialTheme.colorScheme.tertiary
 
-    fun loadStats() {
-        isLoadingStats = true
-        coroutineScope.launch {
-            try {
-                val response = apiService.getStatsSummary()
-                if (response.isSuccessful) statsSummary = response.body()
-            } catch (e: Exception) {
-                Toast.makeText(context, "Lỗi tải thống kê: ${e.message}", Toast.LENGTH_SHORT).show()
-            } finally {
-                isLoadingStats = false
-            }
-        }
-    }
-
-    fun loadMemories() {
-        isLoadingMemories = true
-        coroutineScope.launch {
-            try {
-                val response = apiService.listMemories()
-                if (response.isSuccessful) memories = response.body() ?: emptyList()
-            } catch (e: Exception) {
-                Toast.makeText(context, "Lỗi tải trí nhớ: ${e.message}", Toast.LENGTH_SHORT).show()
-            } finally {
-                isLoadingMemories = false
-            }
-        }
-    }
-
-    fun loadWeeklyChart() {
-        isLoadingWeekly = true
-        coroutineScope.launch {
-            try {
-                val response = apiService.listTasks(status = "COMPLETED")
-                if (response.isSuccessful) {
-                    val tasks: List<Task> = response.body() ?: emptyList()
-                    val cal = Calendar.getInstance()
-                    val now = cal.time
-                    val counts = MutableList(7) { 0 }
-                    // Map: Sunday=0..Saturday=6 in Calendar → Mon=0..Sun=6 display
-                    tasks.forEach { task ->
-                        val updated = parseIso8601(task.updatedAt) ?: return@forEach
-                        cal.time = updated
-                        val daysSinceNow = ((now.time - updated.time) / (1000 * 60 * 60 * 24)).toInt()
-                        if (daysSinceNow in 0..6) {
-                            // index 0 = 6 days ago, index 6 = today
-                            val idx = 6 - daysSinceNow
-                            counts[idx]++
-                        }
-                    }
-                    weeklyData = counts
-                }
-            } catch (e: Exception) {
-                Toast.makeText(context, "Lỗi tải biểu đồ: ${e.message}", Toast.LENGTH_SHORT).show()
-            } finally {
-                isLoadingWeekly = false
-            }
-        }
-    }
-
     LaunchedEffect(selectedTab) {
         when (selectedTab) {
-            0 -> loadStats()
-            1 -> loadWeeklyChart()
-            2 -> loadMemories()
+            0 -> statsViewModel.loadSummary()
+            1 -> statsViewModel.loadWeekly()
+            2 -> statsViewModel.loadMemories()
+        }
+    }
+    LaunchedEffect(Unit) {
+        statsViewModel.events.collect { msg ->
+            Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
         }
     }
 
@@ -356,30 +304,7 @@ fun StatsScreen(navController: NavController) {
                                             ))
                                         )
                                         .clickable(enabled = !isTriggeringExtraction) {
-                                            isTriggeringExtraction = true
-                                            coroutineScope.launch {
-                                                try {
-                                                    val response = apiService.triggerMemoryExtraction()
-                                                    if (response.isSuccessful) {
-                                                        val extracted = response.body()?.extracted ?: 0
-                                                        val analyzed = response.body()?.analyzed ?: 0
-                                                        val r2 = apiService.listMemories()
-                                                        if (r2.isSuccessful) memories = r2.body() ?: emptyList()
-                                                        val msg = when {
-                                                            extracted > 0 -> "Đã phân tích $analyzed hoạt động và rút ra $extracted thói quen mới."
-                                                            analyzed == 0 -> "Chưa có hoạt động nào trong 30 ngày để phân tích."
-                                                            else -> "Đã phân tích $analyzed hoạt động nhưng chưa rút ra thói quen mới."
-                                                        }
-                                                        Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
-                                                    } else {
-                                                        Toast.makeText(context, "Phân tích thất bại: ${response.code()}", Toast.LENGTH_SHORT).show()
-                                                    }
-                                                } catch (e: Exception) {
-                                                    Toast.makeText(context, "Lỗi: ${e.message}", Toast.LENGTH_SHORT).show()
-                                                } finally {
-                                                    isTriggeringExtraction = false
-                                                }
-                                            }
+                                            statsViewModel.triggerExtraction()
                                         },
                                     contentAlignment = Alignment.Center
                                 ) {
@@ -476,15 +401,7 @@ fun StatsScreen(navController: NavController) {
                                                 modifier = Modifier.weight(1f)
                                             )
                                             IconButton(
-                                                onClick = {
-                                                    coroutineScope.launch {
-                                                        val r = apiService.deleteMemory(memory.id)
-                                                        if (r.isSuccessful) {
-                                                            Toast.makeText(context, "Đã xóa trí nhớ", Toast.LENGTH_SHORT).show()
-                                                            loadMemories()
-                                                        }
-                                                    }
-                                                },
+                                                onClick = { statsViewModel.deleteMemory(memory.id) },
                                                 modifier = Modifier.size(32.dp)
                                             ) {
                                                 Icon(

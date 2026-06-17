@@ -21,7 +21,6 @@ import androidx.navigation.navArgument
 import java.net.URLDecoder
 import com.example.todoapplication.data.repository.SessionEvents
 import com.example.todoapplication.data.repository.SessionManager
-import com.example.todoapplication.data.repository.ThemeController
 import com.example.todoapplication.ui.navigation.Screen
 import com.example.todoapplication.ui.screens.*
 import com.example.todoapplication.ui.theme.TodoApplicationTheme
@@ -29,7 +28,6 @@ import com.example.todoapplication.ui.theme.TodoApplicationTheme
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        ThemeController.init(this)
         enableEdgeToEdge()
         setContent {
             TodoApplicationTheme {
@@ -114,6 +112,9 @@ class MainActivity : ComponentActivity() {
                                 "UTF-8"
                             )
                             PomodoroScreen(navController, taskId, taskTitle)
+                        }
+                        composable(Screen.Achievements.route) {
+                            AchievementsScreen(navController)
                         }
                     }
                 }

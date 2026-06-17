@@ -24,63 +24,33 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
-import com.example.todoapplication.data.api.NetworkClient
-import com.example.todoapplication.data.model.ChatInput
 import com.example.todoapplication.ui.theme.*
-import kotlinx.coroutines.launch
-
-data class ChatUIModel(val text: String, val isUser: Boolean)
-
-private const val COACH_GREETING =
-    "Xin chào! Tôi là AI Coach của bạn. Tôi có thể giúp bạn sắp xếp kế hoạch, tìm động lực hoặc phân tích thói quen trì hoãn. Hôm nay bạn muốn chia sẻ điều gì?"
-
-private val SUGGESTED_PROMPTS = listOf(
-    "Giúp tôi sắp xếp hôm nay",
-    "Tôi hay trì hoãn, sao khắc phục?",
-    "Lời khuyên giữ tập trung",
-    "Phân tích thói quen của tôi"
-)
-
-object ChatHistory {
-    val messages = mutableStateListOf(ChatUIModel(COACH_GREETING, isUser = false))
-}
+import com.example.todoapplication.ui.viewmodel.AICoachViewModel
+import com.example.todoapplication.ui.viewmodel.ChatUIModel
+import com.example.todoapplication.ui.viewmodel.SUGGESTED_PROMPTS
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AICoachScreen(navController: NavController) {
-    val context = LocalContext.current
-    val coroutineScope = rememberCoroutineScope()
-    val apiService = remember { NetworkClient.getApiService(context) }
+fun AICoachScreen(
+    navController: NavController,
+    aiCoachViewModel: AICoachViewModel = viewModel(factory = AICoachViewModel.Factory)
+) {
+    val state by aiCoachViewModel.uiState.collectAsStateWithLifecycle()
+    val messages = state.messages
+    val isThinking = state.isThinking
 
-    val messages = ChatHistory.messages
     var messageText by remember { mutableStateOf("") }
-    var isThinking by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
 
     val primary = MaterialTheme.colorScheme.primary
     val tertiary = MaterialTheme.colorScheme.tertiary
 
     fun sendMessage(text: String) {
-        val trimmed = text.trim()
-        if (trimmed.isBlank() || isThinking) return
+        aiCoachViewModel.sendMessage(text)
         messageText = ""
-        messages.add(ChatUIModel(trimmed, isUser = true))
-        isThinking = true
-        coroutineScope.launch {
-            try {
-                val response = apiService.chat(ChatInput(trimmed))
-                if (response.isSuccessful && response.body() != null) {
-                    messages.add(ChatUIModel(response.body()!!.reply, isUser = false))
-                } else {
-                    messages.add(ChatUIModel("Tôi gặp sự cố kết nối tới máy chủ AI. Vui lòng thử lại sau.", isUser = false))
-                }
-            } catch (e: Exception) {
-                messages.add(ChatUIModel("Lỗi: ${e.message}", isUser = false))
-            } finally {
-                isThinking = false
-            }
-        }
     }
 
     LaunchedEffect(messages.size) {

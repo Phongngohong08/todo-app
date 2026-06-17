@@ -30,11 +30,13 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
-import com.example.todoapplication.data.api.NetworkClient
 import com.example.todoapplication.data.model.PostponeTaskInput
 import com.example.todoapplication.data.model.Task
-import com.example.todoapplication.data.notifications.ReminderScheduler
+import com.example.todoapplication.data.repository.GamificationManager
+import com.example.todoapplication.data.repository.QuickAddDraft
 import com.example.todoapplication.data.repository.SessionManager
 import com.example.todoapplication.ui.components.AppBottomBar
 import com.example.todoapplication.ui.components.EmptyState
@@ -45,7 +47,8 @@ import com.example.todoapplication.ui.utils.formatUtcToLocal
 import com.example.todoapplication.ui.utils.parseIso8601
 import com.example.todoapplication.ui.utils.priorityLabel
 import com.example.todoapplication.ui.utils.statusLabel
-import kotlinx.coroutines.launch
+import com.example.todoapplication.ui.viewmodel.TaskListEvent
+import com.example.todoapplication.ui.viewmodel.TaskListViewModel
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
 import java.text.SimpleDateFormat
@@ -84,22 +87,27 @@ fun computeAiScore(task: Task): Double {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TaskListScreen(navController: NavController) {
+fun TaskListScreen(
+    navController: NavController,
+    taskListViewModel: TaskListViewModel = viewModel(factory = TaskListViewModel.Factory)
+) {
     val context = LocalContext.current
-    val coroutineScope = rememberCoroutineScope()
     val sessionManager = remember { SessionManager(context) }
-    val apiService = remember { NetworkClient.getApiService(context) }
     val userName = remember { sessionManager.getUserName() ?: "bạn" }
 
-    var tasks by remember { mutableStateOf<List<Task>>(emptyList()) }
-    var isLoading by remember { mutableStateOf(true) }
+    val state by taskListViewModel.uiState.collectAsStateWithLifecycle()
+    val tasks = state.tasks
+    val isLoading = state.isLoading
+    val isOffline = state.isOffline
+    val quickAddLoading = state.quickAddLoading
+
     var selectedStatusFilter by remember { mutableStateOf("ALL") }
     var searchQuery by remember { mutableStateOf("") }
     var sortMode by remember { mutableStateOf(false) }
 
     val lazyListState = rememberLazyListState()
     val reorderState = rememberReorderableLazyListState(lazyListState) { from, to ->
-        tasks = tasks.toMutableList().apply { add(to.index, removeAt(from.index)) }
+        taskListViewModel.moveTask(from.index, to.index)
     }
 
     val aiRecommendedIds by remember(tasks) {
@@ -123,34 +131,30 @@ fun TaskListScreen(navController: NavController) {
 
     var showQuickAdd by remember { mutableStateOf(false) }
     var quickAddText by remember { mutableStateOf("") }
-    var quickAddLoading by remember { mutableStateOf(false) }
 
     val calendar = remember { Calendar.getInstance() }
 
-    fun loadTasks() {
-        isLoading = true
-        coroutineScope.launch {
-            try {
-                val filter = if (selectedStatusFilter == "ALL") null else selectedStatusFilter
-                val q = searchQuery.trim().ifEmpty { null }
-                val response = apiService.listTasks(status = filter, query = q)
-                if (response.isSuccessful) {
-                    tasks = response.body() ?: emptyList()
-                    ReminderScheduler.syncAll(context, tasks)
-                } else {
-                    Toast.makeText(context, "Không thể tải danh sách công việc", Toast.LENGTH_SHORT).show()
+    // Lắng nghe sự kiện một lần từ ViewModel
+    LaunchedEffect(Unit) {
+        taskListViewModel.events.collect { event ->
+            when (event) {
+                is TaskListEvent.BadgeUnlocked ->
+                    Toast.makeText(context, "${event.badge.emoji} Mở khóa huy hiệu: ${event.badge.title}!", Toast.LENGTH_LONG).show()
+                is TaskListEvent.Message ->
+                    Toast.makeText(context, event.text, Toast.LENGTH_SHORT).show()
+                is TaskListEvent.QuickAddReady -> {
+                    QuickAddDraft.set(event.parsed)
+                    showQuickAdd = false
+                    quickAddText = ""
+                    navController.navigate(Screen.TaskDetail.createRoute("new"))
                 }
-            } catch (e: Exception) {
-                Toast.makeText(context, "Lỗi kết nối: ${e.message}", Toast.LENGTH_SHORT).show()
-            } finally {
-                isLoading = false
             }
         }
     }
 
     LaunchedEffect(selectedStatusFilter, searchQuery) {
         kotlinx.coroutines.delay(300)
-        loadTasks()
+        taskListViewModel.loadTasks(selectedStatusFilter, searchQuery)
     }
 
     // Derived stats
@@ -212,6 +216,36 @@ fun TaskListScreen(navController: NavController) {
                             }
                         }
                     )
+                }
+
+                // Offline banner
+                if (isOffline) {
+                    item {
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = StatePostponed.copy(alpha = 0.13f),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text("📴", fontSize = 15.sp)
+                                Spacer(Modifier.width(8.dp))
+                                Text(
+                                    "Chế độ offline — hiển thị dữ liệu đã lưu trên máy",
+                                    color = StatePostponed,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Streak / gamification card
+                item {
+                    StreakCard(onClick = { navController.navigate(Screen.Achievements.route) })
                 }
 
                 // Search bar
@@ -304,12 +338,8 @@ fun TaskListScreen(navController: NavController) {
                             TaskCard(
                                 task = task,
                                 onCardClick = { navController.navigate(Screen.TaskDetail.createRoute(task.id)) },
-                                onStartClick = {
-                                    coroutineScope.launch { val resp = apiService.startTask(task.id); if (resp.isSuccessful) loadTasks() }
-                                },
-                                onCompleteClick = {
-                                    coroutineScope.launch { val resp = apiService.completeTask(task.id); if (resp.isSuccessful) loadTasks() }
-                                },
+                                onStartClick = { taskListViewModel.startTask(task) },
+                                onCompleteClick = { taskListViewModel.completeTask(task) },
                                 onPostponeClick = {
                                     selectedTaskForPostpone = task; postponeDueDate = task.dueDate ?: ""; postponeReason = ""
                                     if (postponeDueDate.isNotEmpty()) { val p = parseIso8601(postponeDueDate); if (p != null) calendar.time = p } else calendar.time = Date()
@@ -329,13 +359,8 @@ fun TaskListScreen(navController: NavController) {
                         val dismissState = rememberSwipeToDismissBoxState(
                             confirmValueChange = { value ->
                                 if (value == SwipeToDismissBoxValue.StartToEnd) {
-                                    coroutineScope.launch {
-                                        val resp = apiService.completeTask(task.id)
-                                        if (resp.isSuccessful) {
-                                            Toast.makeText(context, "Đã hoàn thành: ${task.title}", Toast.LENGTH_SHORT).show()
-                                            loadTasks()
-                                        }
-                                    }
+                                    taskListViewModel.completeTask(task)
+                                    Toast.makeText(context, "Đã hoàn thành: ${task.title}", Toast.LENGTH_SHORT).show()
                                 }
                                 false
                             }
@@ -364,18 +389,8 @@ fun TaskListScreen(navController: NavController) {
                             TaskCard(
                                 task = task,
                                 onCardClick = { navController.navigate(Screen.TaskDetail.createRoute(task.id)) },
-                                onStartClick = {
-                                    coroutineScope.launch {
-                                        val resp = apiService.startTask(task.id)
-                                        if (resp.isSuccessful) loadTasks()
-                                    }
-                                },
-                                onCompleteClick = {
-                                    coroutineScope.launch {
-                                        val resp = apiService.completeTask(task.id)
-                                        if (resp.isSuccessful) loadTasks()
-                                    }
-                                },
+                                onStartClick = { taskListViewModel.startTask(task) },
+                                onCompleteClick = { taskListViewModel.completeTask(task) },
                                 onPostponeClick = {
                                     selectedTaskForPostpone = task
                                     postponeDueDate = task.dueDate ?: ""
@@ -467,19 +482,11 @@ fun TaskListScreen(navController: NavController) {
                         Toast.makeText(context, "Vui lòng điền đủ hạn chót và lý do", Toast.LENGTH_SHORT).show()
                         return@TextButton
                     }
-                    coroutineScope.launch {
-                        val resp = apiService.postponeTask(
-                            selectedTaskForPostpone!!.id,
-                            PostponeTaskInput(postponeDueDate, postponeReason)
-                        )
-                        if (resp.isSuccessful) {
-                            Toast.makeText(context, "Đã cập nhật hoãn việc", Toast.LENGTH_SHORT).show()
-                            showPostponeDialog = false
-                            loadTasks()
-                        } else {
-                            Toast.makeText(context, "Lỗi cập nhật hoãn việc", Toast.LENGTH_SHORT).show()
-                        }
-                    }
+                    taskListViewModel.postponeTask(
+                        selectedTaskForPostpone!!.id,
+                        PostponeTaskInput(postponeDueDate, postponeReason)
+                    )
+                    showPostponeDialog = false
                 }) {
                     Text("Xác Nhận", color = MaterialTheme.colorScheme.tertiary)
                 }
@@ -500,13 +507,7 @@ fun TaskListScreen(navController: NavController) {
             text = { Text("Bạn có chắc muốn hủy \"${task.title}\"?", color = MaterialTheme.colorScheme.onSurfaceVariant) },
             confirmButton = {
                 TextButton(onClick = {
-                    coroutineScope.launch {
-                        val resp = apiService.cancelTask(task.id)
-                        if (resp.isSuccessful) {
-                            Toast.makeText(context, "Đã hủy công việc", Toast.LENGTH_SHORT).show()
-                            loadTasks()
-                        }
-                    }
+                    taskListViewModel.cancelTask(task)
                     taskToCancel = null
                 }) { Text("Hủy việc", color = StateCancelled) }
             },
@@ -526,14 +527,7 @@ fun TaskListScreen(navController: NavController) {
             text = { Text("\"${task.title}\" sẽ bị xóa vĩnh viễn.", color = MaterialTheme.colorScheme.onSurfaceVariant) },
             confirmButton = {
                 TextButton(onClick = {
-                    coroutineScope.launch {
-                        val resp = apiService.deleteTask(task.id)
-                        if (resp.isSuccessful) {
-                            ReminderScheduler.cancel(context, task.id)
-                            Toast.makeText(context, "Đã xóa công việc", Toast.LENGTH_SHORT).show()
-                            loadTasks()
-                        }
-                    }
+                    taskListViewModel.deleteTask(task)
                     taskToDelete = null
                 }) { Text("Xóa", color = PriorityHighColor) }
             },
@@ -624,25 +618,8 @@ fun TaskListScreen(navController: NavController) {
                             ))
                         )
                         .clickable(enabled = !quickAddLoading && quickAddText.isNotBlank()) {
-                            quickAddLoading = true
-                            coroutineScope.launch {
-                                try {
-                                    val nowRfc = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", Locale.getDefault()).format(Date())
-                                    val resp = apiService.parseTask(com.example.todoapplication.data.model.ParseTaskInput(quickAddText, nowRfc))
-                                    if (resp.isSuccessful && resp.body() != null) {
-                                        com.example.todoapplication.data.repository.QuickAddDraft.set(resp.body()!!)
-                                        showQuickAdd = false
-                                        quickAddText = ""
-                                        navController.navigate(Screen.TaskDetail.createRoute("new"))
-                                    } else {
-                                        Toast.makeText(context, "Không phân tích được. Hãy thử mô tả rõ hơn.", Toast.LENGTH_LONG).show()
-                                    }
-                                } catch (e: Exception) {
-                                    Toast.makeText(context, "Lỗi: ${e.message}", Toast.LENGTH_LONG).show()
-                                } finally {
-                                    quickAddLoading = false
-                                }
-                            }
+                            val nowRfc = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", Locale.getDefault()).format(Date())
+                            taskListViewModel.parseQuickAdd(quickAddText, nowRfc)
                         },
                     contentAlignment = Alignment.Center
                 ) {
@@ -741,6 +718,94 @@ private fun GreetingHeroCard(
                     HeroStatChip(value = overdueCount.toString(), label = "Quá hạn", valueColor = StateOverdue)
                 }
             }
+        }
+    }
+}
+
+// ─── Streak / gamification card ──────────────────────────────────────────────
+
+@Composable
+private fun StreakCard(onClick: () -> Unit) {
+    val state = GamificationManager.state
+    val primary = MaterialTheme.colorScheme.primary
+    val tertiary = MaterialTheme.colorScheme.tertiary
+
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surface,
+        shadowElevation = 2.dp,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Streak flame
+            Box(
+                modifier = Modifier
+                    .size(46.dp)
+                    .background(
+                        Brush.linearGradient(listOf(PriorityHighColor, PriorityMediumColor)),
+                        CircleShape
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("🔥", fontSize = 22.sp)
+            }
+            Spacer(Modifier.width(12.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        "${state.currentStreak} ngày liên tiếp",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 15.sp,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Surface(shape = RoundedCornerShape(8.dp), color = primary.copy(alpha = 0.12f)) {
+                        Text(
+                            "Cấp ${state.level}",
+                            color = primary,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+                Spacer(Modifier.height(6.dp))
+                // XP progress bar
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(7.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .fillMaxWidth(state.levelProgress.coerceIn(0f, 1f))
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(Brush.horizontalGradient(listOf(primary, tertiary)))
+                    )
+                }
+                Text(
+                    "${state.totalXp} XP · ${state.unlockedBadgeIds.size} huy hiệu",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 10.sp,
+                    modifier = Modifier.padding(top = 3.dp)
+                )
+            }
+            Icon(
+                Icons.Default.KeyboardArrowRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }

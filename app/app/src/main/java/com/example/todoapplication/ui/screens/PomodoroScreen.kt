@@ -34,34 +34,32 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.todoapplication.ui.theme.*
-import kotlinx.coroutines.delay
-
-enum class PomodoroPhase { WORK, SHORT_BREAK, LONG_BREAK }
-
-private val PHASE_DURATIONS = mapOf(
-    PomodoroPhase.WORK to 25 * 60,
-    PomodoroPhase.SHORT_BREAK to 5 * 60,
-    PomodoroPhase.LONG_BREAK to 15 * 60
-)
+import com.example.todoapplication.ui.viewmodel.PHASE_DURATIONS
+import com.example.todoapplication.ui.viewmodel.PomodoroPhase
+import com.example.todoapplication.ui.viewmodel.PomodoroViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PomodoroScreen(
     navController: NavController,
     taskId: String,
-    taskTitle: String
+    taskTitle: String,
+    pomodoroViewModel: PomodoroViewModel = viewModel(factory = PomodoroViewModel.Factory)
 ) {
     val context = LocalContext.current
     val primary = MaterialTheme.colorScheme.primary
     val tertiary = MaterialTheme.colorScheme.tertiary
 
-    var phase by remember { mutableStateOf(PomodoroPhase.WORK) }
-    var sessionCount by remember { mutableIntStateOf(0) }
-    var secondsLeft by remember { mutableIntStateOf(PHASE_DURATIONS[PomodoroPhase.WORK]!!) }
-    var isRunning by remember { mutableStateOf(false) }
-    var isCompleted by remember { mutableStateOf(false) }
+    val state by pomodoroViewModel.uiState.collectAsStateWithLifecycle()
+    val phase = state.phase
+    val sessionCount = state.sessionCount
+    val secondsLeft = state.secondsLeft
+    val isRunning = state.isRunning
+    val isCompleted = state.isCompleted
 
     val totalSeconds = PHASE_DURATIONS[phase]!!
     val progress = secondsLeft.toFloat() / totalSeconds.toFloat()
@@ -76,43 +74,18 @@ fun PomodoroScreen(
         label = "phaseColor"
     )
 
-    fun vibrate() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            val manager = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
-            manager.defaultVibrator.vibrate(VibrationEffect.createWaveform(longArrayOf(0, 300, 100, 300, 100, 300), -1))
-        } else {
-            @Suppress("DEPRECATION")
-            val v = context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
-            @Suppress("DEPRECATION")
-            v.vibrate(longArrayOf(0, 300, 100, 300, 100, 300), -1)
-        }
-    }
-
-    fun advancePhase() {
-        vibrate()
-        when (phase) {
-            PomodoroPhase.WORK -> {
-                val newCount = sessionCount + 1
-                sessionCount = newCount
-                phase = if (newCount % 4 == 0) PomodoroPhase.LONG_BREAK else PomodoroPhase.SHORT_BREAK
+    // Side-effect rung (cần Context) do UI xử lý khi ViewModel phát tín hiệu
+    LaunchedEffect(Unit) {
+        pomodoroViewModel.vibrate.collect {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val manager = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
+                manager.defaultVibrator.vibrate(VibrationEffect.createWaveform(longArrayOf(0, 300, 100, 300, 100, 300), -1))
+            } else {
+                @Suppress("DEPRECATION")
+                val v = context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+                @Suppress("DEPRECATION")
+                v.vibrate(longArrayOf(0, 300, 100, 300, 100, 300), -1)
             }
-            PomodoroPhase.SHORT_BREAK, PomodoroPhase.LONG_BREAK -> {
-                phase = PomodoroPhase.WORK
-            }
-        }
-        secondsLeft = PHASE_DURATIONS[phase]!!
-        isRunning = false
-        isCompleted = true
-    }
-
-    LaunchedEffect(isRunning, phase) {
-        isCompleted = false
-        while (isRunning && secondsLeft > 0) {
-            delay(1000L)
-            secondsLeft--
-        }
-        if (isRunning && secondsLeft == 0) {
-            advancePhase()
         }
     }
 
@@ -263,11 +236,7 @@ fun PomodoroScreen(
                         .size(54.dp)
                         .clip(CircleShape)
                         .background(MaterialTheme.colorScheme.surfaceVariant)
-                        .clickable {
-                            isRunning = false
-                            secondsLeft = PHASE_DURATIONS[phase]!!
-                            isCompleted = false
-                        },
+                        .clickable { pomodoroViewModel.reset() },
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(Icons.Default.Refresh, contentDescription = "Reset", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(22.dp))
@@ -279,7 +248,7 @@ fun PomodoroScreen(
                         .size(80.dp)
                         .clip(CircleShape)
                         .background(Brush.linearGradient(listOf(phaseColor, phaseColor.copy(alpha = 0.75f))))
-                        .clickable { isRunning = !isRunning },
+                        .clickable { pomodoroViewModel.toggleRunning() },
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
@@ -296,7 +265,7 @@ fun PomodoroScreen(
                         .size(54.dp)
                         .clip(CircleShape)
                         .background(MaterialTheme.colorScheme.surfaceVariant)
-                        .clickable { advancePhase() },
+                        .clickable { pomodoroViewModel.skip() },
                     contentAlignment = Alignment.Center
                 ) {
                     Text("⏭", fontSize = 22.sp)

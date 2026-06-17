@@ -15,4 +15,5 @@ sealed class Screen(val route: String) {
         fun createRoute(taskId: String, taskTitle: String) =
             "pomodoro/${taskId}/${java.net.URLEncoder.encode(taskTitle, "UTF-8")}"
     }
+    object Achievements : Screen("achievements")
 }

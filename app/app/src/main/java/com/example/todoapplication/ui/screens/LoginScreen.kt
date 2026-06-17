@@ -21,56 +21,45 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
-import com.example.todoapplication.data.api.NetworkClient
-import com.example.todoapplication.data.model.LoginInput
-import com.example.todoapplication.data.repository.SessionManager
 import com.example.todoapplication.ui.components.AppTextField
 import com.example.todoapplication.ui.navigation.Screen
-import kotlinx.coroutines.launch
+import com.example.todoapplication.ui.viewmodel.AuthEvent
+import com.example.todoapplication.ui.viewmodel.LoginViewModel
 
 @Composable
-fun LoginScreen(navController: NavController) {
+fun LoginScreen(
+    navController: NavController,
+    loginViewModel: LoginViewModel = viewModel(factory = LoginViewModel.Factory)
+) {
     val context = LocalContext.current
-    val coroutineScope = rememberCoroutineScope()
-    val sessionManager = remember { SessionManager(context) }
-    val apiService = remember { NetworkClient.getApiService(context) }
 
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
-    var isLoading by remember { mutableStateOf(false) }
+    val isLoading by loginViewModel.isLoading.collectAsStateWithLifecycle()
 
     val primary = MaterialTheme.colorScheme.primary
     val tertiary = MaterialTheme.colorScheme.tertiary
     val bgColor = MaterialTheme.colorScheme.background
 
-    fun doLogin() {
-        if (email.isBlank() || password.isBlank()) {
-            Toast.makeText(context, "Vui lòng điền đầy đủ thông tin", Toast.LENGTH_SHORT).show()
-            return
-        }
-        isLoading = true
-        coroutineScope.launch {
-            try {
-                val response = apiService.login(LoginInput(email, password))
-                if (response.isSuccessful && response.body() != null) {
-                    val body = response.body()!!
-                    sessionManager.saveTokens(body.token, body.refreshToken)
-                    sessionManager.saveUser(body.user.id, body.user.email, body.user.name)
-                    Toast.makeText(context, "Chào mừng quay trở lại, ${body.user.name}!", Toast.LENGTH_SHORT).show()
+    // Lắng nghe sự kiện một lần từ ViewModel
+    LaunchedEffect(Unit) {
+        loginViewModel.events.collect { event ->
+            when (event) {
+                is AuthEvent.Success -> {
+                    Toast.makeText(context, event.message, Toast.LENGTH_SHORT).show()
                     navController.navigate(Screen.TaskList.route) {
                         popUpTo(Screen.Login.route) { inclusive = true }
                     }
-                } else {
-                    Toast.makeText(context, "Tài khoản hoặc mật khẩu không chính xác", Toast.LENGTH_LONG).show()
                 }
-            } catch (e: Exception) {
-                Toast.makeText(context, "Lỗi kết nối: ${e.message}", Toast.LENGTH_LONG).show()
-            } finally {
-                isLoading = false
+                is AuthEvent.Error -> Toast.makeText(context, event.message, Toast.LENGTH_LONG).show()
             }
         }
     }
+
+    fun doLogin() = loginViewModel.login(email, password)
 
     Box(
         modifier = Modifier

@@ -27,11 +27,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
-import com.example.todoapplication.data.api.NetworkClient
 import com.example.todoapplication.data.model.CreateTaskInput
 import com.example.todoapplication.data.model.UpdateTaskInput
-import com.example.todoapplication.data.notifications.ReminderScheduler
 import com.example.todoapplication.data.repository.QuickAddDraft
 import com.example.todoapplication.ui.theme.*
 import com.example.todoapplication.ui.utils.formatUtcToLocal
@@ -39,18 +39,21 @@ import com.example.todoapplication.ui.utils.parseIso8601
 import com.example.todoapplication.ui.utils.priorityLabel
 import com.example.todoapplication.ui.utils.recurrenceLabel
 import com.example.todoapplication.ui.utils.RECURRENCE_OPTIONS
-import kotlinx.coroutines.launch
+import com.example.todoapplication.ui.viewmodel.TaskDetailEvent
+import com.example.todoapplication.ui.viewmodel.TaskDetailViewModel
 import java.text.SimpleDateFormat
 import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TaskDetailScreen(navController: NavController, taskId: String) {
+fun TaskDetailScreen(
+    navController: NavController,
+    taskId: String,
+    taskDetailViewModel: TaskDetailViewModel = viewModel(factory = TaskDetailViewModel.Factory)
+) {
     val context = LocalContext.current
-    val coroutineScope = rememberCoroutineScope()
-    val apiService = remember { NetworkClient.getApiService(context) }
-
     val isNewTask = taskId == "new"
+    val isLoading by taskDetailViewModel.isBusy.collectAsStateWithLifecycle()
 
     var title by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
@@ -62,16 +65,14 @@ fun TaskDetailScreen(navController: NavController, taskId: String) {
     var tags by remember { mutableStateOf<List<String>>(emptyList()) }
     var tagInput by remember { mutableStateOf("") }
     var recurrence by remember { mutableStateOf("NONE") }
-    var isLoading by remember { mutableStateOf(false) }
     val calendar = remember { Calendar.getInstance() }
 
-    LaunchedEffect(taskId) {
-        if (!isNewTask) {
-            isLoading = true
-            try {
-                val response = apiService.getTask(taskId)
-                if (response.isSuccessful && response.body() != null) {
-                    val task = response.body()!!
+    // Lắng nghe sự kiện từ ViewModel: nạp dữ liệu, lưu xong, hoặc lỗi
+    LaunchedEffect(Unit) {
+        taskDetailViewModel.events.collect { event ->
+            when (event) {
+                is TaskDetailEvent.Loaded -> {
+                    val task = event.task
                     title = task.title
                     description = task.description ?: ""
                     priority = task.priority
@@ -82,14 +83,19 @@ fun TaskDetailScreen(navController: NavController, taskId: String) {
                     tags = task.tags
                     recurrence = task.recurrence
                     if (dueDate.isNotEmpty()) parseIso8601(dueDate)?.let { calendar.time = it }
-                } else {
-                    Toast.makeText(context, "Không thể tải chi tiết công việc", Toast.LENGTH_SHORT).show()
                 }
-            } catch (e: Exception) {
-                Toast.makeText(context, "Lỗi: ${e.message}", Toast.LENGTH_SHORT).show()
-            } finally {
-                isLoading = false
+                TaskDetailEvent.Saved -> {
+                    Toast.makeText(context, "Đã lưu công việc thành công!", Toast.LENGTH_SHORT).show()
+                    navController.popBackStack()
+                }
+                is TaskDetailEvent.Error -> Toast.makeText(context, event.message, Toast.LENGTH_LONG).show()
             }
+        }
+    }
+
+    LaunchedEffect(taskId) {
+        if (!isNewTask) {
+            taskDetailViewModel.loadTask(taskId)
         } else {
             QuickAddDraft.consume()?.let { draft ->
                 title = draft.title
@@ -168,33 +174,15 @@ fun TaskDetailScreen(navController: NavController, taskId: String) {
                             val dateString = if (dueDate.isEmpty()) null else dueDate
                             val timeStart = if (preferredTimeStart.isEmpty()) null else preferredTimeStart
                             val timeEnd = if (preferredTimeEnd.isEmpty()) null else preferredTimeEnd
-                            isLoading = true
-                            coroutineScope.launch {
-                                try {
-                                    val savedTask = if (isNewTask) {
-                                        val r = apiService.createTask(
-                                            CreateTaskInput(title, description, priority, dateString, estimatedMinutes, timeStart, timeEnd, tags, recurrence)
-                                        )
-                                        if (r.isSuccessful) r.body() else null
-                                    } else {
-                                        val r = apiService.updateTask(
-                                            taskId,
-                                            UpdateTaskInput(title, description, priority, dateString, estimatedMinutes, timeStart, timeEnd, tags, recurrence)
-                                        )
-                                        if (r.isSuccessful) r.body() else null
-                                    }
-                                    if (savedTask != null) {
-                                        ReminderScheduler.schedule(context, savedTask)
-                                        Toast.makeText(context, "Đã lưu công việc thành công!", Toast.LENGTH_SHORT).show()
-                                        navController.popBackStack()
-                                    } else {
-                                        Toast.makeText(context, "Không thể lưu công việc", Toast.LENGTH_LONG).show()
-                                    }
-                                } catch (e: Exception) {
-                                    Toast.makeText(context, "Lỗi: ${e.message}", Toast.LENGTH_LONG).show()
-                                } finally {
-                                    isLoading = false
-                                }
+                            if (isNewTask) {
+                                taskDetailViewModel.create(
+                                    CreateTaskInput(title, description, priority, dateString, estimatedMinutes, timeStart, timeEnd, tags, recurrence)
+                                )
+                            } else {
+                                taskDetailViewModel.update(
+                                    taskId,
+                                    UpdateTaskInput(title, description, priority, dateString, estimatedMinutes, timeStart, timeEnd, tags, recurrence)
+                                )
                             }
                         },
                     contentAlignment = Alignment.Center

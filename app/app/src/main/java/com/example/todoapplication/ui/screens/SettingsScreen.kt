@@ -24,43 +24,35 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
-import com.example.todoapplication.data.api.NetworkClient
-import com.example.todoapplication.data.model.UserPreferences
 import com.example.todoapplication.data.repository.ThemeController
 import com.example.todoapplication.data.repository.ThemeMode
-import kotlinx.coroutines.launch
+import com.example.todoapplication.ui.viewmodel.SettingsViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(navController: NavController) {
+fun SettingsScreen(
+    navController: NavController,
+    settingsViewModel: SettingsViewModel = viewModel(factory = SettingsViewModel.Factory)
+) {
     val context = LocalContext.current
-    val coroutineScope = rememberCoroutineScope()
-    val apiService = remember { NetworkClient.getApiService(context) }
+    val state by settingsViewModel.uiState.collectAsStateWithLifecycle()
 
-    var morningStart by remember { mutableStateOf("08:00") }
-    var eveningEnd by remember { mutableStateOf("18:00") }
-    var workDuration by remember { mutableStateOf("60") }
-    var isLoading by remember { mutableStateOf(true) }
-    var isSaving by remember { mutableStateOf(false) }
+    val morningStart = state.morningStart
+    val eveningEnd = state.eveningEnd
+    val workDuration = state.workDuration
+    val isLoading = state.isLoading
+    val isSaving = state.isSaving
 
     val primary = MaterialTheme.colorScheme.primary
     val tertiary = MaterialTheme.colorScheme.tertiary
 
+    LaunchedEffect(Unit) { settingsViewModel.load() }
     LaunchedEffect(Unit) {
-        isLoading = true
-        try {
-            val response = apiService.getPreferences()
-            if (response.isSuccessful && response.body() != null) {
-                val prefs = response.body()!!
-                morningStart = prefs.morningStartTime
-                eveningEnd = prefs.eveningEndTime
-                workDuration = prefs.workDurationPreference.toString()
-            }
-        } catch (e: Exception) {
-            Toast.makeText(context, "Lỗi tải cấu hình: ${e.message}", Toast.LENGTH_SHORT).show()
-        } finally {
-            isLoading = false
+        settingsViewModel.events.collect { msg ->
+            Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -159,7 +151,7 @@ fun SettingsScreen(navController: NavController) {
                         TimePickerField(
                             label = "Bắt đầu buổi sáng",
                             value = morningStart,
-                            onValueChange = { morningStart = it }
+                            onValueChange = { settingsViewModel.setMorning(it) }
                         )
 
                         Spacer(Modifier.height(12.dp))
@@ -167,14 +159,14 @@ fun SettingsScreen(navController: NavController) {
                         TimePickerField(
                             label = "Kết thúc buổi tối",
                             value = eveningEnd,
-                            onValueChange = { eveningEnd = it }
+                            onValueChange = { settingsViewModel.setEvening(it) }
                         )
 
                         Spacer(Modifier.height(12.dp))
 
                         OutlinedTextField(
                             value = workDuration,
-                            onValueChange = { input -> workDuration = input.filter { it.isDigit() } },
+                            onValueChange = { settingsViewModel.setDuration(it) },
                             label = { Text("Thời lượng phiên làm việc (phút)") },
                             modifier = Modifier.fillMaxWidth(),
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -204,31 +196,7 @@ fun SettingsScreen(navController: NavController) {
                                     MaterialTheme.colorScheme.surfaceVariant
                                 ))
                             )
-                            .clickable(enabled = !isSaving) {
-                                val durationInt = workDuration.toIntOrNull() ?: 60
-                                isSaving = true
-                                coroutineScope.launch {
-                                    try {
-                                        val response = apiService.updatePreferences(
-                                            UserPreferences(
-                                                userId = "",
-                                                morningStartTime = morningStart,
-                                                eveningEndTime = eveningEnd,
-                                                workDurationPreference = durationInt
-                                            )
-                                        )
-                                        if (response.isSuccessful) {
-                                            Toast.makeText(context, "Cấu hình đã được lưu!", Toast.LENGTH_SHORT).show()
-                                        } else {
-                                            Toast.makeText(context, "Lưu cấu hình thất bại", Toast.LENGTH_SHORT).show()
-                                        }
-                                    } catch (e: Exception) {
-                                        Toast.makeText(context, "Lỗi: ${e.message}", Toast.LENGTH_LONG).show()
-                                    } finally {
-                                        isSaving = false
-                                    }
-                                }
-                            },
+                            .clickable(enabled = !isSaving) { settingsViewModel.save() },
                         contentAlignment = Alignment.Center
                     ) {
                         if (isSaving) {

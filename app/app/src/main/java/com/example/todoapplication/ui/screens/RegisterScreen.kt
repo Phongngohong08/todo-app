@@ -21,27 +21,43 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
-import com.example.todoapplication.data.api.NetworkClient
-import com.example.todoapplication.data.model.RegisterInput
 import com.example.todoapplication.ui.components.AppTextField
 import com.example.todoapplication.ui.navigation.Screen
-import kotlinx.coroutines.launch
+import com.example.todoapplication.ui.viewmodel.AuthEvent
+import com.example.todoapplication.ui.viewmodel.RegisterViewModel
 
 @Composable
-fun RegisterScreen(navController: NavController) {
+fun RegisterScreen(
+    navController: NavController,
+    registerViewModel: RegisterViewModel = viewModel(factory = RegisterViewModel.Factory)
+) {
     val context = LocalContext.current
-    val coroutineScope = rememberCoroutineScope()
-    val apiService = remember { NetworkClient.getApiService(context) }
 
     var name by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
-    var isLoading by remember { mutableStateOf(false) }
+    val isLoading by registerViewModel.isLoading.collectAsStateWithLifecycle()
 
     val primary = MaterialTheme.colorScheme.primary
     val tertiary = MaterialTheme.colorScheme.tertiary
     val bgColor = MaterialTheme.colorScheme.background
+
+    LaunchedEffect(Unit) {
+        registerViewModel.events.collect { event ->
+            when (event) {
+                is AuthEvent.Success -> {
+                    Toast.makeText(context, event.message, Toast.LENGTH_SHORT).show()
+                    navController.navigate(Screen.Login.route) {
+                        popUpTo(Screen.Register.route) { inclusive = true }
+                    }
+                }
+                is AuthEvent.Error -> Toast.makeText(context, event.message, Toast.LENGTH_LONG).show()
+            }
+        }
+    }
 
     Box(
         modifier = Modifier
@@ -155,32 +171,11 @@ fun RegisterScreen(navController: NavController) {
                                 ))
                             )
                             .clickable(enabled = !isLoading) {
-                                if (name.isBlank() || email.isBlank() || password.isBlank()) {
-                                    Toast.makeText(context, "Vui lòng điền đầy đủ thông tin", Toast.LENGTH_SHORT).show()
-                                    return@clickable
-                                }
-                                if (password.length < 6) {
+                                if (password.isNotBlank() && password.length < 6) {
                                     Toast.makeText(context, "Mật khẩu phải dài ít nhất 6 ký tự", Toast.LENGTH_SHORT).show()
                                     return@clickable
                                 }
-                                isLoading = true
-                                coroutineScope.launch {
-                                    try {
-                                        val response = apiService.register(RegisterInput(email, password, name))
-                                        if (response.isSuccessful) {
-                                            Toast.makeText(context, "Đăng ký thành công! Hãy đăng nhập.", Toast.LENGTH_SHORT).show()
-                                            navController.navigate(Screen.Login.route) {
-                                                popUpTo(Screen.Register.route) { inclusive = true }
-                                            }
-                                        } else {
-                                            Toast.makeText(context, "Email có thể đã tồn tại", Toast.LENGTH_LONG).show()
-                                        }
-                                    } catch (e: Exception) {
-                                        Toast.makeText(context, "Lỗi kết nối: ${e.message}", Toast.LENGTH_LONG).show()
-                                    } finally {
-                                        isLoading = false
-                                    }
-                                }
+                                registerViewModel.register(name, email, password)
                             },
                         contentAlignment = Alignment.Center
                     ) {

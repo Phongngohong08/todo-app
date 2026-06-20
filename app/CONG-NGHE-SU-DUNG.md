@@ -57,7 +57,7 @@ View (Composable)  →  ViewModel (StateFlow<UiState>)  →  Repository  →  Da
 ```
 
 - **View** (`ui/screens/`): chỉ hiển thị state và chuyển hành động người dùng tới ViewModel; **không** gọi API trực tiếp.
-- **ViewModel** (`ui/viewmodel/`): 9 ViewModel (`TaskListViewModel`, `TaskDetailViewModel`, `LoginViewModel`, `RegisterViewModel`, `DailyPlanViewModel`, `AICoachViewModel`, `StatsViewModel`, `SettingsViewModel`, `PomodoroViewModel`). Mỗi VM:
+- **ViewModel** (`ui/viewmodel/`): 10 ViewModel (`TaskListViewModel`, `TaskDetailViewModel`, `LoginViewModel`, `RegisterViewModel`, `DailyPlanViewModel`, `AICoachViewModel`, `StatsViewModel`, `SettingsViewModel`, `PomodoroViewModel`, `CalendarViewModel`). Mỗi VM:
   - Phơi state qua **`StateFlow<…UiState>`** (data class bất biến) — View thu bằng **`collectAsStateWithLifecycle()`**.
   - Phát **sự kiện một lần** (toast/điều hướng/rung) qua **`SharedFlow`** để tránh phát lại khi recompose.
   - Chạy nghiệp vụ trong **`viewModelScope`** → tự hủy coroutine theo vòng đời; **sống sót qua xoay màn hình** (vd timer Pomodoro chạy trong VM).
@@ -116,7 +116,8 @@ View (Composable)  →  ViewModel (StateFlow<UiState>)  →  Repository  →  Da
 
 ### Kỹ thuật áp dụng
 - **Offline-first read cache**: tải task thành công → ghi đè bảng `task_cache`; mất mạng → đọc lại từ Room + hiển thị banner offline.
-- **Dữ liệu thuần client** (XP, streak, huy hiệu) lưu bảng `gamification`.
+- **Dữ liệu thuần client** (XP, streak, huy hiệu) lưu bảng `gamification`; **bước con (subtask)** lưu bảng `subtask` (quan hệ 1-nhiều theo `taskId`).
+- **Room migration**: DB version 2 (`fallbackToDestructiveMigration`) khi thêm bảng `subtask`.
 - `RoomDatabase` dạng **singleton** (`@Volatile` + double-checked locking), DAO sinh mã qua **KSP**.
 - > Lưu ý kỹ thuật: AGP 9 dùng "built-in Kotlin" nên cần flag `android.disallowKotlinSourceSets=false` trong `gradle.properties` để KSP của Room thêm được thư mục mã sinh.
 
@@ -143,6 +144,10 @@ View (Composable)  →  ViewModel (StateFlow<UiState>)  →  Repository  →  Da
 | **Vibrator / Haptics** | Rung báo khi hết phiên Pomodoro (`VibratorManager` / `Vibrator` theo API level) |
 | **System Services** | Truy cập `VIBRATOR_MANAGER_SERVICE` qua `Context.getSystemService` |
 | **API-level branching** | `Build.VERSION.SDK_INT` để chọn API phù hợp (vibrate, permission) |
+| **BroadcastReceiver** | `NotificationActionReceiver` xử lý nút Hoàn thành/Hoãn trên thông báo (`goAsync()` cho tác vụ mạng ngắn) |
+| **Notification Actions** | `NotificationCompat.Action` + `PendingIntent.getBroadcast` |
+| **App Widget (Collection)** | `AppWidgetProvider` + `RemoteViewsService`/`RemoteViewsFactory` + `RemoteViews` — widget danh sách việc đọc Room cache |
+| **PendingIntent template** | `setPendingIntentTemplate` + `setOnClickFillInIntent` cho item widget |
 
 ---
 

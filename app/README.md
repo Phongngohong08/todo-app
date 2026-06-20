@@ -33,11 +33,12 @@ app/src/main/java/com/example/todoapplication/
       ApiService.kt              # Khai báo các endpoint Retrofit
       NetworkClient.kt           # OkHttp + interceptor token + Authenticator tự refresh
     model/Models.kt              # Các data class request/response
-    local/                       # Room database (local DB)
-      AppDatabase.kt             # RoomDatabase singleton (2 bảng)
+    local/                       # Room database (local DB, version 2)
+      AppDatabase.kt             # RoomDatabase singleton (3 bảng)
       TaskCacheEntity.kt         # Bản sao offline của task
       GamificationEntity.kt      # 1 dòng: XP, streak, huy hiệu
-      Daos.kt                    # TaskCacheDao + GamificationDao
+      SubtaskEntity.kt           # Bước con (checklist) theo taskId
+      Daos.kt                    # TaskCacheDao + GamificationDao + SubtaskDao
     repository/                  # Tầng Repository (MVVM) — nguồn dữ liệu duy nhất
       TaskRepository.kt          # CRUD task + cache offline + gamification
       Repositories.kt            # Auth/Preferences/Plan/Ai/Stats Repository
@@ -48,14 +49,18 @@ app/src/main/java/com/example/todoapplication/
       TaskCacheRepository.kt     # Đọc/ghi cache task offline (map Task ↔ entity)
       GamificationManager.kt     # Logic XP / streak / level / huy hiệu (state Compose)
     notifications/
-      ReminderScheduler.kt       # Lập/huỷ lịch nhắc nhở bằng WorkManager
-      ReminderWorker.kt          # Hiển thị notification khi đến hạn
+      ReminderScheduler.kt       # Lập/huỷ/hoãn lịch nhắc nhở bằng WorkManager
+      ReminderWorker.kt          # Notification + nút Hoàn thành/Hoãn
+      NotificationActionReceiver.kt # Xử lý nút hành động trên thông báo
+  widget/
+    TasksWidgetProvider.kt       # AppWidgetProvider cho widget màn hình chính
+    TasksWidgetService.kt        # RemoteViewsService/Factory đọc Room cache
   di/
     ServiceLocator.kt            # Manual DI: cung cấp ApiService/DB/Repository (lazy singleton)
   ui/
     navigation/Screen.kt         # Định nghĩa route (kể cả Pomodoro)
     state/UiState.kt             # sealed Loading / Success / Error
-    viewmodel/                   # 9 ViewModel (StateFlow<UiState> + SharedFlow sự kiện)
+    viewmodel/                   # 10 ViewModel (StateFlow<UiState> + SharedFlow sự kiện)
     components/
       AppBottomBar.kt            # Floating pill navigation bar tái dùng
       CommonComponents.kt        # EmptyState, LoadingState
@@ -71,6 +76,7 @@ app/src/main/java/com/example/todoapplication/
       SettingsScreen.kt          # Cài đặt cá nhân
       PomodoroScreen.kt          # Pomodoro Timer
       AchievementsScreen.kt      # Thành tích: cấp độ, streak, huy hiệu
+      CalendarScreen.kt          # Lịch tháng xem việc theo ngày
     theme/
       Color.kt                   # Bảng màu pastel Light + Dark + AppAccent
       Theme.kt                   # LightColorScheme / DarkColorScheme
@@ -96,6 +102,28 @@ app/src/main/java/com/example/todoapplication/
 | `SettingsScreen` | Chọn giao diện Sáng/Tối/Hệ thống; cấu hình giờ giấc cho lập lịch AI |
 | `PomodoroScreen` | Pomodoro Timer: arc tiến độ Canvas, 3 pha làm việc/nghỉ, đếm phiên, vibration |
 | `AchievementsScreen` | Cấp độ + thanh XP, chuỗi ngày (streak), lưới huy hiệu thành tích |
+| `CalendarScreen` | Lịch tháng: xem việc theo ngày (chấm màu priority), chọn ngày để lọc |
+
+---
+
+## 🆕 Tính năng Android nâng cao
+
+### ☑️ Subtask / Checklist
+Mỗi task có các bước con lưu cục bộ trong **Room** (bảng `subtask`, quan hệ 1-nhiều theo `taskId`). Trong `TaskDetailScreen` có section checklist: thêm/tích/xóa bước + thanh % hoàn thành. Thẻ task ngoài danh sách hiển thị chip tiến độ `☑ 2/5`.
+
+### 🔔 Thông báo có nút hành động (Notification Actions)
+Thông báo nhắc việc có 2 nút **"Hoàn thành"** và **"Hoãn 1 giờ"** bấm trực tiếp:
+- `NotificationCompat.Action` + `PendingIntent` broadcast → `NotificationActionReceiver` (dùng `goAsync()` để gọi mạng).
+- "Hoàn thành" gọi API complete + tắt thông báo; "Hoãn 1 giờ" đặt lại reminder sau 60 phút (`ReminderScheduler.snooze`).
+
+### 📅 Lịch tháng (Calendar)
+`CalendarScreen` vẽ lưới lịch tháng tự xây (offset thứ 2 đầu tuần), chấm màu theo priority trên ngày có việc, đổi tháng, chọn ngày để xem danh sách việc đến hạn. `CalendarViewModel` nhóm task theo ngày địa phương.
+
+### 🧩 Widget màn hình chính
+**Collection widget** (RemoteViews) hiển thị việc cần làm ngay ngoài home screen:
+- `TasksWidgetProvider : AppWidgetProvider` + `TasksWidgetService : RemoteViewsService` (Factory đọc **Room cache** → ListView).
+- Bấm widget mở app; tự cập nhật qua `notifyAppWidgetViewDataChanged` mỗi khi app cache lại task.
+- Hoạt động cả khi **offline** (đọc từ Room).
 
 ---
 

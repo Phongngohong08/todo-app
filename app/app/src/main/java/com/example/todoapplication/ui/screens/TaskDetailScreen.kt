@@ -65,6 +65,8 @@ fun TaskDetailScreen(
     var tags by remember { mutableStateOf<List<String>>(emptyList()) }
     var tagInput by remember { mutableStateOf("") }
     var recurrence by remember { mutableStateOf("NONE") }
+    var subtaskInput by remember { mutableStateOf("") }
+    val subtasks by taskDetailViewModel.subtasks.collectAsStateWithLifecycle()
     val calendar = remember { Calendar.getInstance() }
 
     // Lắng nghe sự kiện từ ViewModel: nạp dữ liệu, lưu xong, hoặc lỗi
@@ -96,6 +98,7 @@ fun TaskDetailScreen(
     LaunchedEffect(taskId) {
         if (!isNewTask) {
             taskDetailViewModel.loadTask(taskId)
+            taskDetailViewModel.loadSubtasks(taskId)
         } else {
             QuickAddDraft.consume()?.let { draft ->
                 title = draft.title
@@ -543,6 +546,94 @@ fun TaskDetailScreen(
                             fontSize = 12.sp,
                             modifier = Modifier.padding(top = 6.dp)
                         )
+                    }
+                }
+
+                // ── Section 5: Các bước con (Checklist) ──────────────────
+                DetailSection(emoji = "✅", title = "Các bước con") {
+                    if (isNewTask) {
+                        Text(
+                            "Hãy lưu công việc trước, sau đó mở lại để thêm các bước con.",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = 12.sp
+                        )
+                    } else {
+                        val doneCount = subtasks.count { it.isDone }
+                        if (subtasks.isNotEmpty()) {
+                            val fraction = doneCount.toFloat() / subtasks.size.toFloat()
+                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 10.dp)) {
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(8.dp)
+                                        .clip(RoundedCornerShape(4.dp))
+                                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxHeight()
+                                            .fillMaxWidth(fraction)
+                                            .clip(RoundedCornerShape(4.dp))
+                                            .background(Brush.horizontalGradient(listOf(primary, tertiary)))
+                                    )
+                                }
+                                Spacer(Modifier.width(10.dp))
+                                Text("$doneCount/${subtasks.size}", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = primary)
+                            }
+                        }
+
+                        subtasks.forEach { sub ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Checkbox(
+                                    checked = sub.isDone,
+                                    onCheckedChange = { taskDetailViewModel.toggleSubtask(sub) },
+                                    colors = CheckboxDefaults.colors(checkedColor = primary)
+                                )
+                                Text(
+                                    sub.title,
+                                    modifier = Modifier.weight(1f),
+                                    fontSize = 14.sp,
+                                    color = if (sub.isDone) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
+                                    textDecoration = if (sub.isDone) androidx.compose.ui.text.style.TextDecoration.LineThrough else null
+                                )
+                                IconButton(onClick = { taskDetailViewModel.deleteSubtask(sub) }, modifier = Modifier.size(32.dp)) {
+                                    Icon(Icons.Default.Clear, contentDescription = "Xóa bước", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
+                                }
+                            }
+                        }
+
+                        Spacer(Modifier.height(8.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            OutlinedTextField(
+                                value = subtaskInput,
+                                onValueChange = { subtaskInput = it },
+                                label = { Text("Thêm bước con") },
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = fieldColors(),
+                                singleLine = true
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(MaterialTheme.colorScheme.primary)
+                                    .clickable {
+                                        taskDetailViewModel.addSubtask(taskId, subtaskInput)
+                                        subtaskInput = ""
+                                    }
+                                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text("Thêm", color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                            }
+                        }
                     }
                 }
 

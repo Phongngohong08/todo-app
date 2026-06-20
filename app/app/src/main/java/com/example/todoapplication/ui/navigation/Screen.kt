@@ -16,4 +16,5 @@ sealed class Screen(val route: String) {
             "pomodoro/${taskId}/${java.net.URLEncoder.encode(taskTitle, "UTF-8")}"
     }
     object Achievements : Screen("achievements")
+    object Calendar : Screen("calendar")
 }

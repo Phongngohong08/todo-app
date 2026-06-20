@@ -4,9 +4,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.example.todoapplication.data.local.SubtaskEntity
 import com.example.todoapplication.data.model.CreateTaskInput
 import com.example.todoapplication.data.model.Task
 import com.example.todoapplication.data.model.UpdateTaskInput
+import com.example.todoapplication.data.repository.SubtaskRepository
 import com.example.todoapplication.data.repository.TaskRepository
 import com.example.todoapplication.di.ServiceLocator
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -23,12 +25,44 @@ sealed interface TaskDetailEvent {
     data class Error(val message: String) : TaskDetailEvent
 }
 
-class TaskDetailViewModel(private val repo: TaskRepository) : ViewModel() {
+class TaskDetailViewModel(
+    private val repo: TaskRepository,
+    private val subtaskRepo: SubtaskRepository
+) : ViewModel() {
     private val _isBusy = MutableStateFlow(false)
     val isBusy: StateFlow<Boolean> = _isBusy.asStateFlow()
 
     private val _events = MutableSharedFlow<TaskDetailEvent>()
     val events: SharedFlow<TaskDetailEvent> = _events.asSharedFlow()
+
+    private val _subtasks = MutableStateFlow<List<SubtaskEntity>>(emptyList())
+    val subtasks: StateFlow<List<SubtaskEntity>> = _subtasks.asStateFlow()
+
+    fun loadSubtasks(taskId: String) {
+        viewModelScope.launch { _subtasks.value = subtaskRepo.getForTask(taskId) }
+    }
+
+    fun addSubtask(taskId: String, title: String) {
+        if (title.isBlank()) return
+        viewModelScope.launch {
+            subtaskRepo.add(taskId, title, _subtasks.value.size)
+            _subtasks.value = subtaskRepo.getForTask(taskId)
+        }
+    }
+
+    fun toggleSubtask(item: SubtaskEntity) {
+        viewModelScope.launch {
+            subtaskRepo.toggle(item)
+            _subtasks.value = subtaskRepo.getForTask(item.taskId)
+        }
+    }
+
+    fun deleteSubtask(item: SubtaskEntity) {
+        viewModelScope.launch {
+            subtaskRepo.delete(item)
+            _subtasks.value = subtaskRepo.getForTask(item.taskId)
+        }
+    }
 
     fun loadTask(id: String) {
         _isBusy.value = true
@@ -58,7 +92,7 @@ class TaskDetailViewModel(private val repo: TaskRepository) : ViewModel() {
 
     companion object {
         val Factory = viewModelFactory {
-            initializer { TaskDetailViewModel(ServiceLocator.taskRepository) }
+            initializer { TaskDetailViewModel(ServiceLocator.taskRepository, ServiceLocator.subtaskRepository) }
         }
     }
 }

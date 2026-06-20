@@ -28,6 +28,28 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Nhận hành động Hoàn thành / Hoãn từ thông báo nhắc việc -->
+        <receiver
+            android:name=".data.notifications.NotificationActionReceiver"
+            android:exported="false" />
+
+        <!-- Widget màn hình chính: danh sách việc cần làm -->
+        <receiver
+            android:name=".widget.TasksWidgetProvider"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/tasks_widget_info" />
+        </receiver>
+
+        <service
+            android:name=".widget.TasksWidgetService"
+            android:permission="android.permission.BIND_REMOTEVIEWS"
+            android:exported="false" />
     </application>
 
 </manifest>

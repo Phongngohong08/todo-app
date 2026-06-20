@@ -209,6 +209,7 @@ fun TaskListScreen(
                         sortMode = sortMode,
                         onSortToggle = { sortMode = !sortMode },
                         onQuickAdd = { showQuickAdd = true },
+                        onCalendar = { navController.navigate(Screen.Calendar.route) },
                         onLogout = {
                             sessionManager.logout()
                             navController.navigate(Screen.Login.route) {
@@ -349,6 +350,8 @@ fun TaskListScreen(
                                 onDeleteClick = { taskToDelete = task },
                                 isAiRecommended = task.id in aiRecommendedIds,
                                 onPomodoroClick = { navController.navigate(Screen.Pomodoro.createRoute(task.id, task.title)) },
+                                subtaskDone = state.subtaskProgress[task.id]?.done ?: 0,
+                                subtaskTotal = state.subtaskProgress[task.id]?.total ?: 0,
                                 dragHandleModifier = Modifier.draggableHandle()
                             )
                         }
@@ -406,7 +409,9 @@ fun TaskListScreen(
                                 onCancelClick = { taskToCancel = task },
                                 onDeleteClick = { taskToDelete = task },
                                 isAiRecommended = task.id in aiRecommendedIds,
-                                onPomodoroClick = { navController.navigate(Screen.Pomodoro.createRoute(task.id, task.title)) }
+                                onPomodoroClick = { navController.navigate(Screen.Pomodoro.createRoute(task.id, task.title)) },
+                                subtaskDone = state.subtaskProgress[task.id]?.done ?: 0,
+                                subtaskTotal = state.subtaskProgress[task.id]?.total ?: 0
                             )
                         }
                     }
@@ -645,6 +650,7 @@ private fun GreetingHeroCard(
     sortMode: Boolean,
     onSortToggle: () -> Unit,
     onQuickAdd: () -> Unit,
+    onCalendar: () -> Unit,
     onLogout: () -> Unit
 ) {
     val primary = MaterialTheme.colorScheme.primary
@@ -684,6 +690,9 @@ private fun GreetingHeroCard(
                 Row {
                     IconButton(onClick = onQuickAdd, modifier = Modifier.size(38.dp)) {
                         Icon(Icons.Default.Star, contentDescription = "AI Quick Add", modifier = Modifier.size(20.dp), tint = Color.White)
+                    }
+                    IconButton(onClick = onCalendar, modifier = Modifier.size(38.dp)) {
+                        Icon(Icons.Default.DateRange, contentDescription = "Lịch", modifier = Modifier.size(20.dp), tint = Color.White)
                     }
                     IconButton(onClick = onSortToggle, modifier = Modifier.size(38.dp)) {
                         Box(
@@ -839,6 +848,8 @@ fun TaskCard(
     onDeleteClick: () -> Unit,
     isAiRecommended: Boolean = false,
     onPomodoroClick: () -> Unit = {},
+    subtaskDone: Int = 0,
+    subtaskTotal: Int = 0,
     dragHandleModifier: Modifier = Modifier
 ) {
     val isCompleted = task.status == "COMPLETED"
@@ -1069,6 +1080,23 @@ fun TaskCard(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontSize = 11.sp
                         )
+                    }
+                    // Subtask checklist progress chip
+                    if (subtaskTotal > 0) {
+                        Spacer(Modifier.width(6.dp))
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (subtaskDone == subtaskTotal) StateCompleted.copy(alpha = 0.13f)
+                                    else MaterialTheme.colorScheme.surfaceVariant
+                        ) {
+                            Text(
+                                "☑ $subtaskDone/$subtaskTotal",
+                                color = if (subtaskDone == subtaskTotal) StateCompleted else MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Medium,
+                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
+                            )
+                        }
                     }
 
                     Spacer(Modifier.weight(1f))

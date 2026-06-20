@@ -8,6 +8,7 @@ import com.example.todoapplication.data.model.ParsedTask
 import com.example.todoapplication.data.model.PostponeTaskInput
 import com.example.todoapplication.data.model.Task
 import com.example.todoapplication.data.repository.Badge
+import com.example.todoapplication.data.repository.SubtaskProgress
 import com.example.todoapplication.data.repository.TaskRepository
 import com.example.todoapplication.di.ServiceLocator
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -23,7 +24,8 @@ data class TaskListUiState(
     val tasks: List<Task> = emptyList(),
     val isLoading: Boolean = true,
     val isOffline: Boolean = false,
-    val quickAddLoading: Boolean = false
+    val quickAddLoading: Boolean = false,
+    val subtaskProgress: Map<String, SubtaskProgress> = emptyMap()
 )
 
 sealed interface TaskListEvent {
@@ -49,7 +51,8 @@ class TaskListViewModel(private val repo: TaskRepository) : ViewModel() {
         viewModelScope.launch {
             try {
                 val result = repo.loadTasks(lastStatus, lastQuery)
-                _uiState.update { it.copy(tasks = result.tasks, isLoading = false, isOffline = result.isOffline) }
+                val progress = ServiceLocator.subtaskRepository.progressByTask()
+                _uiState.update { it.copy(tasks = result.tasks, isLoading = false, isOffline = result.isOffline, subtaskProgress = progress) }
             } catch (e: Exception) {
                 _uiState.update { it.copy(isLoading = false) }
                 _events.emit(TaskListEvent.Message("Lỗi kết nối: ${e.message}"))
@@ -60,7 +63,8 @@ class TaskListViewModel(private val repo: TaskRepository) : ViewModel() {
     private fun reload() {
         viewModelScope.launch {
             runCatching { repo.loadTasks(lastStatus, lastQuery) }.getOrNull()?.let { result ->
-                _uiState.update { it.copy(tasks = result.tasks, isOffline = result.isOffline) }
+                val progress = ServiceLocator.subtaskRepository.progressByTask()
+                _uiState.update { it.copy(tasks = result.tasks, isOffline = result.isOffline, subtaskProgress = progress) }
             }
         }
     }

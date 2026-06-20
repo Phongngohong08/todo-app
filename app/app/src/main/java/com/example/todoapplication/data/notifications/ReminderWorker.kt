@@ -55,13 +55,29 @@ class ReminderWorker(context: Context, params: WorkerParameters) : CoroutineWork
                 return
             }
 
+            val notifId = taskId.hashCode()
+
             val intent = Intent(context, MainActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
             }
             val pendingIntent = PendingIntent.getActivity(
-                context, taskId.hashCode(), intent,
+                context, notifId, intent,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
+
+            // Nút "Hoàn thành" và "Hoãn 1 giờ" → NotificationActionReceiver
+            fun actionIntent(action: String, requestOffset: Int): PendingIntent {
+                val i = Intent(context, NotificationActionReceiver::class.java).apply {
+                    this.action = action
+                    putExtra(NotificationActionReceiver.EXTRA_TASK_ID, taskId)
+                    putExtra(NotificationActionReceiver.EXTRA_TITLE, title)
+                    putExtra(NotificationActionReceiver.EXTRA_NOTIF_ID, notifId)
+                }
+                return PendingIntent.getBroadcast(
+                    context, notifId + requestOffset, i,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+            }
 
             val notification = NotificationCompat.Builder(context, CHANNEL_ID)
                 .setSmallIcon(android.R.drawable.ic_popup_reminder)
@@ -70,9 +86,17 @@ class ReminderWorker(context: Context, params: WorkerParameters) : CoroutineWork
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setAutoCancel(true)
                 .setContentIntent(pendingIntent)
+                .addAction(
+                    android.R.drawable.ic_menu_save, "Hoàn thành",
+                    actionIntent(NotificationActionReceiver.ACTION_COMPLETE, 1)
+                )
+                .addAction(
+                    android.R.drawable.ic_menu_recent_history, "Hoãn 1 giờ",
+                    actionIntent(NotificationActionReceiver.ACTION_SNOOZE, 2)
+                )
                 .build()
 
-            NotificationManagerCompat.from(context).notify(taskId.hashCode(), notification)
+            NotificationManagerCompat.from(context).notify(notifId, notification)
         }
     }
 }

@@ -4,6 +4,7 @@ import android.content.Context
 import com.example.todoapplication.data.local.AppDatabase
 import com.example.todoapplication.data.local.TaskCacheEntity
 import com.example.todoapplication.data.model.Task
+import com.example.todoapplication.widget.TasksWidgetProvider
 
 /**
  * Cache đọc offline cho danh sách task. Mỗi lần tải thành công từ API sẽ ghi đè cache;
@@ -17,6 +18,8 @@ object TaskCacheRepository {
         val now = System.currentTimeMillis()
         dao.clear()
         dao.insertAll(tasks.map { it.toEntity(now) })
+        // Cập nhật widget màn hình chính sau khi cache thay đổi
+        TasksWidgetProvider.refresh(context.applicationContext)
     }
 
     suspend fun getCached(context: Context): List<Task> {

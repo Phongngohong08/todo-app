@@ -10,6 +10,7 @@ import com.example.todoapplication.data.repository.PlanRepository
 import com.example.todoapplication.data.repository.PreferencesRepository
 import com.example.todoapplication.data.repository.SessionManager
 import com.example.todoapplication.data.repository.StatsRepository
+import com.example.todoapplication.data.repository.SubtaskRepository
 import com.example.todoapplication.data.repository.TaskRepository
 
 /**
@@ -38,4 +39,5 @@ object ServiceLocator {
     val planRepository: PlanRepository by lazy { PlanRepository(apiService) }
     val aiRepository: AiRepository by lazy { AiRepository(apiService) }
     val statsRepository: StatsRepository by lazy { StatsRepository(apiService) }
+    val subtaskRepository: SubtaskRepository by lazy { SubtaskRepository(appContext) }
 }

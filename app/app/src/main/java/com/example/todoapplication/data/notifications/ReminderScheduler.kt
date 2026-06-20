@@ -51,6 +51,21 @@ object ReminderScheduler {
         tasks.forEach { schedule(context, it) }
     }
 
+    /** Hoãn nhắc nhở: nhắc lại sau [delayMinutes] phút (dùng cho nút "Hoãn 1 giờ"). */
+    fun snooze(context: Context, taskId: String, title: String, delayMinutes: Long) {
+        val work = OneTimeWorkRequestBuilder<ReminderWorker>()
+            .setInitialDelay(delayMinutes, TimeUnit.MINUTES)
+            .setInputData(
+                workDataOf(
+                    ReminderWorker.KEY_TITLE to title,
+                    ReminderWorker.KEY_TASK_ID to taskId
+                )
+            )
+            .build()
+        WorkManager.getInstance(context.applicationContext)
+            .enqueueUniqueWork(uniqueName(taskId), ExistingWorkPolicy.REPLACE, work)
+    }
+
     fun cancel(context: Context, taskId: String) {
         WorkManager.getInstance(context.applicationContext)
             .cancelUniqueWork(uniqueName(taskId))

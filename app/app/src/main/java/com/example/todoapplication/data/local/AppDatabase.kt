@@ -6,13 +6,14 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 
 @Database(
-    entities = [GamificationEntity::class, TaskCacheEntity::class],
-    version = 1,
+    entities = [GamificationEntity::class, TaskCacheEntity::class, SubtaskEntity::class],
+    version = 2,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun gamificationDao(): GamificationDao
     abstract fun taskCacheDao(): TaskCacheDao
+    abstract fun subtaskDao(): SubtaskDao
 
     companion object {
         @Volatile

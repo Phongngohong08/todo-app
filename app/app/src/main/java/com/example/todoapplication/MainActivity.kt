@@ -116,6 +116,9 @@ class MainActivity : ComponentActivity() {
                         composable(Screen.Achievements.route) {
                             AchievementsScreen(navController)
                         }
+                        composable(Screen.Calendar.route) {
+                            CalendarScreen(navController)
+                        }
                     }
                 }
             }

@@ -28,7 +28,7 @@ class TasksRemoteViewsFactory(private val context: Context) : RemoteViewsService
     override fun onDataSetChanged() {
         items = runBlocking {
             AppDatabase.get(context).taskCacheDao().getAll()
-        }.filter { it.status != "COMPLETED" && it.status != "CANCELLED" }
+        }.filter { it.status != "COMPLETED" }
             .sortedBy { it.dueDate ?: "9999" }
     }
 

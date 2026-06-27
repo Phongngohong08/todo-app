@@ -8,10 +8,7 @@ package com.example.todoapplication.ui.utils
 fun statusLabel(status: String): String = when (status) {
     "ALL" -> "Tất cả"
     "TODO" -> "Cần làm"
-    "IN_PROGRESS" -> "Đang làm"
     "COMPLETED" -> "Hoàn thành"
-    "CANCELLED" -> "Đã hủy"
-    "POSTPONED" -> "Đã hoãn"
     else -> status
 }
 
@@ -29,5 +26,19 @@ fun recurrenceLabel(recurrence: String): String = when (recurrence) {
     else -> "Không lặp"
 }
 
+fun categoryLabel(category: String): String = when (category) {
+    "ALL" -> "Tất cả"
+    "PERSONAL" -> "Cá nhân"
+    "WORK" -> "Công việc"
+    "OTHER" -> "Khác"
+    else -> category
+}
+
 // Các lựa chọn lặp lại theo thứ tự hiển thị (value enum)
 val RECURRENCE_OPTIONS = listOf("NONE", "DAILY", "WEEKLY", "MONTHLY")
+
+// Các danh mục cố định (value enum)
+val CATEGORY_OPTIONS = listOf("PERSONAL", "WORK", "OTHER")
+
+// Bộ lọc danh mục ở đầu danh sách (gồm "Tất cả")
+val CATEGORY_FILTERS = listOf("ALL", "PERSONAL", "WORK", "OTHER")

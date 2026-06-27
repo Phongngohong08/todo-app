@@ -3,33 +3,11 @@ package db
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
 	"todo-backend/internal/domain"
 )
-
-// marshalTags chuyển []string thành JSON để lưu vào cột JSONB ('[]' nếu rỗng).
-func marshalTags(tags []string) []byte {
-	if tags == nil {
-		tags = []string{}
-	}
-	b, err := json.Marshal(tags)
-	if err != nil {
-		return []byte("[]")
-	}
-	return b
-}
-
-// unmarshalTags đọc JSONB tags về []string (rỗng nếu null/lỗi).
-func unmarshalTags(raw []byte) []string {
-	tags := []string{}
-	if len(raw) > 0 {
-		_ = json.Unmarshal(raw, &tags)
-	}
-	return tags
-}
 
 type PostgresTaskRepository struct {
 	db *sql.DB
@@ -41,14 +19,13 @@ func NewPostgresTaskRepository(db *sql.DB) *PostgresTaskRepository {
 
 func (r *PostgresTaskRepository) Create(ctx context.Context, task *domain.Task) error {
 	query := `
-		INSERT INTO tasks (id, user_id, title, description, priority, due_date, estimated_duration, preferred_time_start, preferred_time_end, status, tags, recurrence, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+		INSERT INTO tasks (id, user_id, title, description, priority, due_date, status, category, recurrence, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 	`
 	_, err := r.db.ExecContext(ctx, query,
 		task.ID, task.UserID, task.Title, task.Description,
-		task.Priority, task.DueDate, task.EstimatedDuration,
-		task.PreferredTimeStart, task.PreferredTimeEnd,
-		task.Status, marshalTags(task.Tags), task.Recurrence,
+		task.Priority, task.DueDate,
+		task.Status, task.Category, task.Recurrence,
 		task.CreatedAt, task.UpdatedAt,
 	)
 	return err
@@ -56,19 +33,17 @@ func (r *PostgresTaskRepository) Create(ctx context.Context, task *domain.Task) 
 
 func (r *PostgresTaskRepository) GetByID(ctx context.Context, id string) (*domain.Task, error) {
 	query := `
-		SELECT id, user_id, title, description, priority, due_date, estimated_duration, preferred_time_start, preferred_time_end, status, tags, recurrence, created_at, updated_at
+		SELECT id, user_id, title, description, priority, due_date, status, category, recurrence, created_at, updated_at
 		FROM tasks
 		WHERE id = $1
 	`
 	row := r.db.QueryRowContext(ctx, query, id)
 
 	var task domain.Task
-	var tagsRaw []byte
 	err := row.Scan(
 		&task.ID, &task.UserID, &task.Title, &task.Description,
-		&task.Priority, &task.DueDate, &task.EstimatedDuration,
-		&task.PreferredTimeStart, &task.PreferredTimeEnd,
-		&task.Status, &tagsRaw, &task.Recurrence, &task.CreatedAt, &task.UpdatedAt,
+		&task.Priority, &task.DueDate,
+		&task.Status, &task.Category, &task.Recurrence, &task.CreatedAt, &task.UpdatedAt,
 	)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -76,13 +51,12 @@ func (r *PostgresTaskRepository) GetByID(ctx context.Context, id string) (*domai
 		}
 		return nil, err
 	}
-	task.Tags = unmarshalTags(tagsRaw)
 	return &task, nil
 }
 
 func (r *PostgresTaskRepository) List(ctx context.Context, userID string, filter domain.TaskFilter) ([]*domain.Task, error) {
 	query := `
-		SELECT id, user_id, title, description, priority, due_date, estimated_duration, preferred_time_start, preferred_time_end, status, tags, recurrence, created_at, updated_at
+		SELECT id, user_id, title, description, priority, due_date, status, category, recurrence, created_at, updated_at
 		FROM tasks
 		WHERE user_id = $1
 	`
@@ -107,11 +81,10 @@ func (r *PostgresTaskRepository) List(ctx context.Context, userID string, filter
 		args = append(args, filter.Query)
 	}
 
-	if filter.Tag != "" {
+	if filter.Category != "" {
 		argCount++
-		// tags @> '["tag"]'::jsonb : task chứa nhãn này
-		query += fmt.Sprintf(" AND tags @> $%d::jsonb", argCount)
-		args = append(args, string(marshalTags([]string{filter.Tag})))
+		query += fmt.Sprintf(" AND category = $%d", argCount)
+		args = append(args, filter.Category)
 	}
 
 	query += " ORDER BY due_date ASC, created_at DESC"
@@ -125,17 +98,14 @@ func (r *PostgresTaskRepository) List(ctx context.Context, userID string, filter
 	var tasks []*domain.Task
 	for rows.Next() {
 		var task domain.Task
-		var tagsRaw []byte
 		err := rows.Scan(
 			&task.ID, &task.UserID, &task.Title, &task.Description,
-			&task.Priority, &task.DueDate, &task.EstimatedDuration,
-			&task.PreferredTimeStart, &task.PreferredTimeEnd,
-			&task.Status, &tagsRaw, &task.Recurrence, &task.CreatedAt, &task.UpdatedAt,
+			&task.Priority, &task.DueDate,
+			&task.Status, &task.Category, &task.Recurrence, &task.CreatedAt, &task.UpdatedAt,
 		)
 		if err != nil {
 			return nil, err
 		}
-		task.Tags = unmarshalTags(tagsRaw)
 		tasks = append(tasks, &task)
 	}
 
@@ -146,14 +116,12 @@ func (r *PostgresTaskRepository) Update(ctx context.Context, task *domain.Task) 
 	query := `
 		UPDATE tasks
 		SET title = $1, description = $2, priority = $3, due_date = $4,
-		    estimated_duration = $5, preferred_time_start = $6, preferred_time_end = $7, status = $8,
-		    tags = $9, recurrence = $10, updated_at = $11
-		WHERE id = $12
+		    status = $5, category = $6, recurrence = $7, updated_at = $8
+		WHERE id = $9
 	`
 	res, err := r.db.ExecContext(ctx, query,
 		task.Title, task.Description, task.Priority, task.DueDate,
-		task.EstimatedDuration, task.PreferredTimeStart, task.PreferredTimeEnd,
-		task.Status, marshalTags(task.Tags), task.Recurrence, task.UpdatedAt, task.ID,
+		task.Status, task.Category, task.Recurrence, task.UpdatedAt, task.ID,
 	)
 	if err != nil {
 		return err

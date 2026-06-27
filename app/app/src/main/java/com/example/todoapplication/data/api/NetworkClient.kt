@@ -11,6 +11,11 @@ import retrofit2.converter.gson.GsonConverterFactory
 import java.util.concurrent.TimeUnit
 
 object NetworkClient {
+    // LƯU Ý chọn đúng địa chỉ theo nơi chạy app:
+    //  - Máy ảo Android Studio (AVD):     http://10.0.2.2:8080/api/v1/   (10.0.2.2 = máy tính host)
+    //  - Máy ảo Genymotion:               http://10.0.3.2:8080/api/v1/
+    //  - Điện thoại thật (cùng Wi-Fi):    http://192.168.0.102:8080/api/v1/  (IP LAN của máy tính)
+    //  KHÔNG dùng "localhost" vì trên thiết bị Android nó trỏ về chính thiết bị, không phải PC.
     private const val BASE_URL = "https://todo.phongngohong.online/api/v1/"
     private var retrofit: Retrofit? = null
 
@@ -29,7 +34,7 @@ object NetworkClient {
             // Client "trần" chỉ dùng để gọi endpoint refresh - KHÔNG gắn authenticator để tránh đệ quy
             val bareClient = OkHttpClient.Builder()
                 .connectTimeout(30, TimeUnit.SECONDS)
-                .readTimeout(30, TimeUnit.SECONDS)
+                .readTimeout(60, TimeUnit.SECONDS)
                 .addInterceptor(loggingInterceptor)
                 .build()
             val bareApi = Retrofit.Builder()
@@ -41,7 +46,9 @@ object NetworkClient {
 
             val okHttpClient = OkHttpClient.Builder()
                 .connectTimeout(30, TimeUnit.SECONDS)
-                .readTimeout(30, TimeUnit.SECONDS)
+                // Daily Plan / phân tích trí nhớ gọi Gemini nên có thể mất 15-30s
+                .readTimeout(60, TimeUnit.SECONDS)
+                .writeTimeout(60, TimeUnit.SECONDS)
                 .addInterceptor(loggingInterceptor)
                 // Gắn access token vào mọi request
                 .addInterceptor { chain ->

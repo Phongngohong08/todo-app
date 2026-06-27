@@ -17,11 +17,16 @@ const (
 type TaskStatus string
 
 const (
-	StatusTodo       TaskStatus = "TODO"
-	StatusInProgress TaskStatus = "IN_PROGRESS"
-	StatusCompleted  TaskStatus = "COMPLETED"
-	StatusCancelled  TaskStatus = "CANCELLED"
-	StatusPostponed  TaskStatus = "POSTPONED"
+	StatusTodo      TaskStatus = "TODO"
+	StatusCompleted TaskStatus = "COMPLETED"
+)
+
+type Category string
+
+const (
+	CategoryPersonal Category = "PERSONAL"
+	CategoryWork     Category = "WORK"
+	CategoryOther    Category = "OTHER"
 )
 
 type Recurrence string
@@ -34,31 +39,24 @@ const (
 )
 
 type Task struct {
-	ID                string     `json:"id"`
-	UserID            string     `json:"user_id"`
-	Title             string     `json:"title"`
-	Description       string     `json:"description"`
-	Priority          Priority   `json:"priority"`
-	DueDate           *time.Time `json:"due_date"`
-	EstimatedDuration int        `json:"estimated_duration"` // in minutes
-	PreferredTimeStart *string    `json:"preferred_time_start"`
-	PreferredTimeEnd   *string    `json:"preferred_time_end"`
-	Status            TaskStatus `json:"status"`
-	Tags              []string   `json:"tags"`
-	Recurrence        Recurrence `json:"recurrence"`
-	CreatedAt         time.Time  `json:"created_at"`
-	UpdatedAt         time.Time  `json:"updated_at"`
+	ID          string     `json:"id"`
+	UserID      string     `json:"user_id"`
+	Title       string     `json:"title"`
+	Description string     `json:"description"`
+	Priority    Priority   `json:"priority"`
+	DueDate     *time.Time `json:"due_date"`
+	Status      TaskStatus `json:"status"`
+	Category    Category   `json:"category"`
+	Recurrence  Recurrence `json:"recurrence"`
+	CreatedAt   time.Time  `json:"created_at"`
+	UpdatedAt   time.Time  `json:"updated_at"`
 }
 
 type TaskLogAction string
 
 const (
 	ActionCreated   TaskLogAction = "CREATED"
-	ActionStarted   TaskLogAction = "STARTED"
-	ActionPaused    TaskLogAction = "PAUSED"
 	ActionCompleted TaskLogAction = "COMPLETED"
-	ActionPostponed TaskLogAction = "POSTPONED"
-	ActionCancelled TaskLogAction = "CANCELLED"
 )
 
 type TaskLog struct {
@@ -72,12 +70,11 @@ type TaskLog struct {
 
 // ParsedTask là kết quả tách task từ câu ngôn ngữ tự nhiên (AI Quick Add).
 type ParsedTask struct {
-	Title             string     `json:"title"`
-	Description       string     `json:"description"`
-	Priority          string     `json:"priority"`
-	DueDate           *time.Time `json:"due_date"`
-	EstimatedDuration int        `json:"estimated_duration"`
-	Tags              []string   `json:"tags"`
+	Title       string     `json:"title"`
+	Description string     `json:"description"`
+	Priority    string     `json:"priority"`
+	DueDate     *time.Time `json:"due_date"`
+	Category    string     `json:"category"`
 }
 
 var (
@@ -89,7 +86,7 @@ var (
 type TaskFilter struct {
 	Status        TaskStatus
 	Query         string // tìm trong title/description (ILIKE)
-	Tag           string // lọc theo một nhãn
+	Category      Category // lọc theo một danh mục
 	DueDateBefore *time.Time
 }
 

@@ -25,8 +25,8 @@ Tài liệu liệt kê đầy đủ các công nghệ, thư viện và **kỹ th
 | **Jetpack Compose** (BOM 2026.02.01) | Toàn bộ UI khai báo (declarative), không dùng XML layout |
 | **Material 3** (`material3`) | Hệ thống thiết kế: `colorScheme`, `Surface`, `Scaffold`, `Card`, component… |
 | **Material Icons Extended** | Bộ icon đầy đủ |
-| **Compose Animation** | `animateColorAsState`, `tween` (đổi theme, đổi pha Pomodoro) |
-| **Compose Canvas** | Vẽ tùy biến: vòng arc Pomodoro, biểu đồ cột năng suất tuần |
+| **Compose Animation** | `animateColorAsState`, `tween` (đổi theme) |
+| **Compose Canvas** | Vẽ tùy biến: biểu đồ cột năng suất tuần |
 | **Compose Foundation Gestures** | `SwipeToDismissBox` (vuốt hoàn thành), kéo-thả sắp xếp |
 | **Lifecycle Runtime Compose** | `collectAsStateWithLifecycle()` — thu thập StateFlow theo vòng đời |
 
@@ -57,11 +57,11 @@ View (Composable)  →  ViewModel (StateFlow<UiState>)  →  Repository  →  Da
 ```
 
 - **View** (`ui/screens/`): chỉ hiển thị state và chuyển hành động người dùng tới ViewModel; **không** gọi API trực tiếp.
-- **ViewModel** (`ui/viewmodel/`): 10 ViewModel (`TaskListViewModel`, `TaskDetailViewModel`, `LoginViewModel`, `RegisterViewModel`, `DailyPlanViewModel`, `AICoachViewModel`, `StatsViewModel`, `SettingsViewModel`, `PomodoroViewModel`, `CalendarViewModel`). Mỗi VM:
+- **ViewModel** (`ui/viewmodel/`): 8 ViewModel (`TaskListViewModel`, `TaskDetailViewModel`, `LoginViewModel`, `RegisterViewModel`, `DailyPlanViewModel`, `AICoachViewModel`, `StatsViewModel`, `SettingsViewModel`, `CalendarViewModel`). Mỗi VM:
   - Phơi state qua **`StateFlow<…UiState>`** (data class bất biến) — View thu bằng **`collectAsStateWithLifecycle()`**.
-  - Phát **sự kiện một lần** (toast/điều hướng/rung) qua **`SharedFlow`** để tránh phát lại khi recompose.
-  - Chạy nghiệp vụ trong **`viewModelScope`** → tự hủy coroutine theo vòng đời; **sống sót qua xoay màn hình** (vd timer Pomodoro chạy trong VM).
-- **Repository** (`data/repository/`): `TaskRepository`, `AuthRepository`, `PreferencesRepository`, `PlanRepository`, `AiRepository`, `StatsRepository` — nguồn dữ liệu duy nhất, bọc REST + Room + side-effect (nhắc nhở, gamification). Trả `Result<T>`.
+  - Phát **sự kiện một lần** (toast/điều hướng) qua **`SharedFlow`** để tránh phát lại khi recompose.
+  - Chạy nghiệp vụ trong **`viewModelScope`** → tự hủy coroutine theo vòng đời; **sống sót qua xoay màn hình**.
+- **Repository** (`data/repository/`): `TaskRepository`, `AuthRepository`, `PreferencesRepository`, `PlanRepository`, `AiRepository`, `StatsRepository` — nguồn dữ liệu duy nhất, bọc REST + Room + side-effect (nhắc nhở). Trả `Result<T>`.
 - **UiState** (`ui/state/UiState.kt`): sealed `Loading / Success / Error` mô hình hóa trạng thái.
 
 ### Dependency Injection — **ServiceLocator (manual DI)**
@@ -72,8 +72,8 @@ View (Composable)  →  ViewModel (StateFlow<UiState>)  →  Repository  →  Da
 
 ### Kỹ thuật kiến trúc khác
 - **Single-Activity Architecture**: 1 `MainActivity` + `NavHost`, mỗi màn là một `@Composable`.
-- **Typed routes + arguments**: `NavType.StringType`, truyền tham số (id task) và **URL-encode** chuỗi có ký tự đặc biệt (tiêu đề task cho Pomodoro).
-- **Holder singleton** cho state cấp ứng dụng: `SessionManager`, `ThemeController`, `GamificationManager`.
+- **Typed routes + arguments**: `NavType.StringType`, truyền tham số (id task) qua route.
+- **Holder singleton** cho state cấp ứng dụng: `SessionManager`, `ThemeController`, `CategoryStore`.
 - **Event bus một chiều** bằng `SharedFlow` (`SessionEvents.forcedLogout`) để điều hướng buộc đăng xuất khi phiên hết hạn.
 
 ---
@@ -112,12 +112,13 @@ View (Composable)  →  ViewModel (StateFlow<UiState>)  →  Repository  →  Da
 | Công nghệ | Vai trò |
 | :--- | :--- |
 | **Room** 2.7.1 (qua KSP) | Local database (SQLite) — `@Entity`, `@Dao`, `@Database` |
-| **SharedPreferences** | Lưu phiên đăng nhập, chế độ giao diện |
+| **SharedPreferences** | Lưu phiên đăng nhập, chế độ giao diện, danh mục tùy chỉnh |
 
 ### Kỹ thuật áp dụng
 - **Offline-first read cache**: tải task thành công → ghi đè bảng `task_cache`; mất mạng → đọc lại từ Room + hiển thị banner offline.
-- **Dữ liệu thuần client** (XP, streak, huy hiệu) lưu bảng `gamification`; **bước con (subtask)** lưu bảng `subtask` (quan hệ 1-nhiều theo `taskId`).
-- **Room migration**: DB version 2 (`fallbackToDestructiveMigration`) khi thêm bảng `subtask`.
+- **Bước con (subtask)** lưu bảng `subtask` (quan hệ 1-nhiều theo `taskId`).
+- **Danh mục tùy chỉnh** lưu trong SharedPreferences (`CategoryStore`), không cần backend.
+- **Room migration**: DB version 3 (`fallbackToDestructiveMigration`) sau khi gỡ bảng `gamification`, còn 2 bảng `task_cache` + `subtask`.
 - `RoomDatabase` dạng **singleton** (`@Volatile` + double-checked locking), DAO sinh mã qua **KSP**.
 - > Lưu ý kỹ thuật: AGP 9 dùng "built-in Kotlin" nên cần flag `android.disallowKotlinSourceSets=false` trong `gradle.properties` để KSP của Room thêm được thư mục mã sinh.
 
@@ -141,7 +142,7 @@ View (Composable)  →  ViewModel (StateFlow<UiState>)  →  Repository  →  Da
 | Kỹ thuật | Áp dụng |
 | :--- | :--- |
 | **Runtime Permissions** | Xin `POST_NOTIFICATIONS` (Android 13+) qua **Activity Result API** (`rememberLauncherForActivityResult`) |
-| **Vibrator / Haptics** | Rung báo khi hết phiên Pomodoro (`VibratorManager` / `Vibrator` theo API level) |
+| **Vibrator / Haptics** | Rung báo khi có thông báo nhắc việc (`VibratorManager` / `Vibrator` theo API level) |
 | **System Services** | Truy cập `VIBRATOR_MANAGER_SERVICE` qua `Context.getSystemService` |
 | **API-level branching** | `Build.VERSION.SDK_INT` để chọn API phù hợp (vibrate, permission) |
 | **BroadcastReceiver** | `NotificationActionReceiver` xử lý nút Hoàn thành/Hoãn trên thông báo (`goAsync()` cho tác vụ mạng ngắn) |
@@ -165,7 +166,7 @@ View (Composable)  →  ViewModel (StateFlow<UiState>)  →  Repository  →  Da
 | :--- | :--- |
 | `INTERNET` | Gọi REST API |
 | `POST_NOTIFICATIONS` | Hiển thị nhắc nhở (Android 13+) |
-| `VIBRATE` | Rung báo hết phiên Pomodoro |
+| `VIBRATE` | Rung báo khi có thông báo nhắc việc |
 
 ---
 

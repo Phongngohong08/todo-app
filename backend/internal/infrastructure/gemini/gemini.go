@@ -84,8 +84,7 @@ Extract:
 - "description": any extra detail, else empty string.
 - "priority": one of "LOW", "MEDIUM", "HIGH" (infer urgency; default "MEDIUM").
 - "due_date": absolute RFC3339 timestamp (e.g. "2026-06-20T15:00:00+07:00") resolved from the provided current time, or null if the note has no time/date. Keep the user's timezone offset from the current time.
-- "estimated_duration": integer minutes if implied (e.g. "1 tiếng" = 60), else 0.
-- "tags": array of short lowercase tags inferred from context (e.g. ["công việc"], ["sức khỏe"]). Empty array if none.
+- "category": exactly one of "PERSONAL", "WORK", "OTHER" inferred from context (work/meetings/email => WORK; personal life/health/family/hobbies => PERSONAL; otherwise OTHER). Default "OTHER".
 
 Write title/description in the SAME language as the user's note (Vietnamese stays Vietnamese).
 Return ONLY a JSON object with exactly these keys. No markdown.`
@@ -140,14 +139,16 @@ func (c *GeminiClient) GenerateDailyPlan(ctx context.Context, tasks []*domain.Ta
 	}
 
 	systemPrompt := `You are an AI scheduler. Your job is to output a structured daily schedule in JSON format based on:
-1. User active tasks (title, status, duration, priority, due date, preferred_time_start, preferred_time_end).
-2. User preferences (morning start time, evening end time, work block size).
+1. User active tasks (title, status, priority, due date, category).
+2. User preferences (morning start time, evening end time, default work block size in minutes).
 3. User habits and history (long-term memories).
 4. Current time of day (if provided).
 
 Scheduling Rules:
+- Schedule each task into a time block of roughly the user's default work block size (split larger work sensibly).
+- Order tasks by priority (HIGH first) and by due date (earlier due dates first).
+- Stay within the user's morning start time and evening end time.
 - If a current local time is provided (e.g., "10:15"), you MUST ONLY schedule tasks starting from or after this time. Do not suggest slots in the past.
-- Tasks may have "preferred_time_start" and "preferred_time_end" values (e.g. "17:00" and "20:00" for a workout). You MUST prioritize scheduling these tasks strictly within their preferred windows.
 - Suggest a logical, realistic daily schedule that avoids overlaps.
 
 Return ONLY a JSON array of slots with this exact structure:

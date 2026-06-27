@@ -20,7 +20,7 @@ object ReminderScheduler {
     /** Đặt (hoặc cập nhật) nhắc nhở cho task. Tự huỷ nếu không có hạn, đã xong/huỷ, hoặc đã quá hạn. */
     fun schedule(context: Context, task: Task) {
         val due = task.dueDate?.let { parseIso8601(it) }
-        if (due == null || task.status == "COMPLETED" || task.status == "CANCELLED") {
+        if (due == null || task.status == "COMPLETED") {
             cancel(context, task.id)
             return
         }

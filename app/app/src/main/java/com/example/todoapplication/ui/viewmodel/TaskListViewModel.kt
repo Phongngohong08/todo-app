@@ -4,10 +4,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.example.todoapplication.data.model.CreateTaskInput
 import com.example.todoapplication.data.model.ParsedTask
-import com.example.todoapplication.data.model.PostponeTaskInput
 import com.example.todoapplication.data.model.Task
-import com.example.todoapplication.data.repository.Badge
 import com.example.todoapplication.data.repository.SubtaskProgress
 import com.example.todoapplication.data.repository.TaskRepository
 import com.example.todoapplication.di.ServiceLocator
@@ -29,7 +28,6 @@ data class TaskListUiState(
 )
 
 sealed interface TaskListEvent {
-    data class BadgeUnlocked(val badge: Badge) : TaskListEvent
     data class Message(val text: String) : TaskListEvent
     data class QuickAddReady(val parsed: ParsedTask) : TaskListEvent
 }
@@ -41,16 +39,16 @@ class TaskListViewModel(private val repo: TaskRepository) : ViewModel() {
     private val _events = MutableSharedFlow<TaskListEvent>()
     val events: SharedFlow<TaskListEvent> = _events.asSharedFlow()
 
-    private var lastStatus: String? = null
+    private var lastCategory: String? = null
     private var lastQuery: String? = null
 
-    fun loadTasks(statusFilter: String, query: String) {
-        lastStatus = if (statusFilter == "ALL") null else statusFilter
+    fun loadTasks(categoryFilter: String, query: String) {
+        lastCategory = if (categoryFilter == "ALL") null else categoryFilter
         lastQuery = query.trim().ifEmpty { null }
         _uiState.update { it.copy(isLoading = true) }
         viewModelScope.launch {
             try {
-                val result = repo.loadTasks(lastStatus, lastQuery)
+                val result = repo.loadTasks(lastCategory, lastQuery)
                 val progress = ServiceLocator.subtaskRepository.progressByTask()
                 _uiState.update { it.copy(tasks = result.tasks, isLoading = false, isOffline = result.isOffline, subtaskProgress = progress) }
             } catch (e: Exception) {
@@ -62,7 +60,7 @@ class TaskListViewModel(private val repo: TaskRepository) : ViewModel() {
 
     private fun reload() {
         viewModelScope.launch {
-            runCatching { repo.loadTasks(lastStatus, lastQuery) }.getOrNull()?.let { result ->
+            runCatching { repo.loadTasks(lastCategory, lastQuery) }.getOrNull()?.let { result ->
                 val progress = ServiceLocator.subtaskRepository.progressByTask()
                 _uiState.update { it.copy(tasks = result.tasks, isOffline = result.isOffline, subtaskProgress = progress) }
             }
@@ -71,22 +69,8 @@ class TaskListViewModel(private val repo: TaskRepository) : ViewModel() {
 
     fun completeTask(task: Task) {
         viewModelScope.launch {
-            val newBadges = repo.completeTask(task)
-            newBadges.firstOrNull()?.let { _events.emit(TaskListEvent.BadgeUnlocked(it)) }
+            repo.completeTask(task)
             reload()
-        }
-    }
-
-    fun startTask(task: Task) {
-        viewModelScope.launch { if (repo.startTask(task.id)) reload() }
-    }
-
-    fun cancelTask(task: Task) {
-        viewModelScope.launch {
-            if (repo.cancelTask(task.id)) {
-                _events.emit(TaskListEvent.Message("Đã hủy công việc"))
-                reload()
-            }
         }
     }
 
@@ -99,14 +83,16 @@ class TaskListViewModel(private val repo: TaskRepository) : ViewModel() {
         }
     }
 
-    fun postponeTask(id: String, input: PostponeTaskInput) {
+    /** Tạo nhanh một công việc từ thanh nhập (không qua màn chi tiết). */
+    fun createQuickTask(input: CreateTaskInput) {
         viewModelScope.launch {
-            if (repo.postponeTask(id, input)) {
-                _events.emit(TaskListEvent.Message("Đã cập nhật hoãn việc"))
-                reload()
-            } else {
-                _events.emit(TaskListEvent.Message("Lỗi cập nhật hoãn việc"))
-            }
+            repo.createTask(input).fold(
+                onSuccess = {
+                    _events.emit(TaskListEvent.Message("Đã thêm: ${it.title}"))
+                    reload()
+                },
+                onFailure = { _events.emit(TaskListEvent.Message("Không thể thêm công việc")) }
+            )
         }
     }
 

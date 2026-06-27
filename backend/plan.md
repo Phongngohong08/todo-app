@@ -375,3 +375,37 @@ Only after architecture approval should implementation begin.
 ## Phía ứng dụng Android (client-side)
 - **Reminders**: WorkManager lập lịch local notification theo `due_date` (không dùng FCM).
 - UI: ô tìm kiếm, nhập tag dạng chip, selector lặp lại, bottom sheet AI Quick Add, tự điều hướng về Login khi phiên hết hạn.
+
+---
+
+# Cập nhật v3 (Đơn giản hoá — phản ánh hiện trạng mới nhất)
+
+> Mục tiêu: bám tính năng của một app to-do tối giản phổ biến + giữ phần AI. Đã **rút gọn trường dữ liệu và bỏ bớt tính năng phụ**. Phần này **thay thế** các mô tả cũ về tags/duration/status nhiều trạng thái ở trên.
+
+## Mô hình Task rút gọn
+- **Trường giữ lại**: `id`, `user_id`, `title`, `description`, `priority`, `due_date`, `status`, `category`, `recurrence`, `created_at`, `updated_at`.
+- **Bỏ**: `estimated_duration`, `preferred_time_start`, `preferred_time_end`, `tags` (JSONB).
+- **Status**: chỉ còn `TODO` / `COMPLETED` (bỏ `IN_PROGRESS`/`POSTPONED`/`CANCELLED` và các thao tác start/postpone/cancel).
+- **Category**: thay tags (nhiều, JSONB) bằng **một danh mục** dạng chuỗi tự do. Mặc định gợi ý `PERSONAL`/`WORK`/`OTHER`, nhưng người dùng có thể tự thêm danh mục mới (không còn ràng buộc CHECK).
+- **Activity log**: chỉ còn `CREATED` / `COMPLETED`.
+
+## AI (giữ nguyên cơ chế, đổi input)
+- **Quick Add** trả về `category` (thay `estimated_duration`/`tags`).
+- **Daily Plan** lập lịch dựa trên `priority` + `due_date` (thay vì thời lượng + khung giờ ưu tiên), dùng block mặc định từ `user_preferences`.
+- **AI Coach** + **Trí nhớ dài hạn**: không đổi.
+
+## Thống kê rút gọn
+- `GET /stats/summary` trả: `completed_tasks`, `pending_tasks`, `by_category` (map danh mục → số việc chưa xong), `daily_completed` (7 ngày). Bỏ phân tích lý do hoãn/tổng phút.
+
+## Tính năng phụ đã loại bỏ (phía Android)
+- **Pomodoro** và **Gamification** (streak/XP/huy hiệu) đã được gỡ khỏi ứng dụng.
+
+## Migrations bổ sung
+- `000003_simplify_tasks.up.sql`: bỏ `estimated_duration`/`preferred_time_*`/`tags`, thêm `category`, siết CHECK status & action log.
+- `000004_custom_category.up.sql`: nới `category` thành `VARCHAR(50)` và **bỏ ràng buộc CHECK** để cho phép danh mục tự do.
+
+## Phía Android (client-side)
+- Danh sách nhóm **Hôm nay / Tương lai / Đã hoàn thành hôm nay**; chip lọc theo danh mục; thẻ tối giản (checkbox tròn + vạch màu ưu tiên).
+- **Thanh tạo nhanh** (gõ tiêu đề + preset ngày + danh mục + mẫu gợi ý) và preset ngày trong màn chi tiết.
+- **Danh mục tùy chỉnh** lưu cục bộ (`CategoryStore` qua SharedPreferences) + tạo mới trong màn chi tiết.
+- Lịch tháng **chiếu các lần lặp** ra tới 12 tháng để hiển thị chấm cho ngày lặp lại.

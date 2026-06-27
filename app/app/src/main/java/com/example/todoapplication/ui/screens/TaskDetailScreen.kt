@@ -9,7 +9,6 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
@@ -24,7 +23,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -38,7 +36,9 @@ import com.example.todoapplication.ui.utils.formatUtcToLocal
 import com.example.todoapplication.ui.utils.parseIso8601
 import com.example.todoapplication.ui.utils.priorityLabel
 import com.example.todoapplication.ui.utils.recurrenceLabel
+import com.example.todoapplication.ui.utils.categoryLabel
 import com.example.todoapplication.ui.utils.RECURRENCE_OPTIONS
+import com.example.todoapplication.data.repository.CategoryStore
 import com.example.todoapplication.ui.viewmodel.TaskDetailEvent
 import com.example.todoapplication.ui.viewmodel.TaskDetailViewModel
 import java.text.SimpleDateFormat
@@ -58,12 +58,8 @@ fun TaskDetailScreen(
     var title by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
     var priority by remember { mutableStateOf("MEDIUM") }
-    var duration by remember { mutableStateOf("30") }
     var dueDate by remember { mutableStateOf("") }
-    var preferredTimeStart by remember { mutableStateOf("") }
-    var preferredTimeEnd by remember { mutableStateOf("") }
-    var tags by remember { mutableStateOf<List<String>>(emptyList()) }
-    var tagInput by remember { mutableStateOf("") }
+    var category by remember { mutableStateOf("OTHER") }
     var recurrence by remember { mutableStateOf("NONE") }
     var subtaskInput by remember { mutableStateOf("") }
     val subtasks by taskDetailViewModel.subtasks.collectAsStateWithLifecycle()
@@ -78,11 +74,8 @@ fun TaskDetailScreen(
                     title = task.title
                     description = task.description ?: ""
                     priority = task.priority
-                    duration = task.estimatedDuration.toString()
                     dueDate = task.dueDate ?: ""
-                    preferredTimeStart = task.preferredTimeStart ?: ""
-                    preferredTimeEnd = task.preferredTimeEnd ?: ""
-                    tags = task.tags
+                    category = task.category
                     recurrence = task.recurrence
                     if (dueDate.isNotEmpty()) parseIso8601(dueDate)?.let { calendar.time = it }
                 }
@@ -104,9 +97,8 @@ fun TaskDetailScreen(
                 title = draft.title
                 description = draft.description
                 priority = draft.priority.ifBlank { "MEDIUM" }
-                if (draft.estimatedDuration > 0) duration = draft.estimatedDuration.toString()
                 dueDate = draft.dueDate ?: ""
-                tags = draft.tags
+                category = draft.category.ifBlank { "OTHER" }
                 if (dueDate.isNotEmpty()) parseIso8601(dueDate)?.let { calendar.time = it }
             }
         }
@@ -173,18 +165,15 @@ fun TaskDetailScreen(
                                 Toast.makeText(context, "Vui lòng đặt hạn chót cho công việc lặp lại", Toast.LENGTH_SHORT).show()
                                 return@clickable
                             }
-                            val estimatedMinutes = duration.toIntOrNull() ?: 30
                             val dateString = if (dueDate.isEmpty()) null else dueDate
-                            val timeStart = if (preferredTimeStart.isEmpty()) null else preferredTimeStart
-                            val timeEnd = if (preferredTimeEnd.isEmpty()) null else preferredTimeEnd
                             if (isNewTask) {
                                 taskDetailViewModel.create(
-                                    CreateTaskInput(title, description, priority, dateString, estimatedMinutes, timeStart, timeEnd, tags, recurrence)
+                                    CreateTaskInput(title, description, priority, dateString, category, recurrence)
                                 )
                             } else {
                                 taskDetailViewModel.update(
                                     taskId,
-                                    UpdateTaskInput(title, description, priority, dateString, estimatedMinutes, timeStart, timeEnd, tags, recurrence)
+                                    UpdateTaskInput(title, description, priority, dateString, category, recurrence)
                                 )
                             }
                         },
@@ -242,14 +231,8 @@ fun TaskDetailScreen(
                     )
                 }
 
-                // ── Section 2: Ưu tiên & Thời lượng ──────────────────────
-                DetailSection(emoji = "🎯", title = "Ưu tiên & Thời lượng") {
-                    Text(
-                        "Độ ưu tiên",
-                        fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(bottom = 8.dp)
-                    )
+                // ── Section 2: Độ ưu tiên ────────────────────────────────
+                DetailSection(emoji = "🎯", title = "Độ ưu tiên") {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -280,61 +263,34 @@ fun TaskDetailScreen(
                             }
                         }
                     }
-                    Spacer(Modifier.height(12.dp))
-                    Text(
-                        "Thời lượng ước tính",
-                        fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(bottom = 8.dp)
-                    )
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        listOf(15, 30, 60, 90).forEach { preset ->
-                            val isSelected = duration == preset.toString()
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .background(
-                                        if (isSelected) MaterialTheme.colorScheme.primary
-                                        else MaterialTheme.colorScheme.surfaceVariant
-                                    )
-                                    .clickable { duration = preset.toString() }
-                                    .padding(vertical = 10.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    "${preset}p",
-                                    color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
-                                    fontSize = 13.sp
-                                )
-                            }
-                        }
-                    }
-                    Spacer(Modifier.height(8.dp))
-                    OutlinedTextField(
-                        value = duration,
-                        onValueChange = { input -> duration = input.filter { it.isDigit() } },
-                        label = { Text("Tùy chỉnh (phút)") },
-                        modifier = Modifier.fillMaxWidth(),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = fieldColors(),
-                        singleLine = true
-                    )
                 }
 
-                // ── Section 3: Thời gian ──────────────────────────────────
-                DetailSection(emoji = "📅", title = "Thời gian") {
-                    Text(
-                        "Hạn chót",
-                        fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(bottom = 8.dp)
-                    )
+                // ── Section 3: Hạn chót ───────────────────────────────────
+                DetailSection(emoji = "📅", title = "Hạn chót") {
+                    // Chọn nhanh hạn chót
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState())
+                            .padding(bottom = 10.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        listOf(
+                            0 to "Hôm nay", 1 to "Ngày mai", 3 to "3 ngày sau",
+                            daysUntilSunday() to "Cuối tuần", -1 to "Không"
+                        ).forEach { (offset, label) ->
+                            val newDue = if (offset < 0) "" else dueAtDayOffset(offset)
+                            val isSel = dueDate == newDue
+                            StatusFilterChip(
+                                text = label,
+                                selected = isSel,
+                                onClick = {
+                                    dueDate = newDue
+                                    if (dueDate.isNotEmpty()) parseIso8601(dueDate)?.let { calendar.time = it }
+                                }
+                            )
+                        }
+                    }
                     Surface(
                         shape = RoundedCornerShape(12.dp),
                         color = if (dueDate.isEmpty()) MaterialTheme.colorScheme.surfaceVariant
@@ -402,106 +358,57 @@ fun TaskDetailScreen(
                             }
                         }
                     }
+                }
 
-                    Spacer(Modifier.height(12.dp))
+                // ── Section 4: Danh mục & Lặp lại ────────────────────────
+                DetailSection(emoji = "🏷️", title = "Danh mục & Lặp lại") {
                     Text(
-                        "Khung giờ ưu tiên (tùy chọn)",
+                        "Danh mục",
                         fontSize = 12.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(bottom = 8.dp)
                     )
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        TimePickerButton(
-                            label = if (preferredTimeStart.isEmpty()) "Từ giờ..." else "Từ $preferredTimeStart",
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            val h = preferredTimeStart.split(":").getOrNull(0)?.toIntOrNull() ?: 8
-                            val m = preferredTimeStart.split(":").getOrNull(1)?.toIntOrNull() ?: 0
-                            TimePickerDialog(context, { _, hr, min ->
-                                preferredTimeStart = String.format("%02d:%02d", hr, min)
-                            }, h, m, true).show()
-                        }
-                        TimePickerButton(
-                            label = if (preferredTimeEnd.isEmpty()) "Đến giờ..." else "Đến $preferredTimeEnd",
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            val h = preferredTimeEnd.split(":").getOrNull(0)?.toIntOrNull() ?: 18
-                            val m = preferredTimeEnd.split(":").getOrNull(1)?.toIntOrNull() ?: 0
-                            TimePickerDialog(context, { _, hr, min ->
-                                preferredTimeEnd = String.format("%02d:%02d", hr, min)
-                            }, h, m, true).show()
-                        }
-                        if (preferredTimeStart.isNotEmpty() || preferredTimeEnd.isNotEmpty()) {
-                            IconButton(onClick = { preferredTimeStart = ""; preferredTimeEnd = "" }, modifier = Modifier.size(40.dp)) {
-                                Icon(Icons.Default.Clear, contentDescription = "Xóa khung giờ", tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
+                        CategoryStore.all().forEach { c ->
+                            StatusFilterChip(
+                                text = categoryLabel(c),
+                                selected = category == c,
+                                onClick = { category = c }
+                            )
                         }
                     }
-                }
-
-                // ── Section 4: Nhãn & Lặp lại ────────────────────────────
-                DetailSection(emoji = "🏷️", title = "Nhãn & Lặp lại") {
+                    Spacer(Modifier.height(8.dp))
+                    var newCategory by remember { mutableStateOf("") }
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         OutlinedTextField(
-                            value = tagInput,
-                            onValueChange = { tagInput = it },
-                            label = { Text("Thêm nhãn") },
+                            value = newCategory,
+                            onValueChange = { newCategory = it },
+                            label = { Text("Thêm danh mục mới") },
                             modifier = Modifier.weight(1f),
                             shape = RoundedCornerShape(12.dp),
                             colors = fieldColors(),
                             singleLine = true
                         )
-                        val addTag = {
-                            val t = tagInput.trim().lowercase()
-                            if (t.isNotEmpty() && !tags.contains(t)) tags = tags + t
-                            tagInput = ""
-                        }
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(12.dp))
                                 .background(MaterialTheme.colorScheme.primary)
-                                .clickable { addTag() }
+                                .clickable {
+                                    val added = CategoryStore.add(newCategory)
+                                    if (added.isNotEmpty()) category = added
+                                    newCategory = ""
+                                }
                                 .padding(horizontal = 16.dp, vertical = 14.dp),
                             contentAlignment = Alignment.Center
                         ) {
                             Text("Thêm", color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-                        }
-                    }
-                    if (tags.isNotEmpty()) {
-                        Spacer(Modifier.height(10.dp))
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .horizontalScroll(rememberScrollState()),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            tags.forEach { tag ->
-                                InputChip(
-                                    selected = false,
-                                    onClick = { tags = tags - tag },
-                                    label = { Text("#$tag", fontSize = 12.sp) },
-                                    trailingIcon = {
-                                        Icon(
-                                            Icons.Default.Clear,
-                                            contentDescription = "Xóa nhãn",
-                                            modifier = Modifier.size(14.dp)
-                                        )
-                                    },
-                                    colors = InputChipDefaults.inputChipColors(
-                                        containerColor = MaterialTheme.colorScheme.primaryContainer,
-                                        labelColor = MaterialTheme.colorScheme.primary,
-                                        trailingIconColor = MaterialTheme.colorScheme.primary
-                                    )
-                                )
-                            }
                         }
                     }
 
@@ -678,22 +585,6 @@ private fun DetailSection(
                 content = content
             )
         }
-    }
-}
-
-@Composable
-private fun TimePickerButton(label: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
-    Surface(
-        shape = RoundedCornerShape(10.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant,
-        modifier = modifier.clickable { onClick() }
-    ) {
-        Text(
-            label,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            fontSize = 13.sp,
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 11.dp)
-        )
     }
 }
 

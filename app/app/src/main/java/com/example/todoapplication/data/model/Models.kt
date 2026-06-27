@@ -28,11 +28,8 @@ data class Task(
     val description: String?,
     val priority: String, // "LOW", "MEDIUM", "HIGH"
     @SerializedName("due_date") val dueDate: String?,
-    @SerializedName("estimated_duration") val estimatedDuration: Int, // in minutes
-    @SerializedName("preferred_time_start") val preferredTimeStart: String?,
-    @SerializedName("preferred_time_end") val preferredTimeEnd: String?,
-    val status: String, // "TODO", "IN_PROGRESS", "COMPLETED", "CANCELLED", "POSTPONED"
-    val tags: List<String> = emptyList(),
+    val status: String, // "TODO", "COMPLETED"
+    val category: String = "OTHER", // "PERSONAL", "WORK", "OTHER"
     val recurrence: String = "NONE", // "NONE", "DAILY", "WEEKLY", "MONTHLY"
     @SerializedName("created_at") val createdAt: String,
     @SerializedName("updated_at") val updatedAt: String
@@ -78,12 +75,16 @@ data class UserPreferences(
     @SerializedName("updated_at") val updatedAt: String? = null
 )
 
+data class DailyCount(
+    val date: String,
+    val completed: Int
+)
+
 data class StatsSummary(
     @SerializedName("completed_tasks") val completedTasks: Int,
-    @SerializedName("postponed_tasks") val postponedTasks: Int,
-    @SerializedName("total_time_spent_mins") val totalTimeSpentMins: Int,
-    @SerializedName("most_postponed_category") val mostPostponedCategory: String?,
-    @SerializedName("postpone_reasons") val postponeReasons: Map<String, Int>?
+    @SerializedName("pending_tasks") val pendingTasks: Int,
+    @SerializedName("by_category") val byCategory: Map<String, Int> = emptyMap(),
+    @SerializedName("daily_completed") val dailyCompleted: List<DailyCount> = emptyList()
 )
 
 // Request inputs
@@ -103,10 +104,7 @@ data class CreateTaskInput(
     val description: String,
     val priority: String,
     @SerializedName("due_date") val dueDate: String?,
-    @SerializedName("estimated_duration") val estimatedDuration: Int,
-    @SerializedName("preferred_time_start") val preferredTimeStart: String?,
-    @SerializedName("preferred_time_end") val preferredTimeEnd: String?,
-    val tags: List<String> = emptyList(),
+    val category: String = "OTHER",
     val recurrence: String = "NONE"
 )
 
@@ -115,10 +113,7 @@ data class UpdateTaskInput(
     val description: String,
     val priority: String,
     @SerializedName("due_date") val dueDate: String?,
-    @SerializedName("estimated_duration") val estimatedDuration: Int,
-    @SerializedName("preferred_time_start") val preferredTimeStart: String?,
-    @SerializedName("preferred_time_end") val preferredTimeEnd: String?,
-    val tags: List<String> = emptyList(),
+    val category: String = "OTHER",
     val recurrence: String = "NONE"
 )
 
@@ -132,13 +127,7 @@ data class ParsedTask(
     val description: String = "",
     val priority: String = "MEDIUM",
     @SerializedName("due_date") val dueDate: String? = null,
-    @SerializedName("estimated_duration") val estimatedDuration: Int = 0,
-    val tags: List<String> = emptyList()
-)
-
-data class PostponeTaskInput(
-    @SerializedName("due_date") val dueDate: String,
-    val reason: String
+    val category: String = "OTHER"
 )
 
 data class ChatInput(

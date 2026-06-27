@@ -29,23 +29,34 @@ class CalendarViewModel(private val repo: TaskRepository) : ViewModel() {
         _uiState.update { it.copy(isLoading = true) }
         viewModelScope.launch {
             val tasks = runCatching { repo.loadTasks(null, null).tasks }.getOrDefault(emptyList())
-            val grouped = tasks
-                .filter { it.dueDate != null }
-                .groupBy { task -> dayKey(task.dueDate!!) }
-                .filterKeys { it.isNotEmpty() }
-            _uiState.update { it.copy(isLoading = false, tasksByDay = grouped) }
+            val map = HashMap<String, MutableList<Task>>()
+            // Chiếu lịch tới 12 tháng sau để hiển thị cả các lần lặp
+            val horizon = Calendar.getInstance().apply { add(Calendar.MONTH, 12) }.time
+
+            tasks.forEach { task ->
+                val due = task.dueDate?.let { parseIso8601(it) } ?: return@forEach
+                val occ = Calendar.getInstance().apply { time = due }
+                var guard = 0
+                while (occ.time.before(horizon) && guard < 800) {
+                    map.getOrPut(dayKey(occ)) { mutableListOf() }.add(task)
+                    when (task.recurrence) {
+                        "DAILY" -> occ.add(Calendar.DAY_OF_MONTH, 1)
+                        "WEEKLY" -> occ.add(Calendar.DAY_OF_MONTH, 7)
+                        "MONTHLY" -> occ.add(Calendar.MONTH, 1)
+                        else -> break // không lặp: chỉ thêm đúng ngày hạn chót
+                    }
+                    guard++
+                }
+            }
+            _uiState.update { it.copy(isLoading = false, tasksByDay = map) }
         }
     }
 
-    private fun dayKey(iso: String): String {
-        val date = parseIso8601(iso) ?: return ""
-        val cal = Calendar.getInstance().apply { time = date }
-        return "%04d-%02d-%02d".format(
-            cal.get(Calendar.YEAR),
-            cal.get(Calendar.MONTH) + 1,
-            cal.get(Calendar.DAY_OF_MONTH)
-        )
-    }
+    private fun dayKey(cal: Calendar): String = "%04d-%02d-%02d".format(
+        cal.get(Calendar.YEAR),
+        cal.get(Calendar.MONTH) + 1,
+        cal.get(Calendar.DAY_OF_MONTH)
+    )
 
     companion object {
         fun keyOf(year: Int, month0: Int, day: Int) = "%04d-%02d-%02d".format(year, month0 + 1, day)

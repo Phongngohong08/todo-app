@@ -32,7 +32,7 @@ interface ApiService {
         @Query("status") status: String? = null,
         @Query("due_date_before") dueDateBefore: String? = null,
         @Query("q") query: String? = null,
-        @Query("tag") tag: String? = null
+        @Query("category") category: String? = null
     ): Response<List<Task>>
 
     @GET("tasks/{id}")
@@ -44,17 +44,8 @@ interface ApiService {
     @DELETE("tasks/{id}")
     suspend fun deleteTask(@Path("id") id: String): Response<Unit>
 
-    @POST("tasks/{id}/start")
-    suspend fun startTask(@Path("id") id: String): Response<Task>
-
     @POST("tasks/{id}/complete")
     suspend fun completeTask(@Path("id") id: String): Response<Task>
-
-    @POST("tasks/{id}/postpone")
-    suspend fun postponeTask(@Path("id") id: String, @Body input: PostponeTaskInput): Response<Task>
-
-    @POST("tasks/{id}/cancel")
-    suspend fun cancelTask(@Path("id") id: String): Response<Task>
 
     // Daily Plans
     @GET("plans/daily")

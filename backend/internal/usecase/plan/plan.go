@@ -65,7 +65,7 @@ func (u *PlanUseCase) Generate(ctx context.Context, userID string, date time.Tim
 	// Filter tasks to only active ones
 	var activeTasks []*domain.Task
 	for _, t := range tasks {
-		if t.Status == domain.StatusTodo || t.Status == domain.StatusInProgress || t.Status == domain.StatusPostponed {
+		if t.Status == domain.StatusTodo {
 			activeTasks = append(activeTasks, t)
 		}
 	}

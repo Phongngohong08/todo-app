@@ -97,10 +97,7 @@ func (rm *RouteManager) SetupRouter() *gin.Engine {
 				tasksGroup.PUT("/:id", rm.handleUpdateTask)
 				tasksGroup.DELETE("/:id", rm.handleDeleteTask)
 				
-				tasksGroup.POST("/:id/start", rm.handleStartTask)
 				tasksGroup.POST("/:id/complete", rm.handleCompleteTask)
-				tasksGroup.POST("/:id/postpone", rm.handlePostponeTask)
-				tasksGroup.POST("/:id/cancel", rm.handleCancelTask)
 			}
 
 			// Daily Plans Routes
@@ -248,7 +245,7 @@ func (rm *RouteManager) handleListTasks(c *gin.Context) {
 	userID := c.GetString("userID")
 	status := c.Query("status")
 	query := c.Query("q")
-	tag := c.Query("tag")
+	category := c.Query("category")
 
 	var dueDateBefore *time.Time
 	dueDateBeforeStr := c.Query("due_date_before")
@@ -259,7 +256,7 @@ func (rm *RouteManager) handleListTasks(c *gin.Context) {
 		}
 	}
 
-	tasks, err := rm.taskUC.List(c.Request.Context(), userID, status, dueDateBefore, query, tag)
+	tasks, err := rm.taskUC.List(c.Request.Context(), userID, status, dueDateBefore, query, category)
 	if err != nil {
 		handleError(c, http.StatusInternalServerError, err)
 		return
@@ -325,27 +322,6 @@ func (rm *RouteManager) handleDeleteTask(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "task deleted successfully"})
 }
 
-func (rm *RouteManager) handleStartTask(c *gin.Context) {
-	userID := c.GetString("userID")
-	id := c.Param("id")
-
-	t, err := rm.taskUC.Start(c.Request.Context(), id, userID)
-	if err != nil {
-		if err == domain.ErrTaskNotFound {
-			c.JSON(http.StatusNotFound, gin.H{"error": "task not found"})
-			return
-		}
-		if err == domain.ErrInvalidStatusTrans {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
-		handleError(c, http.StatusInternalServerError, err)
-		return
-	}
-
-	c.JSON(http.StatusOK, t)
-}
-
 func (rm *RouteManager) handleCompleteTask(c *gin.Context) {
 	userID := c.GetString("userID")
 	id := c.Param("id")
@@ -366,55 +342,6 @@ func (rm *RouteManager) handleCompleteTask(c *gin.Context) {
 
 	c.JSON(http.StatusOK, t)
 }
-
-func (rm *RouteManager) handlePostponeTask(c *gin.Context) {
-	userID := c.GetString("userID")
-	id := c.Param("id")
-
-	var input task.PostponeTaskInput
-	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	t, err := rm.taskUC.Postpone(c.Request.Context(), id, userID, input)
-	if err != nil {
-		if err == domain.ErrTaskNotFound {
-			c.JSON(http.StatusNotFound, gin.H{"error": "task not found"})
-			return
-		}
-		if err == domain.ErrInvalidStatusTrans {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
-		handleError(c, http.StatusInternalServerError, err)
-		return
-	}
-
-	c.JSON(http.StatusOK, t)
-}
-
-func (rm *RouteManager) handleCancelTask(c *gin.Context) {
-	userID := c.GetString("userID")
-	id := c.Param("id")
-
-	t, err := rm.taskUC.Cancel(c.Request.Context(), id, userID)
-	if err != nil {
-		if err == domain.ErrTaskNotFound {
-			c.JSON(http.StatusNotFound, gin.H{"error": "task not found"})
-			return
-		}
-		if err == domain.ErrInvalidStatusTrans {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
-		handleError(c, http.StatusInternalServerError, err)
-		return
-	}
-
-	c.JSON(http.StatusOK, t)
-}
-
 
 func (rm *RouteManager) handleGetDailyPlan(c *gin.Context) {
 	userID := c.GetString("userID")

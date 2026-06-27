@@ -11,7 +11,6 @@ import com.example.todoapplication.widget.TasksWidgetProvider
  * khi mất mạng, đọc lại từ Room để vẫn xem được công việc (offline-first read).
  */
 object TaskCacheRepository {
-    private const val TAG_SEP = "" // unit separator — tránh đụng ký tự thường trong tag
 
     suspend fun cache(context: Context, tasks: List<Task>) {
         val dao = AppDatabase.get(context.applicationContext).taskCacheDao()
@@ -34,11 +33,8 @@ object TaskCacheRepository {
         description = description,
         priority = priority,
         dueDate = dueDate,
-        estimatedDuration = estimatedDuration,
-        preferredTimeStart = preferredTimeStart,
-        preferredTimeEnd = preferredTimeEnd,
         status = status,
-        tagsCsv = tags.joinToString(TAG_SEP),
+        category = category,
         recurrence = recurrence,
         createdAt = createdAt,
         updatedAt = updatedAt,
@@ -52,11 +48,8 @@ object TaskCacheRepository {
         description = description,
         priority = priority,
         dueDate = dueDate,
-        estimatedDuration = estimatedDuration,
-        preferredTimeStart = preferredTimeStart,
-        preferredTimeEnd = preferredTimeEnd,
         status = status,
-        tags = if (tagsCsv.isBlank()) emptyList() else tagsCsv.split(TAG_SEP),
+        category = category,
         recurrence = recurrence,
         createdAt = createdAt,
         updatedAt = updatedAt

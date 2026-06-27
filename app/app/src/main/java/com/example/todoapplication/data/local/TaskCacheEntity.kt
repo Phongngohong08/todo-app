@@ -4,8 +4,7 @@ import androidx.room.Entity
 import androidx.room.PrimaryKey
 
 /**
- * Bản sao offline của một task. Lưu các trường JSON dạng chuỗi (tags) để đơn giản.
- * Dùng để hiển thị danh sách khi mất mạng (offline-first read cache).
+ * Bản sao offline của một task. Dùng để hiển thị danh sách khi mất mạng (offline-first read cache).
  */
 @Entity(tableName = "task_cache")
 data class TaskCacheEntity(
@@ -15,11 +14,8 @@ data class TaskCacheEntity(
     val description: String?,
     val priority: String,
     val dueDate: String?,
-    val estimatedDuration: Int,
-    val preferredTimeStart: String?,
-    val preferredTimeEnd: String?,
     val status: String,
-    val tagsCsv: String,        // tags nối bằng dấu phẩy
+    val category: String,
     val recurrence: String,
     val createdAt: String,
     val updatedAt: String,

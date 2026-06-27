@@ -60,7 +60,7 @@ func (u *CoachUseCase) Chat(ctx context.Context, userID string, messageText stri
 	var activeTasks []*domain.Task
 	if err == nil {
 		for _, t := range tasks {
-			if t.Status == domain.StatusTodo || t.Status == domain.StatusInProgress || t.Status == domain.StatusPostponed {
+			if t.Status == domain.StatusTodo {
 				activeTasks = append(activeTasks, t)
 			}
 		}

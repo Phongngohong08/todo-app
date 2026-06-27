@@ -108,7 +108,7 @@ func TestTaskUseCase_Create(t *testing.T) {
 	}
 }
 
-func TestTaskUseCase_StartAndComplete(t *testing.T) {
+func TestTaskUseCase_Complete(t *testing.T) {
 	repo := NewMockTaskRepository()
 	uc := NewTaskUseCase(repo)
 
@@ -123,15 +123,6 @@ func TestTaskUseCase_StartAndComplete(t *testing.T) {
 		UpdatedAt: time.Now(),
 	}
 	_ = repo.Create(ctx, taskSeed)
-
-	// Start task
-	startedTask, err := uc.Start(ctx, "task-1", "user-1")
-	if err != nil {
-		t.Fatalf("unexpected error starting task: %v", err)
-	}
-	if startedTask.Status != domain.StatusInProgress {
-		t.Errorf("expected status 'IN_PROGRESS', got '%s'", startedTask.Status)
-	}
 
 	// Complete task
 	completedTask, err := uc.Complete(ctx, "task-1", "user-1")
@@ -159,8 +150,8 @@ func TestTaskUseCase_InvalidTransition(t *testing.T) {
 	}
 	_ = repo.Create(ctx, taskSeed)
 
-	// Try to start it
-	_, err := uc.Start(ctx, "task-1", "user-1")
+	// Completing an already-completed task is invalid
+	_, err := uc.Complete(ctx, "task-1", "user-1")
 	if !errors.Is(err, domain.ErrInvalidStatusTrans) {
 		t.Errorf("expected invalid status transition error, got: %v", err)
 	}

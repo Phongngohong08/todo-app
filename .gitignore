@@ -21,3 +21,6 @@ desktop.ini
 .env
 .env.*
 !.env.example
+
+# directory for temporary files
+thamkhao

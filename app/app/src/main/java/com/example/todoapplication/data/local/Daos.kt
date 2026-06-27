@@ -8,15 +8,6 @@ import androidx.room.Query
 import androidx.room.Update
 
 @Dao
-interface GamificationDao {
-    @Query("SELECT * FROM gamification WHERE id = 0")
-    suspend fun get(): GamificationEntity?
-
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun upsert(entity: GamificationEntity)
-}
-
-@Dao
 interface TaskCacheDao {
     @Query("SELECT * FROM task_cache ORDER BY cachedAt ASC")
     suspend fun getAll(): List<TaskCacheEntity>

@@ -169,7 +169,7 @@ fun StatsScreen(
                             verticalArrangement = Arrangement.spacedBy(14.dp),
                             modifier = Modifier.fillMaxSize()
                         ) {
-                            // Big metric card — 3 columns
+                            // Big metric card — 2 columns: Hoàn thành / Đang chờ
                             item {
                                 Surface(
                                     shape = RoundedCornerShape(20.dp),
@@ -190,33 +190,27 @@ fun StatsScreen(
                                         )
                                         VerticalDivider()
                                         BigMetric(
-                                            value = "${statsSummary?.postponedTasks ?: 0}",
-                                            label = "Đã hoãn",
-                                            color = PriorityHighColor
-                                        )
-                                        VerticalDivider()
-                                        BigMetric(
-                                            value = "${statsSummary?.totalTimeSpentMins ?: 0}",
-                                            label = "Phút làm việc",
+                                            value = "${statsSummary?.pendingTasks ?: 0}",
+                                            label = "Đang chờ",
                                             color = primary
                                         )
                                     }
                                 }
                             }
 
-                            // Postpone reasons
-                            val reasons = statsSummary?.postponeReasons ?: emptyMap()
-                            if (reasons.isNotEmpty()) {
+                            // Phân bố việc đang chờ theo danh mục
+                            val byCategory = statsSummary?.byCategory ?: emptyMap()
+                            if (byCategory.isNotEmpty()) {
                                 item {
                                     Text(
-                                        "Lý do trì hoãn thường gặp",
+                                        "Việc đang chờ theo danh mục",
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 15.sp,
                                         color = MaterialTheme.colorScheme.onSurface,
                                         modifier = Modifier.padding(top = 4.dp)
                                     )
                                 }
-                                items(reasons.toList().sortedByDescending { it.second }) { (reason, count) ->
+                                items(byCategory.toList().sortedByDescending { it.second }) { (cat, count) ->
                                     Surface(
                                         shape = RoundedCornerShape(14.dp),
                                         color = MaterialTheme.colorScheme.surface,
@@ -230,22 +224,26 @@ fun StatsScreen(
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
                                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                                // Colored left bar
                                                 Box(
                                                     modifier = Modifier
                                                         .size(width = 3.dp, height = 36.dp)
-                                                        .background(PriorityHighColor, RoundedCornerShape(2.dp))
+                                                        .background(primary, RoundedCornerShape(2.dp))
                                                 )
                                                 Spacer(Modifier.width(12.dp))
-                                                Text(reason, color = MaterialTheme.colorScheme.onSurface, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                                                Text(
+                                                    com.example.todoapplication.ui.utils.categoryLabel(cat),
+                                                    color = MaterialTheme.colorScheme.onSurface,
+                                                    fontSize = 14.sp,
+                                                    fontWeight = FontWeight.Medium
+                                                )
                                             }
                                             Surface(
                                                 shape = RoundedCornerShape(10.dp),
-                                                color = PriorityHighColor.copy(alpha = 0.12f)
+                                                color = primary.copy(alpha = 0.12f)
                                             ) {
                                                 Text(
-                                                    "$count lần",
-                                                    color = PriorityHighColor,
+                                                    "$count việc",
+                                                    color = primary,
                                                     fontSize = 12.sp,
                                                     fontWeight = FontWeight.Bold,
                                                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
@@ -265,7 +263,7 @@ fun StatsScreen(
                                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                             Text("🎉", fontSize = 44.sp)
                                             Text(
-                                                "Chưa có lý do trì hoãn nào!",
+                                                "Không còn việc nào đang chờ!",
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                 modifier = Modifier.padding(top = 8.dp)
                                             )

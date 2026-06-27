@@ -1,7 +1,7 @@
 package com.example.todoapplication
 
 import android.app.Application
-import com.example.todoapplication.data.repository.GamificationManager
+import com.example.todoapplication.data.repository.CategoryStore
 import com.example.todoapplication.data.repository.ThemeController
 import com.example.todoapplication.di.ServiceLocator
 
@@ -14,6 +14,6 @@ class TodoApplication : Application() {
         super.onCreate()
         ServiceLocator.init(this)
         ThemeController.init(this)
-        GamificationManager.init(this)
+        CategoryStore.init(this)
     }
 }

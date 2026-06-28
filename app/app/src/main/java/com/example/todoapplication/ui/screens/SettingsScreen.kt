@@ -11,6 +11,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -27,8 +28,10 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import com.example.todoapplication.data.repository.CategoryStore
 import com.example.todoapplication.data.repository.ThemeController
 import com.example.todoapplication.data.repository.ThemeMode
+import com.example.todoapplication.ui.utils.categoryLabel
 import com.example.todoapplication.ui.viewmodel.SettingsViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -182,6 +185,65 @@ fun SettingsScreen(
                         )
                     }
 
+                    // Category management section
+                    SettingsSection(title = "🏷️ Danh mục") {
+                        Text(
+                            "Danh mục dùng khi tạo công việc. Bạn có thể thêm danh mục riêng và xoá danh mục tự thêm.",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = 12.sp,
+                            modifier = Modifier.padding(bottom = 10.dp)
+                        )
+                        CategoryStore.all().forEach { c ->
+                            val isDefault = CategoryStore.defaults.any { it.equals(c, ignoreCase = true) }
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(categoryLabel(c), color = MaterialTheme.colorScheme.onSurface, fontSize = 14.sp, modifier = Modifier.weight(1f))
+                                if (isDefault) {
+                                    Text("Mặc định", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
+                                } else {
+                                    IconButton(onClick = { CategoryStore.remove(c) }, modifier = Modifier.size(28.dp)) {
+                                        Icon(Icons.Default.Close, contentDescription = "Xoá", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
+                                    }
+                                }
+                            }
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        var newCat by remember { mutableStateOf("") }
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            OutlinedTextField(
+                                value = newCat,
+                                onValueChange = { newCat = it },
+                                label = { Text("Danh mục mới") },
+                                modifier = Modifier.weight(1f),
+                                singleLine = true,
+                                shape = RoundedCornerShape(12.dp),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = primary,
+                                    unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                                    focusedLabelColor = primary,
+                                    focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface
+                                )
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(primary)
+                                    .clickable { CategoryStore.add(newCat); newCat = "" }
+                                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text("Thêm", color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                            }
+                        }
+                    }
+
                     // Save button
                     Box(
                         modifier = Modifier
@@ -209,6 +271,29 @@ fun SettingsScreen(
                                 fontSize = 15.sp
                             )
                         }
+                    }
+
+                    // About / FAQ section
+                    SettingsSection(title = "ℹ️ Giới thiệu") {
+                        Text("TaskFlow AI", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurface)
+                        Text("Phiên bản 1.0", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp, bottom = 8.dp))
+                        Text(
+                            "Ứng dụng quản lý công việc tích hợp AI: thêm nhanh bằng ngôn ngữ tự nhiên, lịch trình AI hàng ngày, AI Coach và trí nhớ dài hạn.",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = 12.sp,
+                            lineHeight = 18.sp
+                        )
+                        Spacer(Modifier.height(10.dp))
+                        Text("Hỏi đáp nhanh", fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface)
+                        Text(
+                            "• Không nhận thông báo? Hãy cấp quyền thông báo và đặt hạn chót cho việc.\n" +
+                                "• Thêm danh mục mới? Ngay tại mục Danh mục ở trên, hoặc trong màn chi tiết công việc.\n" +
+                                "• AI hiểu sai khi thêm nhanh? Mô tả rõ thời gian/độ ưu tiên hơn, rồi chỉnh tay trước khi lưu.",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = 12.sp,
+                            lineHeight = 18.sp,
+                            modifier = Modifier.padding(top = 4.dp)
+                        )
                     }
 
                     Spacer(Modifier.height(8.dp))

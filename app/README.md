@@ -97,8 +97,8 @@ app/src/main/java/com/example/todoapplication/
 | `TemplatesScreen` | Thư viện **Mẫu nhiệm vụ** theo nhóm (Sức khỏe/Cuộc sống/Công việc/Học tập); bấm mẫu → mở form điền sẵn |
 | `DailyPlanScreen` | Lịch trình do AI tạo, timeline với dot gradient |
 | `AICoachScreen` | Chat với AI Coach — bubble hiện đại, gradient send button |
-| `StatsScreen` | 3 tab: **Thống kê** (Hoàn thành/Đang chờ + phân bố danh mục) · **Biểu đồ** (bar chart 7 ngày) · **Trí nhớ AI** |
-| `SettingsScreen` | Chọn giao diện Sáng/Tối/Hệ thống; cấu hình giờ giấc cho lập lịch AI |
+| `StatsScreen` | 3 tab: **Thống kê** (hồ sơ: tên + Hoàn thành/Đang chờ/Ngày hoàn hảo + **bản đồ nhiệt năm** + phân bố danh mục) · **Biểu đồ** (bar chart 7 ngày) · **Trí nhớ AI** |
+| `SettingsScreen` | Giao diện Sáng/Tối/Hệ thống; giờ giấc cho lập lịch AI; **quản lý danh mục** (thêm/xoá); **Giới thiệu & Hỏi đáp** |
 | `CalendarScreen` | Lịch tháng: xem việc theo ngày (chấm màu priority), **chiếu các lần lặp ra tương lai**, chọn ngày để lọc |
 
 ---

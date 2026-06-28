@@ -63,7 +63,7 @@ fun DailyPlanScreen(
     }
 
     Scaffold(
-        bottomBar = { BottomNavigationBar(navController, activeTab = 1) },
+        bottomBar = { BottomNavigationBar(navController, activeTab = 2) },
         containerColor = MaterialTheme.colorScheme.background
     ) { innerPadding ->
         Column(

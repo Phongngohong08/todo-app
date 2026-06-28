@@ -6,10 +6,11 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AccountBox
+import androidx.compose.material.icons.filled.BarChart
+import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.DateRange
-import androidx.compose.material.icons.filled.List
-import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -29,10 +30,11 @@ fun AppBottomBar(navController: NavController, activeTab: Int) {
     data class NavItem(val route: String, val icon: ImageVector, val label: String)
 
     val items = listOf(
-        NavItem(Screen.TaskList.route, Icons.Default.List, "Việc làm"),
-        NavItem(Screen.DailyPlan.route, Icons.Default.DateRange, "Kế hoạch"),
-        NavItem(Screen.AICoach.route, Icons.Default.Send, "AI Coach"),
-        NavItem(Screen.Stats.route, Icons.Default.AccountBox, "Thống kê")
+        NavItem(Screen.TaskList.route, Icons.Default.Checklist, "Việc làm"),
+        NavItem(Screen.Calendar.route, Icons.Default.DateRange, "Lịch"),
+        NavItem(Screen.DailyPlan.route, Icons.Default.Schedule, "Kế hoạch"),
+        NavItem(Screen.AICoach.route, Icons.Default.SmartToy, "AI Coach"),
+        NavItem(Screen.Stats.route, Icons.Default.BarChart, "Thống kê")
     )
 
     Box(

@@ -38,9 +38,10 @@ Khu vực trên cùng là **thẻ chào mừng** hiển thị lời chào, số 
 | Biểu tượng | Chức năng |
 | :--- | :--- |
 | ⭐ | Thêm nhanh bằng AI (Quick Add) |
-| 📅 | Mở Lịch tháng |
 | ☰ | Bật/tắt chế độ **kéo-thả sắp xếp** |
 | ⎋ (thoát) | Đăng xuất |
+
+> Lịch tháng nay nằm ở tab **Lịch** trên thanh điều hướng dưới.
 
 Bên dưới:
 - **Ô tìm kiếm**: gõ để lọc theo tiêu đề/mô tả.
@@ -117,7 +118,7 @@ Chia một công việc lớn thành nhiều bước nhỏ:
 
 ## 6. Lịch tháng
 
-Nhấn **📅** trên thẻ chào mừng:
+Mở tab **Lịch** (thanh điều hướng dưới):
 - Dùng **◀ ▶** để chuyển tháng.
 - Ngày có công việc được đánh **chấm màu** theo độ ưu tiên.
 - Công việc **lặp lại** (hàng ngày/tuần/tháng) được hiển thị chấm ở **tất cả các ngày lặp** trong tương lai, không chỉ ngày đầu.
@@ -146,7 +147,7 @@ Tab **AI Coach**:
 ## 9. Thống kê & Biểu đồ
 
 Tab **Thống kê** có 3 mục:
-- **📊 Thống kê**: số việc **Hoàn thành**, số việc **Đang chờ**, và phân bố việc đang chờ theo **danh mục**.
+- **📊 Thống kê** (hồ sơ của bạn): tên người dùng; số việc **Hoàn thành**, **Đang chờ**, **Ngày hoàn hảo** (số ngày trong năm có hoàn thành việc); **Bản đồ nhiệt hằng năm** (mỗi ô là một ngày, đậm dần theo số việc hoàn thành); và phân bố việc đang chờ theo **danh mục**.
 - **📈 Biểu đồ**: biểu đồ cột số việc hoàn thành trong 7 ngày qua + ngày năng suất nhất.
 - **🧠 Trí nhớ AI**: các thói quen AI quan sát được. Nhấn **Phân tích thói quen bằng AI** để cập nhật; có thể xóa từng mục.
 
@@ -157,6 +158,8 @@ Tab **Thống kê** có 3 mục:
 Mở **Thiết lập** (biểu tượng ⚙ ở tab Thống kê):
 - **🌗 Giao diện**: chọn **Sáng / Tối / Theo hệ thống** — đổi tức thì toàn app.
 - **🕐 Nhịp sinh hoạt**: đặt giờ bắt đầu buổi sáng, kết thúc buổi tối, thời lượng phiên làm việc — AI dùng để sắp xếp lịch trình. Nhấn **Lưu thiết lập**.
+- **🏷️ Danh mục**: xem tất cả danh mục, **thêm danh mục mới** hoặc **xoá danh mục tự thêm** (3 danh mục mặc định không xoá được).
+- **ℹ️ Giới thiệu**: thông tin phiên bản và phần **Hỏi đáp nhanh**.
 
 ---
 

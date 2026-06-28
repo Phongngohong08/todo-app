@@ -253,7 +253,6 @@ fun TaskListScreen(
                         sortMode = sortMode,
                         onSortToggle = { sortMode = !sortMode },
                         onQuickAdd = { showQuickAdd = true },
-                        onCalendar = { navController.navigate(Screen.Calendar.route) },
                         onLogout = {
                             sessionManager.logout()
                             navController.navigate(Screen.Login.route) {
@@ -806,7 +805,6 @@ private fun GreetingHeroCard(
     sortMode: Boolean,
     onSortToggle: () -> Unit,
     onQuickAdd: () -> Unit,
-    onCalendar: () -> Unit,
     onLogout: () -> Unit
 ) {
     val primary = MaterialTheme.colorScheme.primary
@@ -846,9 +844,6 @@ private fun GreetingHeroCard(
                 Row {
                     IconButton(onClick = onQuickAdd, modifier = Modifier.size(38.dp)) {
                         Icon(Icons.Default.Star, contentDescription = "AI Quick Add", modifier = Modifier.size(20.dp), tint = Color.White)
-                    }
-                    IconButton(onClick = onCalendar, modifier = Modifier.size(38.dp)) {
-                        Icon(Icons.Default.DateRange, contentDescription = "Lịch", modifier = Modifier.size(20.dp), tint = Color.White)
                     }
                     IconButton(onClick = onSortToggle, modifier = Modifier.size(38.dp)) {
                         Box(

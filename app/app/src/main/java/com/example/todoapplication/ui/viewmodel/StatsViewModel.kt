@@ -26,7 +26,11 @@ data class StatsUiState(
     val isLoadingWeekly: Boolean = false,
     val memories: List<MemoryItem> = emptyList(),
     val isLoadingMemories: Boolean = false,
-    val isExtracting: Boolean = false
+    val isExtracting: Boolean = false,
+    /** Số việc hoàn thành theo từng ngày trong năm ("yyyy-MM-dd" -> count) cho bản đồ nhiệt. */
+    val yearly: Map<String, Int> = emptyMap(),
+    /** Số ngày hoàn hảo = số ngày có hoàn thành ít nhất 1 việc trong năm. */
+    val perfectDays: Int = 0
 )
 
 class StatsViewModel(private val repo: StatsRepository) : ViewModel() {
@@ -41,6 +45,25 @@ class StatsViewModel(private val repo: StatsRepository) : ViewModel() {
         viewModelScope.launch {
             val result = repo.summary()
             _uiState.update { it.copy(summary = result.getOrNull(), isLoadingStats = false) }
+        }
+        loadYearly()
+    }
+
+    /** Tải việc đã hoàn thành rồi gom theo từng ngày trong năm hiện tại (cho bản đồ nhiệt + ngày hoàn hảo). */
+    private fun loadYearly() {
+        viewModelScope.launch {
+            val result = repo.completedTasks()
+            val map = HashMap<String, Int>()
+            val year = Calendar.getInstance().get(Calendar.YEAR)
+            result.getOrNull()?.forEach { task ->
+                val d = parseIso8601(task.updatedAt) ?: return@forEach
+                val cal = Calendar.getInstance().apply { time = d }
+                if (cal.get(Calendar.YEAR) == year) {
+                    val key = "%04d-%02d-%02d".format(cal.get(Calendar.YEAR), cal.get(Calendar.MONTH) + 1, cal.get(Calendar.DAY_OF_MONTH))
+                    map[key] = (map[key] ?: 0) + 1
+                }
+            }
+            _uiState.update { it.copy(yearly = map, perfectDays = map.size) }
         }
     }
 

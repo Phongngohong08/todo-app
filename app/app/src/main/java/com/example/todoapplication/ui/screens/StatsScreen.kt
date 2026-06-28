@@ -4,6 +4,8 @@ import android.widget.Toast
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -32,6 +34,7 @@ import androidx.navigation.NavController
 import com.example.todoapplication.data.api.NetworkClient
 import com.example.todoapplication.data.model.MemoryItem
 import com.example.todoapplication.data.model.StatsSummary
+import com.example.todoapplication.data.repository.SessionManager
 import com.example.todoapplication.ui.navigation.Screen
 import com.example.todoapplication.ui.theme.*
 import com.example.todoapplication.ui.viewmodel.StatsViewModel
@@ -76,7 +79,7 @@ fun StatsScreen(
     }
 
     Scaffold(
-        bottomBar = { BottomNavigationBar(navController, activeTab = 3) },
+        bottomBar = { BottomNavigationBar(navController, activeTab = 4) },
         containerColor = MaterialTheme.colorScheme.background
     ) { innerPadding ->
         Column(
@@ -169,7 +172,31 @@ fun StatsScreen(
                             verticalArrangement = Arrangement.spacedBy(14.dp),
                             modifier = Modifier.fillMaxSize()
                         ) {
-                            // Big metric card — 2 columns: Hoàn thành / Đang chờ
+                            // Header hồ sơ
+                            item {
+                                val userName = remember { SessionManager(context).getUserName() ?: "bạn" }
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(48.dp)
+                                            .clip(androidx.compose.foundation.shape.CircleShape)
+                                            .background(Brush.linearGradient(listOf(primary, tertiary))),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(userName.take(1).uppercase(), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 20.sp)
+                                    }
+                                    Spacer(Modifier.width(12.dp))
+                                    Column {
+                                        Text(userName, fontWeight = FontWeight.Bold, fontSize = 17.sp, color = MaterialTheme.colorScheme.onSurface)
+                                        Text("Bạn đang đi đúng kế hoạch! 🎯", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                                    }
+                                }
+                            }
+
+                            // Big metric card — Hoàn thành / Đang chờ / Ngày hoàn hảo
                             item {
                                 Surface(
                                     shape = RoundedCornerShape(20.dp),
@@ -194,7 +221,38 @@ fun StatsScreen(
                                             label = "Đang chờ",
                                             color = primary
                                         )
+                                        VerticalDivider()
+                                        BigMetric(
+                                            value = "${state.perfectDays}",
+                                            label = "Ngày hoàn hảo",
+                                            color = tertiary
+                                        )
                                     }
+                                }
+                            }
+
+                            // Bản đồ nhiệt hằng năm
+                            item {
+                                Text(
+                                    "Bản đồ nhiệt ${java.util.Calendar.getInstance().get(java.util.Calendar.YEAR)}",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 15.sp,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.padding(top = 4.dp)
+                                )
+                            }
+                            item {
+                                Surface(
+                                    shape = RoundedCornerShape(20.dp),
+                                    color = MaterialTheme.colorScheme.surface,
+                                    shadowElevation = 2.dp,
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    YearHeatmap(
+                                        data = state.yearly,
+                                        baseColor = primary,
+                                        modifier = Modifier.padding(16.dp)
+                                    )
                                 }
                             }
 
@@ -571,6 +629,103 @@ private fun WeeklyProductivityChart(
                 Spacer(Modifier.width(8.dp))
                 Text("$count", color = if (count > 0) primaryColor else MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(18.dp), textAlign = TextAlign.End)
             }
+        }
+    }
+}
+
+private data class DayCell(val month: Int, val dom: Int, val count: Int, val inYear: Boolean)
+
+/** Bản đồ nhiệt kiểu GitHub: 7 hàng (CN..T7) × các tuần trong năm, đậm dần theo số việc hoàn thành. */
+@Composable
+private fun YearHeatmap(data: Map<String, Int>, baseColor: Color, modifier: Modifier = Modifier) {
+    val year = remember { Calendar.getInstance().get(Calendar.YEAR) }
+    val cell = 12.dp
+    val gap = 3.dp
+    val maxV = (data.values.maxOrNull() ?: 1).coerceAtLeast(1)
+    val emptyColor = MaterialTheme.colorScheme.surfaceVariant
+
+    val weeks = remember(data, year) {
+        val list = ArrayList<List<DayCell>>()
+        val cal = Calendar.getInstance().apply { clear(); set(year, 0, 1) }
+        while (cal.get(Calendar.DAY_OF_WEEK) != Calendar.SUNDAY) cal.add(Calendar.DAY_OF_MONTH, -1)
+        val end = Calendar.getInstance().apply { clear(); set(year, 11, 31) }
+        while (cal.timeInMillis <= end.timeInMillis) {
+            val week = ArrayList<DayCell>(7)
+            for (d in 0..6) {
+                val inYear = cal.get(Calendar.YEAR) == year
+                val key = "%04d-%02d-%02d".format(cal.get(Calendar.YEAR), cal.get(Calendar.MONTH) + 1, cal.get(Calendar.DAY_OF_MONTH))
+                week.add(DayCell(cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH), if (inYear) (data[key] ?: 0) else -1, inYear))
+                cal.add(Calendar.DAY_OF_MONTH, 1)
+            }
+            list.add(week)
+            if (list.size > 60) break
+        }
+        list
+    }
+
+    val dayLabels = listOf("CN", "T2", "T3", "T4", "T5", "T6", "T7")
+    val monthShort = listOf("Th1", "Th2", "Th3", "Th4", "Th5", "Th6", "Th7", "Th8", "Th9", "Th10", "Th11", "Th12")
+    var lastMonth = -1
+
+    Column(modifier) {
+        Row {
+            // Cột nhãn thứ (cố định bên trái)
+            Column(verticalArrangement = Arrangement.spacedBy(gap)) {
+                Spacer(Modifier.height(14.dp)) // chừa chỗ cho hàng nhãn tháng
+                dayLabels.forEach { d ->
+                    Box(modifier = Modifier.height(cell), contentAlignment = Alignment.CenterStart) {
+                        Text(d, fontSize = 8.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+            Spacer(Modifier.width(6.dp))
+            // Lưới tuần (cuộn ngang)
+            Column(modifier = Modifier.horizontalScroll(rememberScrollState())) {
+                // Hàng nhãn tháng
+                Row {
+                    weeks.forEach { week ->
+                        val firstInYear = week.firstOrNull { it.inYear && it.dom <= 7 }
+                        val label = if (firstInYear != null && firstInYear.month != lastMonth) {
+                            lastMonth = firstInYear.month
+                            monthShort[firstInYear.month]
+                        } else ""
+                        Box(modifier = Modifier.width(cell + gap).height(14.dp)) {
+                            if (label.isNotEmpty()) Text(label, fontSize = 8.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+                // Các ô ngày
+                Row(horizontalArrangement = Arrangement.spacedBy(gap)) {
+                    weeks.forEach { week ->
+                        Column(verticalArrangement = Arrangement.spacedBy(gap)) {
+                            week.forEach { c ->
+                                val color = when {
+                                    !c.inYear -> Color.Transparent
+                                    c.count <= 0 -> emptyColor
+                                    else -> baseColor.copy(alpha = (0.35f + 0.65f * c.count / maxV).coerceIn(0.35f, 1f))
+                                }
+                                Box(
+                                    modifier = Modifier
+                                        .size(cell)
+                                        .clip(RoundedCornerShape(3.dp))
+                                        .background(color)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        // Chú thích
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("Ít", fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.width(4.dp))
+            listOf(0.35f, 0.55f, 0.75f, 1f).forEach { a ->
+                Box(modifier = Modifier.size(11.dp).clip(RoundedCornerShape(3.dp)).background(baseColor.copy(alpha = a)))
+                Spacer(Modifier.width(3.dp))
+            }
+            Text("Nhiều", fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }

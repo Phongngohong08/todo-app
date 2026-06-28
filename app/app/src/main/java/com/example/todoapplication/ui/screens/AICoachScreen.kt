@@ -200,7 +200,7 @@ fun AICoachScreen(
                     }
                 }
 
-                BottomNavigationBar(navController, activeTab = 2)
+                BottomNavigationBar(navController, activeTab = 3)
             }
         },
         containerColor = MaterialTheme.colorScheme.background

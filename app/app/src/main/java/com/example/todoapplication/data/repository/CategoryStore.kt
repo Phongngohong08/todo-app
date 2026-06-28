@@ -31,6 +31,19 @@ object CategoryStore {
     /** Tất cả danh mục để người dùng chọn (mặc định + tùy chỉnh). */
     fun all(): List<String> = defaults + custom
 
+    /** Xoá một danh mục tùy chỉnh (không xoá được 3 danh mục mặc định). */
+    fun remove(name: String) {
+        if (defaults.any { it.equals(name, ignoreCase = true) }) return
+        if (custom.none { it.equals(name, ignoreCase = true) }) return
+        custom = custom.filterNot { it.equals(name, ignoreCase = true) }
+        if (::appContext.isInitialized) {
+            appContext.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
+                .edit()
+                .putStringSet(KEY_CUSTOM, custom.toSet())
+                .apply()
+        }
+    }
+
     /** Thêm một danh mục mới (bỏ qua nếu rỗng/trùng). Trả về tên đã chuẩn hoá. */
     fun add(name: String): String {
         val n = name.trim()

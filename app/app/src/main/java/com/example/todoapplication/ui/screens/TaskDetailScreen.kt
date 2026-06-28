@@ -61,6 +61,8 @@ fun TaskDetailScreen(
     var dueDate by remember { mutableStateOf("") }
     var category by remember { mutableStateOf("OTHER") }
     var recurrence by remember { mutableStateOf("NONE") }
+    var recurrenceDays by remember { mutableStateOf("") } // "MON,WED,FRI" khi WEEKLY
+    var reminderOffset by remember { mutableIntStateOf(0) } // phút nhắc trước hạn
     var subtaskInput by remember { mutableStateOf("") }
     val subtasks by taskDetailViewModel.subtasks.collectAsStateWithLifecycle()
     val calendar = remember { Calendar.getInstance() }
@@ -77,6 +79,8 @@ fun TaskDetailScreen(
                     dueDate = task.dueDate ?: ""
                     category = task.category
                     recurrence = task.recurrence
+                    recurrenceDays = task.recurrenceDays
+                    reminderOffset = task.reminderOffsetMinutes
                     if (dueDate.isNotEmpty()) parseIso8601(dueDate)?.let { calendar.time = it }
                 }
                 TaskDetailEvent.Saved -> {
@@ -166,14 +170,16 @@ fun TaskDetailScreen(
                                 return@clickable
                             }
                             val dateString = if (dueDate.isEmpty()) null else dueDate
+                            // Chỉ lưu thứ lặp khi đang lặp theo tuần
+                            val days = if (recurrence == "WEEKLY") recurrenceDays else ""
                             if (isNewTask) {
                                 taskDetailViewModel.create(
-                                    CreateTaskInput(title, description, priority, dateString, category, recurrence)
+                                    CreateTaskInput(title, description, priority, dateString, category, recurrence, days, reminderOffset)
                                 )
                             } else {
                                 taskDetailViewModel.update(
                                     taskId,
-                                    UpdateTaskInput(title, description, priority, dateString, category, recurrence)
+                                    UpdateTaskInput(title, description, priority, dateString, category, recurrence, days, reminderOffset)
                                 )
                             }
                         },
@@ -446,6 +452,40 @@ fun TaskDetailScreen(
                             }
                         }
                     }
+                    // Chọn thứ trong tuần (chỉ khi lặp Hàng tuần)
+                    if (recurrence == "WEEKLY") {
+                        Spacer(Modifier.height(10.dp))
+                        Text(
+                            "Lặp vào các thứ",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+                        val selectedDays = recurrenceDays.split(",").map { it.trim() }.filter { it.isNotEmpty() }.toSet()
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            listOf("MON" to "T2", "TUE" to "T3", "WED" to "T4", "THU" to "T5", "FRI" to "T6", "SAT" to "T7", "SUN" to "CN").forEach { (code, label) ->
+                                val isSel = code in selectedDays
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .aspectRatio(1f)
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(if (isSel) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant)
+                                        .clickable {
+                                            val ns = if (isSel) selectedDays - code else selectedDays + code
+                                            // giữ thứ tự T2..CN
+                                            recurrenceDays = listOf("MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN").filter { it in ns }.joinToString(",")
+                                        },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(label, fontSize = 11.sp, fontWeight = if (isSel) FontWeight.Bold else FontWeight.Normal, color = if (isSel) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                        }
+                    }
                     if (recurrence != "NONE" && dueDate.isEmpty()) {
                         Text(
                             "⚠ Cần đặt hạn chót để dùng lặp lại.",
@@ -456,7 +496,27 @@ fun TaskDetailScreen(
                     }
                 }
 
-                // ── Section 5: Các bước con (Checklist) ──────────────────
+                // ── Section 5: Lời nhắc ───────────────────────────────────
+                DetailSection(emoji = "🔔", title = "Lời nhắc") {
+                    if (dueDate.isEmpty()) {
+                        Text("Đặt hạn chót để bật nhắc nhở.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                    } else {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            listOf(0 to "Đúng giờ", 5 to "Trước 5 phút", 10 to "Trước 10 phút", 30 to "Trước 30 phút", 60 to "Trước 1 giờ").forEach { (mins, label) ->
+                                StatusFilterChip(
+                                    text = label,
+                                    selected = reminderOffset == mins,
+                                    onClick = { reminderOffset = mins }
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // ── Section 6: Các bước con (Checklist) ──────────────────
                 DetailSection(emoji = "✅", title = "Các bước con") {
                     if (isNewTask) {
                         Text(

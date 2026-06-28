@@ -36,6 +36,8 @@ object TaskCacheRepository {
         status = status,
         category = category,
         recurrence = recurrence,
+        recurrenceDays = recurrenceDays,
+        reminderOffsetMinutes = reminderOffsetMinutes,
         createdAt = createdAt,
         updatedAt = updatedAt,
         cachedAt = cachedAt
@@ -51,6 +53,8 @@ object TaskCacheRepository {
         status = status,
         category = category,
         recurrence = recurrence,
+        recurrenceDays = recurrenceDays,
+        reminderOffsetMinutes = reminderOffsetMinutes,
         createdAt = createdAt,
         updatedAt = updatedAt
     )

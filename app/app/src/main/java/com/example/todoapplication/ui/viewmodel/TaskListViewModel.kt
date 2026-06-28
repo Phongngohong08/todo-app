@@ -7,6 +7,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.example.todoapplication.data.model.CreateTaskInput
 import com.example.todoapplication.data.model.ParsedTask
 import com.example.todoapplication.data.model.Task
+import com.example.todoapplication.data.model.UpdateTaskInput
 import com.example.todoapplication.data.repository.SubtaskProgress
 import com.example.todoapplication.data.repository.TaskRepository
 import com.example.todoapplication.di.ServiceLocator
@@ -80,6 +81,24 @@ class TaskListViewModel(private val repo: TaskRepository) : ViewModel() {
                 _events.emit(TaskListEvent.Message("Đã xóa công việc"))
                 reload()
             }
+        }
+    }
+
+    /** Đổi nhanh độ ưu tiên của một task (bấm cờ trên thẻ). */
+    fun setPriority(task: Task, priority: String) {
+        if (task.priority == priority) return
+        viewModelScope.launch {
+            val input = UpdateTaskInput(
+                title = task.title,
+                description = task.description ?: "",
+                priority = priority,
+                dueDate = task.dueDate,
+                category = task.category,
+                recurrence = task.recurrence,
+                recurrenceDays = task.recurrenceDays,
+                reminderOffsetMinutes = task.reminderOffsetMinutes
+            )
+            if (repo.updateTask(task.id, input).isSuccess) reload()
         }
     }
 

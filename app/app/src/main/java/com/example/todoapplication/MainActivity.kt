@@ -101,6 +101,9 @@ class MainActivity : ComponentActivity() {
                         composable(Screen.Calendar.route) {
                             CalendarScreen(navController)
                         }
+                        composable(Screen.Templates.route) {
+                            TemplatesScreen(navController)
+                        }
                     }
                 }
             }

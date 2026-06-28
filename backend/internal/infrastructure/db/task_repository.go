@@ -19,13 +19,14 @@ func NewPostgresTaskRepository(db *sql.DB) *PostgresTaskRepository {
 
 func (r *PostgresTaskRepository) Create(ctx context.Context, task *domain.Task) error {
 	query := `
-		INSERT INTO tasks (id, user_id, title, description, priority, due_date, status, category, recurrence, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+		INSERT INTO tasks (id, user_id, title, description, priority, due_date, status, category, recurrence, recurrence_days, reminder_offset_minutes, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
 	`
 	_, err := r.db.ExecContext(ctx, query,
 		task.ID, task.UserID, task.Title, task.Description,
 		task.Priority, task.DueDate,
 		task.Status, task.Category, task.Recurrence,
+		task.RecurrenceDays, task.ReminderOffsetMinutes,
 		task.CreatedAt, task.UpdatedAt,
 	)
 	return err
@@ -33,7 +34,7 @@ func (r *PostgresTaskRepository) Create(ctx context.Context, task *domain.Task) 
 
 func (r *PostgresTaskRepository) GetByID(ctx context.Context, id string) (*domain.Task, error) {
 	query := `
-		SELECT id, user_id, title, description, priority, due_date, status, category, recurrence, created_at, updated_at
+		SELECT id, user_id, title, description, priority, due_date, status, category, recurrence, recurrence_days, reminder_offset_minutes, created_at, updated_at
 		FROM tasks
 		WHERE id = $1
 	`
@@ -43,7 +44,7 @@ func (r *PostgresTaskRepository) GetByID(ctx context.Context, id string) (*domai
 	err := row.Scan(
 		&task.ID, &task.UserID, &task.Title, &task.Description,
 		&task.Priority, &task.DueDate,
-		&task.Status, &task.Category, &task.Recurrence, &task.CreatedAt, &task.UpdatedAt,
+		&task.Status, &task.Category, &task.Recurrence, &task.RecurrenceDays, &task.ReminderOffsetMinutes, &task.CreatedAt, &task.UpdatedAt,
 	)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -56,7 +57,7 @@ func (r *PostgresTaskRepository) GetByID(ctx context.Context, id string) (*domai
 
 func (r *PostgresTaskRepository) List(ctx context.Context, userID string, filter domain.TaskFilter) ([]*domain.Task, error) {
 	query := `
-		SELECT id, user_id, title, description, priority, due_date, status, category, recurrence, created_at, updated_at
+		SELECT id, user_id, title, description, priority, due_date, status, category, recurrence, recurrence_days, reminder_offset_minutes, created_at, updated_at
 		FROM tasks
 		WHERE user_id = $1
 	`
@@ -101,7 +102,7 @@ func (r *PostgresTaskRepository) List(ctx context.Context, userID string, filter
 		err := rows.Scan(
 			&task.ID, &task.UserID, &task.Title, &task.Description,
 			&task.Priority, &task.DueDate,
-			&task.Status, &task.Category, &task.Recurrence, &task.CreatedAt, &task.UpdatedAt,
+			&task.Status, &task.Category, &task.Recurrence, &task.RecurrenceDays, &task.ReminderOffsetMinutes, &task.CreatedAt, &task.UpdatedAt,
 		)
 		if err != nil {
 			return nil, err
@@ -116,12 +117,14 @@ func (r *PostgresTaskRepository) Update(ctx context.Context, task *domain.Task) 
 	query := `
 		UPDATE tasks
 		SET title = $1, description = $2, priority = $3, due_date = $4,
-		    status = $5, category = $6, recurrence = $7, updated_at = $8
-		WHERE id = $9
+		    status = $5, category = $6, recurrence = $7, recurrence_days = $8,
+		    reminder_offset_minutes = $9, updated_at = $10
+		WHERE id = $11
 	`
 	res, err := r.db.ExecContext(ctx, query,
 		task.Title, task.Description, task.Priority, task.DueDate,
-		task.Status, task.Category, task.Recurrence, task.UpdatedAt, task.ID,
+		task.Status, task.Category, task.Recurrence, task.RecurrenceDays,
+		task.ReminderOffsetMinutes, task.UpdatedAt, task.ID,
 	)
 	if err != nil {
 		return err

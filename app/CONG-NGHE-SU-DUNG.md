@@ -118,7 +118,7 @@ View (Composable)  →  ViewModel (StateFlow<UiState>)  →  Repository  →  Da
 - **Offline-first read cache**: tải task thành công → ghi đè bảng `task_cache`; mất mạng → đọc lại từ Room + hiển thị banner offline.
 - **Bước con (subtask)** lưu bảng `subtask` (quan hệ 1-nhiều theo `taskId`).
 - **Danh mục tùy chỉnh** lưu trong SharedPreferences (`CategoryStore`), không cần backend.
-- **Room migration**: DB version 3 (`fallbackToDestructiveMigration`) sau khi gỡ bảng `gamification`, còn 2 bảng `task_cache` + `subtask`.
+- **Room migration**: DB version 4 (`fallbackToDestructiveMigration`) — 2 bảng `task_cache` + `subtask` (cache thêm cột `recurrence_days`, `reminder_offset_minutes`).
 - `RoomDatabase` dạng **singleton** (`@Volatile` + double-checked locking), DAO sinh mã qua **KSP**.
 - > Lưu ý kỹ thuật: AGP 9 dùng "built-in Kotlin" nên cần flag `android.disallowKotlinSourceSets=false` trong `gradle.properties` để KSP của Room thêm được thư mục mã sinh.
 

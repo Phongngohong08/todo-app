@@ -29,8 +29,10 @@ data class Task(
     val priority: String, // "LOW", "MEDIUM", "HIGH"
     @SerializedName("due_date") val dueDate: String?,
     val status: String, // "TODO", "COMPLETED"
-    val category: String = "OTHER", // "PERSONAL", "WORK", "OTHER"
+    val category: String = "OTHER", // "PERSONAL", "WORK", "OTHER" hoặc danh mục tự do
     val recurrence: String = "NONE", // "NONE", "DAILY", "WEEKLY", "MONTHLY"
+    @SerializedName("recurrence_days") val recurrenceDays: String = "", // "MON,WED,FRI" khi WEEKLY
+    @SerializedName("reminder_offset_minutes") val reminderOffsetMinutes: Int = 0, // phút nhắc trước hạn
     @SerializedName("created_at") val createdAt: String,
     @SerializedName("updated_at") val updatedAt: String
 )
@@ -105,7 +107,9 @@ data class CreateTaskInput(
     val priority: String,
     @SerializedName("due_date") val dueDate: String?,
     val category: String = "OTHER",
-    val recurrence: String = "NONE"
+    val recurrence: String = "NONE",
+    @SerializedName("recurrence_days") val recurrenceDays: String = "",
+    @SerializedName("reminder_offset_minutes") val reminderOffsetMinutes: Int = 0
 )
 
 data class UpdateTaskInput(
@@ -114,7 +118,9 @@ data class UpdateTaskInput(
     val priority: String,
     @SerializedName("due_date") val dueDate: String?,
     val category: String = "OTHER",
-    val recurrence: String = "NONE"
+    val recurrence: String = "NONE",
+    @SerializedName("recurrence_days") val recurrenceDays: String = "",
+    @SerializedName("reminder_offset_minutes") val reminderOffsetMinutes: Int = 0
 )
 
 data class ParseTaskInput(

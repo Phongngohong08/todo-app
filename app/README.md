@@ -33,7 +33,7 @@ app/src/main/java/com/example/todoapplication/
       ApiService.kt              # Khai báo các endpoint Retrofit
       NetworkClient.kt           # OkHttp + interceptor token + Authenticator tự refresh
     model/Models.kt              # Các data class request/response
-    local/                       # Room database (local DB, version 3)
+    local/                       # Room database (local DB, version 4)
       AppDatabase.kt             # RoomDatabase singleton (2 bảng)
       TaskCacheEntity.kt         # Bản sao offline của task
       SubtaskEntity.kt           # Bước con (checklist) theo taskId
@@ -67,13 +67,14 @@ app/src/main/java/com/example/todoapplication/
     screens/
       LoginScreen.kt             # Đăng nhập
       RegisterScreen.kt          # Đăng ký
-      TaskListScreen.kt          # Danh sách task (chính) — nhóm Hôm nay/Tương lai/Đã hoàn thành, thanh tạo nhanh
-      TaskDetailScreen.kt        # Thêm/sửa task
+      TaskListScreen.kt          # Danh sách task (chính) — nhóm Hôm nay/Tương lai/Đã hoàn thành, thanh tạo nhanh, cờ ưu tiên, sắp xếp
+      TaskDetailScreen.kt        # Thêm/sửa task (danh mục, lặp theo thứ, lời nhắc, subtask)
       DailyPlanScreen.kt         # Lịch trình AI
       AICoachScreen.kt           # Chat AI Coach
       StatsScreen.kt             # Thống kê + Biểu đồ + Trí nhớ AI
       SettingsScreen.kt          # Cài đặt cá nhân
       CalendarScreen.kt          # Lịch tháng xem việc theo ngày (chiếu cả lần lặp)
+      TemplatesScreen.kt         # Thư viện Mẫu nhiệm vụ theo nhóm
     theme/
       Color.kt                   # Bảng màu pastel Light + Dark + AppAccent
       Theme.kt                   # LightColorScheme / DarkColorScheme
@@ -91,8 +92,9 @@ app/src/main/java/com/example/todoapplication/
 | Màn hình | Chức năng |
 | :--- | :--- |
 | `LoginScreen` / `RegisterScreen` | Đăng nhập / đăng ký — gradient hero + white sheet từ dưới |
-| `TaskListScreen` | Danh sách task: tìm kiếm, **lọc theo danh mục**, nhóm **Hôm nay/Tương lai/Đã hoàn thành**, vuốt/tick-hoàn-thành, AI badge ưu tiên, kéo-thả sắp xếp, **thanh tạo nhanh** + AI Quick Add |
-| `TaskDetailScreen` | Thêm/sửa task: ưu tiên, hạn chót (có preset), **danh mục (chọn/thêm mới)**, lặp lại, subtask — chia section card |
+| `TaskListScreen` | Danh sách task: tìm kiếm, **lọc theo danh mục**, nhóm **Hôm nay/Tương lai/Đã hoàn thành**, vuốt/tick-hoàn-thành, **cờ ưu tiên** (bấm đổi), **sắp xếp**, AI badge ưu tiên, kéo-thả sắp xếp, **thanh tạo nhanh** + AI Quick Add |
+| `TaskDetailScreen` | Thêm/sửa task: ưu tiên, hạn chót (có preset), **danh mục (chọn/thêm mới)**, lặp lại (**chọn thứ khi Hàng tuần**), **lời nhắc** (trước hạn), subtask — chia section card |
+| `TemplatesScreen` | Thư viện **Mẫu nhiệm vụ** theo nhóm (Sức khỏe/Cuộc sống/Công việc/Học tập); bấm mẫu → mở form điền sẵn |
 | `DailyPlanScreen` | Lịch trình do AI tạo, timeline với dot gradient |
 | `AICoachScreen` | Chat với AI Coach — bubble hiện đại, gradient send button |
 | `StatsScreen` | 3 tab: **Thống kê** (Hoàn thành/Đang chờ + phân bố danh mục) · **Biểu đồ** (bar chart 7 ngày) · **Trí nhớ AI** |
@@ -118,7 +120,18 @@ Thông báo nhắc việc có 2 nút **"Hoàn thành"** và **"Hoãn 1 giờ"** 
 Mỗi task thuộc **một danh mục**. Ngoài 3 danh mục mặc định (Cá nhân / Công việc / Khác), người dùng **tự thêm danh mục mới** ngay trong `TaskDetailScreen`. Danh mục tùy chỉnh lưu cục bộ qua [`CategoryStore`](app/src/main/java/com/example/todoapplication/data/repository/CategoryStore.kt) (SharedPreferences, state Compose) và xuất hiện đồng bộ ở chip chọn, bộ lọc danh sách và thanh tạo nhanh.
 
 ### ⚡ Thanh tạo nhanh (Quick Create)
-Nút **+** mở bottom sheet tạo nhanh: gõ tiêu đề (hoặc chọn **mẫu gợi ý**), chọn preset hạn chót (Hôm nay/Ngày mai/3 ngày sau/Cuối tuần/Không), danh mục, ưu tiên → tạo ngay; hoặc "Chi tiết hơn" để mở form đầy đủ, hoặc "Dùng AI" để phân tích câu tự nhiên.
+Nút **+** mở bottom sheet tạo nhanh: gõ tiêu đề (hoặc chọn **mẫu gợi ý**), chọn preset hạn chót (Hôm nay/Ngày mai/3 ngày sau/Cuối tuần/Không), danh mục, ưu tiên → tạo ngay; hoặc **Chi tiết** để mở form đầy đủ, **Mẫu** để mở thư viện mẫu, **AI** để phân tích câu tự nhiên.
+
+### 📋 Thư viện Mẫu nhiệm vụ (Templates)
+[`TemplatesScreen`](app/src/main/java/com/example/todoapplication/ui/screens/TemplatesScreen.kt) liệt kê các việc làm sẵn theo nhóm (Sức khỏe / Cuộc sống / Công việc / Học tập). Bấm một mẫu → set [`QuickAddDraft`](app/src/main/java/com/example/todoapplication/data/repository/QuickAddDraft.kt) (tên + danh mục) rồi mở `TaskDetailScreen` để người dùng chỉnh giờ/lặp và lưu.
+
+### 🚩 Cờ ưu tiên & Sắp xếp
+- Mỗi thẻ task có **cờ màu theo ưu tiên**; bấm → menu chọn nhanh Cao/Trung bình/Thấp (gọi `PUT /tasks/{id}` cập nhật).
+- Nút **Sắp xếp** đổi thứ tự hiển thị trong các nhóm: Mặc định / Hạn chót / Ưu tiên / Tên (A-Z) — sắp xếp client-side.
+
+### 🔔 Lời nhắc trước hạn & Lặp theo thứ
+- Màn chi tiết có mục **Lời nhắc**: Đúng giờ / Trước 5–10–30 phút / 1 giờ → lưu `reminder_offset_minutes`; `ReminderScheduler` đặt notification tại `due_date − offset`.
+- Khi lặp **Hàng tuần**: chọn các **thứ** lặp lại (T2…CN) → lưu `recurrence_days` (vd `"MON,WED,FRI"`). Lịch tháng chiếu chấm đúng các thứ này; backend sinh occurrence kế tiếp nhảy đúng thứ.
 
 ### 🧩 Widget màn hình chính
 **Collection widget** (RemoteViews) hiển thị việc cần làm ngay ngoài home screen:
@@ -197,7 +210,7 @@ Cache đọc offline qua local DB (Room) — [`TaskCacheRepository`](app/src/mai
 
 ## 🔔 Nhắc nhở (Reminders)
 
-Hoàn toàn **local**, không dùng FCM. [`ReminderScheduler`](app/src/main/java/com/example/todoapplication/data/notifications/ReminderScheduler.kt) dùng WorkManager đặt `OneTimeWorkRequest` đến thời điểm `due_date` (REPLACE theo task id). Lập lịch khi lưu task và khi tải danh sách; huỷ khi xoá. WorkManager tự khôi phục job sau khởi động lại máy.
+Hoàn toàn **local**, không dùng FCM. [`ReminderScheduler`](app/src/main/java/com/example/todoapplication/data/notifications/ReminderScheduler.kt) dùng WorkManager đặt `OneTimeWorkRequest` đến thời điểm **`due_date − reminder_offset_minutes`** (REPLACE theo task id). Lập lịch khi lưu task và khi tải danh sách; huỷ khi xoá. WorkManager tự khôi phục job sau khởi động lại máy.
 
 ---
 

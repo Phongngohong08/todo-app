@@ -35,13 +35,15 @@ class CalendarViewModel(private val repo: TaskRepository) : ViewModel() {
 
             tasks.forEach { task ->
                 val due = task.dueDate?.let { parseIso8601(it) } ?: return@forEach
+                val weekdays = if (task.recurrence == "WEEKLY") parseWeekdaySet(task.recurrenceDays) else emptySet()
                 val occ = Calendar.getInstance().apply { time = due }
                 var guard = 0
                 while (occ.time.before(horizon) && guard < 800) {
-                    map.getOrPut(dayKey(occ)) { mutableListOf() }.add(task)
+                    val matches = weekdays.isEmpty() || weekdays.contains(occ.get(Calendar.DAY_OF_WEEK))
+                    if (matches) map.getOrPut(dayKey(occ)) { mutableListOf() }.add(task)
                     when (task.recurrence) {
                         "DAILY" -> occ.add(Calendar.DAY_OF_MONTH, 1)
-                        "WEEKLY" -> occ.add(Calendar.DAY_OF_MONTH, 7)
+                        "WEEKLY" -> if (weekdays.isNotEmpty()) occ.add(Calendar.DAY_OF_MONTH, 1) else occ.add(Calendar.DAY_OF_MONTH, 7)
                         "MONTHLY" -> occ.add(Calendar.MONTH, 1)
                         else -> break // không lặp: chỉ thêm đúng ngày hạn chót
                     }
@@ -57,6 +59,16 @@ class CalendarViewModel(private val repo: TaskRepository) : ViewModel() {
         cal.get(Calendar.MONTH) + 1,
         cal.get(Calendar.DAY_OF_MONTH)
     )
+
+    /** Đổi "MON,WED,FRI" thành tập các giá trị Calendar.DAY_OF_WEEK. */
+    private fun parseWeekdaySet(days: String): Set<Int> {
+        if (days.isBlank()) return emptySet()
+        val map = mapOf(
+            "SUN" to Calendar.SUNDAY, "MON" to Calendar.MONDAY, "TUE" to Calendar.TUESDAY,
+            "WED" to Calendar.WEDNESDAY, "THU" to Calendar.THURSDAY, "FRI" to Calendar.FRIDAY, "SAT" to Calendar.SATURDAY
+        )
+        return days.split(",").mapNotNull { map[it.trim().uppercase()] }.toSet()
+    }
 
     companion object {
         fun keyOf(year: Int, month0: Int, day: Int) = "%04d-%02d-%02d".format(year, month0 + 1, day)

@@ -8,7 +8,7 @@
 
 1. **Quản lý Công việc (CRUD)**: Tạo mới, xem, cập nhật, xóa và hoàn thành công việc. Trạng thái được rút gọn còn `TODO`/`COMPLETED`.
 2. **Phân loại theo Danh mục & Tìm kiếm (Category & Search)**: Mỗi task thuộc một **danh mục** (mặc định `PERSONAL`/`WORK`/`OTHER`, nhưng cho phép **danh mục tự do** do người dùng tự đặt); lọc danh sách theo `?category=` và tìm kiếm `?q=` theo tiêu đề/mô tả.
-3. **Task Lặp lại (Recurring)**: Task có thể lặp `DAILY`/`WEEKLY`/`MONTHLY`; khi hoàn thành một task lặp (có hạn chót), hệ thống tự sinh occurrence kế tiếp với hạn chót dời theo chu kỳ.
+3. **Task Lặp lại (Recurring)**: Task có thể lặp `DAILY`/`WEEKLY`/`MONTHLY`; lặp tuần có thể chọn **các thứ cụ thể** (`recurrence_days`, vd `"MON,WED,FRI"`). Khi hoàn thành một task lặp (có hạn chót), hệ thống tự sinh occurrence kế tiếp với hạn chót dời đúng chu kỳ/thứ. Mỗi task còn có **`reminder_offset_minutes`** để nhắc trước hạn (do client lập lịch local notification).
 4. **AI Quick Add (Tạo task bằng ngôn ngữ tự nhiên)**: Gửi một câu mô tả tự nhiên, Gemini tách thành task có cấu trúc (tiêu đề, độ ưu tiên, hạn chót, **danh mục**) để người dùng xác nhận trước khi lưu.
 5. **Theo dõi Hoạt động (Activity Logging)**: Tự động lưu vết hành vi (tạo task `CREATED`, hoàn thành task `COMPLETED`) làm dữ liệu phân tích thói quen cho AI.
 6. **Lập Kế hoạch AI Hàng ngày (Daily AI Planning)**: Tự động chạy ngầm vào lúc `04:00 AM` hàng ngày để tạo lịch trình tối ưu dựa trên danh sách việc chưa hoàn thành, **độ ưu tiên + hạn chót**, cài đặt giờ giấc cá nhân và phân tích thói quen lưu trong bộ nhớ dài hạn.
@@ -88,10 +88,10 @@ Tất cả endpoint dưới đây (trừ nhóm `/auth`) yêu cầu header `Autho
 
 | Phương thức | Endpoint | Mô tả |
 | :--- | :--- | :--- |
-| `POST` | `/api/v1/tasks` | Tạo task. Body: `title`, `description`, `priority` (`LOW`/`MEDIUM`/`HIGH`), `due_date`, **`category`** (chuỗi tự do, mặc định `OTHER`), `recurrence` (`NONE`/`DAILY`/`WEEKLY`/`MONTHLY`) |
+| `POST` | `/api/v1/tasks` | Tạo task. Body: `title`, `description`, `priority` (`LOW`/`MEDIUM`/`HIGH`), `due_date`, **`category`** (chuỗi tự do, mặc định `OTHER`), `recurrence` (`NONE`/`DAILY`/`WEEKLY`/`MONTHLY`), **`recurrence_days`** (vd `"MON,WED,FRI"` khi lặp tuần), **`reminder_offset_minutes`** (số phút nhắc trước hạn) |
 | `GET` | `/api/v1/tasks` | Liệt kê task. Query: `status` (`TODO`/`COMPLETED`), `due_date_before`, **`q`** (tìm trong tiêu đề/mô tả), **`category`** (lọc theo danh mục) |
 | `GET` | `/api/v1/tasks/{id}` | Chi tiết một task |
-| `PUT` | `/api/v1/tasks/{id}` | Cập nhật task (gồm `category`, `recurrence`) |
+| `PUT` | `/api/v1/tasks/{id}` | Cập nhật task (gồm `category`, `recurrence`, `recurrence_days`, `reminder_offset_minutes`) |
 | `DELETE` | `/api/v1/tasks/{id}` | Xóa task |
 | `POST` | `/api/v1/tasks/{id}/complete` | Đánh dấu hoàn thành. Khi `complete` một task lặp (có `due_date`), backend tự tạo occurrence kế tiếp |
 
@@ -136,8 +136,12 @@ docker exec -i todo-postgres psql -U postgres -d todo_db -f /tmp/m3.sql
 # 000004 - cho phép danh mục tự do (bỏ ràng buộc CHECK, nới VARCHAR)
 docker cp migrations/000004_custom_category.up.sql todo-postgres:/tmp/m4.sql
 docker exec -i todo-postgres psql -U postgres -d todo_db -f /tmp/m4.sql
+
+# 000005 - thêm lời nhắc (reminder_offset_minutes) và lặp theo thứ (recurrence_days)
+docker cp migrations/000005_reminder_and_weekdays.up.sql todo-postgres:/tmp/m5.sql
+docker exec -i todo-postgres psql -U postgres -d todo_db -f /tmp/m5.sql
 ```
-> Áp **lần lượt theo thứ tự số**. Migration `000003`/`000004` chuyển schema từ mô hình cũ (tags/duration) sang mô hình đơn giản hoá (category). **Với DB đã có dữ liệu, bắt buộc áp đủ tới `000004` trước khi chạy bản backend mới**, nếu không các truy vấn task sẽ lỗi thiếu/thừa cột.
+> Áp **lần lượt theo thứ tự số**. Migration `000003`/`000004` chuyển schema từ mô hình cũ (tags/duration) sang mô hình đơn giản hoá (category); `000005` thêm trường lời nhắc + lặp theo thứ. **Với DB đã có dữ liệu, bắt buộc áp đủ tới `000005` trước khi chạy bản backend mới**, nếu không các truy vấn task sẽ lỗi thiếu/thừa cột.
 
 ### 3. Cài đặt các thư viện Go Dependencies
 ```bash
@@ -213,6 +217,9 @@ docker exec -i prod-postgres psql -U postgres -d todo_db -f /tmp/m3.sql
 
 docker cp migrations/000004_custom_category.up.sql prod-postgres:/tmp/m4.sql
 docker exec -i prod-postgres psql -U postgres -d todo_db -f /tmp/m4.sql
+
+docker cp migrations/000005_reminder_and_weekdays.up.sql prod-postgres:/tmp/m5.sql
+docker exec -i prod-postgres psql -U postgres -d todo_db -f /tmp/m5.sql
 ```
 
 ### Bước 5: Xem logs và quản lý trạng thái

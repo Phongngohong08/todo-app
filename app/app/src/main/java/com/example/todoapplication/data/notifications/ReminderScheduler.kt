@@ -25,9 +25,11 @@ object ReminderScheduler {
             return
         }
 
-        val delay = due.time - System.currentTimeMillis()
+        // Nhắc trước hạn theo reminderOffsetMinutes (0 = đúng giờ)
+        val fireAt = due.time - task.reminderOffsetMinutes * 60_000L
+        val delay = fireAt - System.currentTimeMillis()
         if (delay <= 0) {
-            // Đã quá hạn -> không nhắc lại
+            // Đã quá thời điểm nhắc -> không nhắc lại
             cancel(context, task.id)
             return
         }

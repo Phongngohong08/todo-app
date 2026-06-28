@@ -17,6 +17,8 @@ data class TaskCacheEntity(
     val status: String,
     val category: String,
     val recurrence: String,
+    val recurrenceDays: String,
+    val reminderOffsetMinutes: Int,
     val createdAt: String,
     val updatedAt: String,
     val cachedAt: Long          // mốc thời gian cache (epoch millis)

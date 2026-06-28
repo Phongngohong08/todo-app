@@ -39,17 +39,19 @@ const (
 )
 
 type Task struct {
-	ID          string     `json:"id"`
-	UserID      string     `json:"user_id"`
-	Title       string     `json:"title"`
-	Description string     `json:"description"`
-	Priority    Priority   `json:"priority"`
-	DueDate     *time.Time `json:"due_date"`
-	Status      TaskStatus `json:"status"`
-	Category    Category   `json:"category"`
-	Recurrence  Recurrence `json:"recurrence"`
-	CreatedAt   time.Time  `json:"created_at"`
-	UpdatedAt   time.Time  `json:"updated_at"`
+	ID                    string     `json:"id"`
+	UserID                string     `json:"user_id"`
+	Title                 string     `json:"title"`
+	Description           string     `json:"description"`
+	Priority              Priority   `json:"priority"`
+	DueDate               *time.Time `json:"due_date"`
+	Status                TaskStatus `json:"status"`
+	Category              Category   `json:"category"`
+	Recurrence            Recurrence `json:"recurrence"`
+	RecurrenceDays        string     `json:"recurrence_days"`         // "MON,WED,FRI" khi recurrence = WEEKLY
+	ReminderOffsetMinutes int        `json:"reminder_offset_minutes"` // số phút nhắc trước hạn (0 = đúng giờ)
+	CreatedAt             time.Time  `json:"created_at"`
+	UpdatedAt             time.Time  `json:"updated_at"`
 }
 
 type TaskLogAction string

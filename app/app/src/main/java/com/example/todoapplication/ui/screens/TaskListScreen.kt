@@ -87,6 +87,21 @@ fun daysUntilSunday(): Int {
     return if (dow == Calendar.SUNDAY) 0 else (Calendar.SATURDAY - dow + 1)
 }
 
+/** Sắp xếp danh sách theo lựa chọn của người dùng (giữ nguyên thứ tự gốc nếu DEFAULT). */
+fun sortTasks(tasks: List<Task>, sortBy: String): List<Task> = when (sortBy) {
+    "DUE" -> tasks.sortedBy { it.dueDate ?: "9999-12-31" }
+    "PRIORITY" -> tasks.sortedBy { when (it.priority) { "HIGH" -> 0; "MEDIUM" -> 1; else -> 2 } }
+    "TITLE" -> tasks.sortedBy { it.title.lowercase() }
+    else -> tasks
+}
+
+fun sortLabel(sortBy: String): String = when (sortBy) {
+    "DUE" -> "Hạn chót"
+    "PRIORITY" -> "Ưu tiên"
+    "TITLE" -> "Tên (A-Z)"
+    else -> "Mặc định"
+}
+
 /** true nếu task được cập nhật trong hôm nay (dùng cho nhóm "Đã hoàn thành hôm nay"). */
 fun Task.isUpdatedToday(): Boolean {
     val d = parseIso8601(updatedAt) ?: return false
@@ -139,6 +154,7 @@ fun TaskListScreen(
     var selectedCategoryFilter by remember { mutableStateOf("ALL") }
     var searchQuery by remember { mutableStateOf("") }
     var sortMode by remember { mutableStateOf(false) }
+    var sortBy by remember { mutableStateOf("DEFAULT") } // DEFAULT/DUE/PRIORITY/TITLE
 
     val lazyListState = rememberLazyListState()
     val reorderState = rememberReorderableLazyListState(lazyListState) { from, to ->
@@ -333,6 +349,47 @@ fun TaskListScreen(
                     }
                 }
 
+                // Thanh sắp xếp (ẩn khi đang ở chế độ kéo-thả)
+                if (!sortMode && tasks.isNotEmpty()) {
+                    item {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Spacer(Modifier.weight(1f))
+                            var sortMenu by remember { mutableStateOf(false) }
+                            Box {
+                                Surface(
+                                    shape = RoundedCornerShape(20.dp),
+                                    color = MaterialTheme.colorScheme.surfaceVariant,
+                                    onClick = { sortMenu = true }
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(Icons.Default.List, contentDescription = null, modifier = Modifier.size(15.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        Spacer(Modifier.width(5.dp))
+                                        Text("Sắp xếp: ${sortLabel(sortBy)}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                }
+                                DropdownMenu(
+                                    expanded = sortMenu,
+                                    onDismissRequest = { sortMenu = false },
+                                    modifier = Modifier.background(MaterialTheme.colorScheme.surface)
+                                ) {
+                                    listOf("DEFAULT", "DUE", "PRIORITY", "TITLE").forEach { opt ->
+                                        DropdownMenuItem(
+                                            text = { Text(sortLabel(opt), color = if (sortBy == opt) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface) },
+                                            onClick = { sortBy = opt; sortMenu = false }
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
                 // Task list or empty state
                 if (tasks.isEmpty()) {
                     item {
@@ -366,13 +423,14 @@ fun TaskListScreen(
                                 isAiRecommended = task.id in aiRecommendedIds,
                                 subtaskDone = state.subtaskProgress[task.id]?.done ?: 0,
                                 subtaskTotal = state.subtaskProgress[task.id]?.total ?: 0,
+                                onSetPriority = { p -> taskListViewModel.setPriority(task, p) },
                                 dragHandleModifier = Modifier.draggableHandle()
                             )
                         }
                     }
                 } else {
                     // Nhóm theo: Hôm nay / Tương lai / Đã hoàn thành (giống ảnh tham khảo)
-                    val pending = tasks.filter { it.status != "COMPLETED" }
+                    val pending = sortTasks(tasks.filter { it.status != "COMPLETED" }, sortBy)
                     val todayTasks = pending.filter { !it.isFuture() }
                     val futureTasks = pending.filter { it.isFuture() }
                     val completedTasks = tasks.filter { it.status == "COMPLETED" && it.isUpdatedToday() }
@@ -387,7 +445,8 @@ fun TaskListScreen(
                                 subtaskTotal = state.subtaskProgress[task.id]?.total ?: 0,
                                 onCardClick = { navController.navigate(Screen.TaskDetail.createRoute(task.id)) },
                                 onComplete = { taskListViewModel.completeTask(task) },
-                                onDelete = { taskToDelete = task }
+                                onDelete = { taskToDelete = task },
+                                onSetPriority = { p -> taskListViewModel.setPriority(task, p) }
                             )
                         }
                     }
@@ -401,7 +460,8 @@ fun TaskListScreen(
                                 subtaskTotal = state.subtaskProgress[task.id]?.total ?: 0,
                                 onCardClick = { navController.navigate(Screen.TaskDetail.createRoute(task.id)) },
                                 onComplete = { taskListViewModel.completeTask(task) },
-                                onDelete = { taskToDelete = task }
+                                onDelete = { taskToDelete = task },
+                                onSetPriority = { p -> taskListViewModel.setPriority(task, p) }
                             )
                         }
                     }
@@ -414,7 +474,8 @@ fun TaskListScreen(
                                 onCompleteClick = { },
                                 onDeleteClick = { taskToDelete = task },
                                 subtaskDone = state.subtaskProgress[task.id]?.done ?: 0,
-                                subtaskTotal = state.subtaskProgress[task.id]?.total ?: 0
+                                subtaskTotal = state.subtaskProgress[task.id]?.total ?: 0,
+                                onSetPriority = { p -> taskListViewModel.setPriority(task, p) }
                             )
                         }
                     }
@@ -558,6 +619,10 @@ fun TaskListScreen(
             onAiAdd = {
                 showQuickCreate = false
                 showQuickAdd = true
+            },
+            onTemplates = {
+                showQuickCreate = false
+                navController.navigate(Screen.Templates.route)
             }
         )
     }
@@ -583,7 +648,8 @@ private fun QuickCreateSheet(
     onDismiss: () -> Unit,
     onCreate: (com.example.todoapplication.data.model.CreateTaskInput) -> Unit,
     onMoreDetails: (title: String, category: String, dueDate: String?) -> Unit,
-    onAiAdd: () -> Unit
+    onAiAdd: () -> Unit,
+    onTemplates: () -> Unit
 ) {
     var title by remember { mutableStateOf("") }
     // Preset ngày: 0=Hôm nay,1=Ngày mai,3=3 ngày sau, -2=Cuối tuần, -1=Không
@@ -685,16 +751,21 @@ private fun QuickCreateSheet(
             }
 
             Row(verticalAlignment = Alignment.CenterVertically) {
-                TextButton(onClick = { onMoreDetails(title, category, resolveDue()) }) {
+                TextButton(onClick = onTemplates, contentPadding = PaddingValues(horizontal = 8.dp)) {
+                    Icon(Icons.Default.List, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.width(4.dp))
+                    Text("Mẫu", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
+                }
+                TextButton(onClick = { onMoreDetails(title, category, resolveDue()) }, contentPadding = PaddingValues(horizontal = 8.dp)) {
                     Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
                     Spacer(Modifier.width(4.dp))
-                    Text("Chi tiết hơn", color = MaterialTheme.colorScheme.primary, fontSize = 13.sp)
+                    Text("Chi tiết", color = MaterialTheme.colorScheme.primary, fontSize = 13.sp)
                 }
                 Spacer(Modifier.weight(1f))
-                TextButton(onClick = onAiAdd) {
+                TextButton(onClick = onAiAdd, contentPadding = PaddingValues(horizontal = 8.dp)) {
                     Icon(Icons.Default.Star, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.tertiary)
                     Spacer(Modifier.width(4.dp))
-                    Text("Dùng AI", color = MaterialTheme.colorScheme.tertiary, fontSize = 13.sp)
+                    Text("AI", color = MaterialTheme.colorScheme.tertiary, fontSize = 13.sp)
                 }
                 Spacer(Modifier.width(8.dp))
                 FloatingActionButton(
@@ -838,7 +909,8 @@ private fun SwipeableTaskCard(
     subtaskTotal: Int,
     onCardClick: () -> Unit,
     onComplete: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onSetPriority: (String) -> Unit
 ) {
     val context = LocalContext.current
     val dismissState = rememberSwipeToDismissBoxState(
@@ -878,7 +950,8 @@ private fun SwipeableTaskCard(
             onDeleteClick = onDelete,
             isAiRecommended = isAiRecommended,
             subtaskDone = subtaskDone,
-            subtaskTotal = subtaskTotal
+            subtaskTotal = subtaskTotal,
+            onSetPriority = onSetPriority
         )
     }
 }
@@ -910,6 +983,7 @@ fun TaskCard(
     isAiRecommended: Boolean = false,
     subtaskDone: Int = 0,
     subtaskTotal: Int = 0,
+    onSetPriority: (String) -> Unit = {},
     dragHandleModifier: Modifier = Modifier
 ) {
     val isCompleted = task.status == "COMPLETED"
@@ -1031,6 +1105,35 @@ fun TaskCard(
                             modifier = Modifier.size(14.dp),
                             tint = MaterialTheme.colorScheme.tertiary
                         )
+                    }
+                    // Cờ ưu tiên (bấm để đổi)
+                    var flagMenu by remember { mutableStateOf(false) }
+                    Box {
+                        IconButton(onClick = { flagMenu = true }, modifier = Modifier.size(32.dp)) {
+                            Icon(
+                                Icons.Default.Flag,
+                                contentDescription = "Đổi ưu tiên",
+                                modifier = Modifier.size(16.dp),
+                                tint = accentColor
+                            )
+                        }
+                        DropdownMenu(
+                            expanded = flagMenu,
+                            onDismissRequest = { flagMenu = false },
+                            modifier = Modifier.background(MaterialTheme.colorScheme.surface)
+                        ) {
+                            listOf(
+                                "HIGH" to PriorityHighColor,
+                                "MEDIUM" to PriorityMediumColor,
+                                "LOW" to PriorityLowColor
+                            ).forEach { (p, color) ->
+                                DropdownMenuItem(
+                                    text = { Text(priorityLabel(p), color = MaterialTheme.colorScheme.onSurface) },
+                                    leadingIcon = { Icon(Icons.Default.Flag, contentDescription = null, tint = color, modifier = Modifier.size(16.dp)) },
+                                    onClick = { flagMenu = false; onSetPriority(p) }
+                                )
+                            }
+                        }
                     }
                     // Overflow menu
                     var menuExpanded by remember { mutableStateOf(false) }

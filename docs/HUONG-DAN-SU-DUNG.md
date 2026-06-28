@@ -51,10 +51,14 @@ Bên dưới:
 - **Tick vào ô tròn** bên trái: đánh dấu **Hoàn thành** nhanh.
 - **Vuốt sang phải**: cũng đánh dấu **Hoàn thành**.
 - **Bấm vào thẻ**: mở chi tiết để chỉnh sửa.
+- **Bấm biểu tượng cờ 🚩**: đổi nhanh **độ ưu tiên** (Cao / Trung bình / Thấp).
 - **Menu ⋮**: Chỉnh sửa / Xóa.
 - Thẻ có vạch màu bên trái thể hiện **độ ưu tiên** (đỏ = Cao, cam = Trung bình, xanh = Thấp).
 - Chip danh mục, chip hạn chót, và chip **☑ 2/5** (tiến độ các bước con) hiển thị ở đáy thẻ.
 - Thẻ có nhãn **🤖 AI khuyến nghị ưu tiên** là các việc AI gợi ý nên làm trước (dựa trên hạn chót + độ ưu tiên).
+
+### Sắp xếp danh sách
+Nhấn nút **Sắp xếp** (góc phải, trên danh sách) để đổi thứ tự hiển thị: **Mặc định / Hạn chót / Ưu tiên / Tên (A-Z)**.
 
 ### Sắp xếp thủ công (kéo-thả)
 Nhấn **☰** trên thẻ chào mừng → giữ và kéo thẻ để đổi thứ tự → nhấn **Xong**.
@@ -68,7 +72,10 @@ Nhấn nút **+** (góc dưới phải) → mở **thanh tạo nhanh**:
 - Gõ tiêu đề (hoặc bấm một **mẫu gợi ý** như 💧 Uống nước, 📚 Học tập… để điền sẵn).
 - Chọn nhanh **hạn chót**: Hôm nay / Ngày mai / 3 ngày sau / Cuối tuần / Không.
 - Chọn **danh mục** và **độ ưu tiên**.
-- Nhấn **✓** để thêm ngay, hoặc **Chi tiết hơn** để mở form đầy đủ, hoặc **Dùng AI** để phân tích câu tự nhiên.
+- Nhấn **✓** để thêm ngay, hoặc **Chi tiết** để mở form đầy đủ, **Mẫu** để mở thư viện mẫu, hoặc **AI** để phân tích câu tự nhiên.
+
+### Thư viện Mẫu nhiệm vụ
+Trong thanh tạo nhanh nhấn **Mẫu** → mở màn **Mẫu nhiệm vụ** gồm các việc làm sẵn theo nhóm (**Sức khỏe / Cuộc sống / Công việc / Học tập**). Bấm một mẫu → mở form chi tiết đã điền sẵn tên + danh mục để bạn chỉnh giờ/lặp rồi lưu.
 
 ### Form chi tiết
 Bấm vào một thẻ để sửa, hoặc chọn **Chi tiết hơn** khi thêm. Màn chi tiết gồm các mục:
@@ -76,8 +83,9 @@ Bấm vào một thẻ để sửa, hoặc chọn **Chi tiết hơn** khi thêm.
 1. **📝 Tên & Mô tả** — tiêu đề (bắt buộc) và mô tả.
 2. **🎯 Độ ưu tiên** — chọn Thấp / Trung bình / Cao.
 3. **📅 Hạn chót** — chọn nhanh (Hôm nay / Ngày mai / 3 ngày sau / Cuối tuần / Không) hoặc chọn ngày + giờ cụ thể.
-4. **🏷️ Danh mục & Lặp lại** — chọn danh mục **Cá nhân / Công việc / Khác**, hoặc gõ **danh mục mới** vào ô "Thêm danh mục mới" rồi nhấn **Thêm** (danh mục mới sẽ xuất hiện ở mọi nơi: chọn, lọc, tạo nhanh); chọn lặp Không / Hàng ngày / Hàng tuần / Hàng tháng (lặp lại cần có hạn chót).
-5. **✅ Các bước con** — checklist (xem mục 5).
+4. **🏷️ Danh mục & Lặp lại** — chọn danh mục **Cá nhân / Công việc / Khác**, hoặc gõ **danh mục mới** vào ô "Thêm danh mục mới" rồi nhấn **Thêm** (danh mục mới sẽ xuất hiện ở mọi nơi: chọn, lọc, tạo nhanh); chọn lặp Không / Hàng ngày / Hàng tuần / Hàng tháng (lặp lại cần có hạn chót). Khi chọn **Hàng tuần**, có lưới chọn **các thứ lặp lại** (T2…CN).
+5. **🔔 Lời nhắc** — chọn nhắc **Đúng giờ / Trước 5 / 10 / 30 phút / 1 giờ** so với hạn chót (cần đặt hạn chót).
+6. **✅ Các bước con** — checklist (xem mục 5).
 
 Nhấn **Tạo công việc** / **Lưu thay đổi** ở dưới cùng.
 
@@ -154,7 +162,7 @@ Mở **Thiết lập** (biểu tượng ⚙ ở tab Thống kê):
 
 ## 11. Nhắc nhở & Thông báo
 
-- Công việc có **hạn chót** sẽ được nhắc bằng thông báo khi đến giờ (không cần mạng, hoạt động nền).
+- Công việc có **hạn chót** sẽ được nhắc bằng thông báo (không cần mạng, hoạt động nền). Thời điểm nhắc theo lựa chọn **🔔 Lời nhắc** (đúng giờ hoặc trước hạn 5/10/30 phút, 1 giờ).
 - Trên thông báo có 2 nút:
   - **Hoàn thành** — đánh dấu xong ngay.
   - **Hoãn 1 giờ** — nhắc lại sau 60 phút.

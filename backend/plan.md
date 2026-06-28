@@ -400,12 +400,20 @@ Only after architecture approval should implementation begin.
 ## Tính năng phụ đã loại bỏ (phía Android)
 - **Pomodoro** và **Gamification** (streak/XP/huy hiệu) đã được gỡ khỏi ứng dụng.
 
+## Lời nhắc & lặp theo thứ
+- Task có thêm `reminder_offset_minutes` (số phút nhắc trước hạn; client lập lịch local notification) và `recurrence_days` (vd `"MON,WED,FRI"`, chỉ dùng khi `recurrence = WEEKLY`).
+- `spawnNextOccurrence` với lặp tuần có chọn thứ: occurrence kế tiếp nhảy đúng thứ được chọn gần nhất.
+
 ## Migrations bổ sung
 - `000003_simplify_tasks.up.sql`: bỏ `estimated_duration`/`preferred_time_*`/`tags`, thêm `category`, siết CHECK status & action log.
 - `000004_custom_category.up.sql`: nới `category` thành `VARCHAR(50)` và **bỏ ràng buộc CHECK** để cho phép danh mục tự do.
+- `000005_reminder_and_weekdays.up.sql`: thêm `reminder_offset_minutes` (INT) và `recurrence_days` (VARCHAR).
 
 ## Phía Android (client-side)
 - Danh sách nhóm **Hôm nay / Tương lai / Đã hoàn thành hôm nay**; chip lọc theo danh mục; thẻ tối giản (checkbox tròn + vạch màu ưu tiên).
 - **Thanh tạo nhanh** (gõ tiêu đề + preset ngày + danh mục + mẫu gợi ý) và preset ngày trong màn chi tiết.
 - **Danh mục tùy chỉnh** lưu cục bộ (`CategoryStore` qua SharedPreferences) + tạo mới trong màn chi tiết.
-- Lịch tháng **chiếu các lần lặp** ra tới 12 tháng để hiển thị chấm cho ngày lặp lại.
+- Lịch tháng **chiếu các lần lặp** ra tới 12 tháng (kể cả lặp theo thứ) để hiển thị chấm cho ngày lặp lại.
+- **Cờ ưu tiên** trên thẻ (bấm đổi ưu tiên) + **sắp xếp** (Mặc định/Hạn/Ưu tiên/Tên).
+- Màn **Mẫu nhiệm vụ** theo nhóm (Sức khỏe/Cuộc sống/Công việc/Học tập).
+- Màn chi tiết: chọn **thứ lặp** (khi Hàng tuần) và **lời nhắc** (đúng giờ / trước 5-10-30 phút, 1 giờ); `ReminderScheduler` nhắc trước hạn theo offset.

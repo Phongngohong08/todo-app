@@ -16,7 +16,7 @@ object NetworkClient {
     //  - Máy ảo Genymotion:               http://10.0.3.2:8080/api/v1/
     //  - Điện thoại thật (cùng Wi-Fi):    http://192.168.0.102:8080/api/v1/  (IP LAN của máy tính)
     //  KHÔNG dùng "localhost" vì trên thiết bị Android nó trỏ về chính thiết bị, không phải PC.
-    private const val BASE_URL = "https://todo.phongngohong.online/api/v1/"
+    private const val BASE_URL = "http://10.0.2.2:8080/api/v1/"
     private var retrofit: Retrofit? = null
 
     // Khóa đồng bộ để nhiều request gặp 401 cùng lúc chỉ refresh một lần

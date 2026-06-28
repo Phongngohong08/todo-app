@@ -12,4 +12,5 @@ sealed class Screen(val route: String) {
     object Stats : Screen("stats")
     object Settings : Screen("settings")
     object Calendar : Screen("calendar")
+    object Templates : Screen("templates")
 }

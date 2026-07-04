@@ -4,7 +4,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import androidx.core.app.NotificationManagerCompat
-import com.example.todoapplication.data.api.NetworkClient
+import com.example.todoapplication.di.ServiceLocator
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -29,7 +29,7 @@ class NotificationActionReceiver : BroadcastReceiver() {
                 val pending = goAsync()
                 CoroutineScope(Dispatchers.IO).launch {
                     try {
-                        NetworkClient.getApiService(appContext).completeTask(taskId)
+                        ServiceLocator.apiService.completeTask(taskId)
                         ReminderScheduler.cancel(appContext, taskId)
                     } catch (_: Exception) {
                         // Mất mạng: bỏ qua, người dùng có thể hoàn thành lại trong app

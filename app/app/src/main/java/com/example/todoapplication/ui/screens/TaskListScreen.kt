@@ -35,14 +35,20 @@ import androidx.navigation.NavController
 import com.example.todoapplication.data.model.Task
 import com.example.todoapplication.data.repository.CategoryStore
 import com.example.todoapplication.data.repository.QuickAddDraft
-import com.example.todoapplication.data.repository.SessionManager
+import com.example.todoapplication.domain.aiRecommendedIds
+import com.example.todoapplication.domain.dueAtDayOffset
+import com.example.todoapplication.domain.daysUntilSunday
+import com.example.todoapplication.domain.isFuture
+import com.example.todoapplication.domain.isOverdue
+import com.example.todoapplication.domain.isUpdatedToday
+import com.example.todoapplication.domain.sortLabel
+import com.example.todoapplication.domain.sortTasks
 import com.example.todoapplication.ui.components.AppBottomBar
 import com.example.todoapplication.ui.components.EmptyState
 import com.example.todoapplication.ui.components.LoadingState
 import com.example.todoapplication.ui.navigation.Screen
 import com.example.todoapplication.ui.theme.*
 import com.example.todoapplication.ui.utils.formatUtcToLocal
-import com.example.todoapplication.ui.utils.parseIso8601
 import com.example.todoapplication.ui.utils.priorityLabel
 import com.example.todoapplication.ui.utils.categoryLabel
 import com.example.todoapplication.ui.viewmodel.TaskListEvent
@@ -52,89 +58,6 @@ import sh.calvin.reorderable.rememberReorderableLazyListState
 import java.text.SimpleDateFormat
 import java.util.*
 
-fun Task.isOverdue(): Boolean {
-    if (status == "COMPLETED") return false
-    val dueDateStr = dueDate ?: return false
-    val date = parseIso8601(dueDateStr) ?: return false
-    return date.before(Date())
-}
-
-/** Nhóm theo hạn: true nếu việc thuộc "Tương lai" (hạn sau hôm nay); ngược lại thuộc "Hôm nay". */
-fun Task.isFuture(): Boolean {
-    val date = dueDate?.let { parseIso8601(it) } ?: return false
-    val cal = Calendar.getInstance().apply {
-        set(Calendar.HOUR_OF_DAY, 23); set(Calendar.MINUTE, 59); set(Calendar.SECOND, 59)
-    }
-    return date.after(cal.time)
-}
-
-/** Chuỗi RFC3339 (UTC) cho ngày cách hôm nay [days] ngày, vào giờ [hour]:[minute] theo giờ máy. */
-fun dueAtDayOffset(days: Int, hour: Int = 9, minute: Int = 0): String {
-    val cal = Calendar.getInstance()
-    cal.add(Calendar.DAY_OF_YEAR, days)
-    cal.set(Calendar.HOUR_OF_DAY, hour)
-    cal.set(Calendar.MINUTE, minute)
-    cal.set(Calendar.SECOND, 0)
-    val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.getDefault())
-    sdf.timeZone = TimeZone.getTimeZone("UTC")
-    return sdf.format(cal.time)
-}
-
-/** Số ngày tới Chủ nhật gần nhất (>=0). */
-fun daysUntilSunday(): Int {
-    val cal = Calendar.getInstance()
-    val dow = cal.get(Calendar.DAY_OF_WEEK) // CN = 1
-    return if (dow == Calendar.SUNDAY) 0 else (Calendar.SATURDAY - dow + 1)
-}
-
-/** Sắp xếp danh sách theo lựa chọn của người dùng (giữ nguyên thứ tự gốc nếu DEFAULT). */
-fun sortTasks(tasks: List<Task>, sortBy: String): List<Task> = when (sortBy) {
-    "DUE" -> tasks.sortedBy { it.dueDate ?: "9999-12-31" }
-    "PRIORITY" -> tasks.sortedBy { when (it.priority) { "HIGH" -> 0; "MEDIUM" -> 1; else -> 2 } }
-    "TITLE" -> tasks.sortedBy { it.title.lowercase() }
-    else -> tasks
-}
-
-fun sortLabel(sortBy: String): String = when (sortBy) {
-    "DUE" -> "Hạn chót"
-    "PRIORITY" -> "Ưu tiên"
-    "TITLE" -> "Tên (A-Z)"
-    else -> "Mặc định"
-}
-
-/** true nếu task được cập nhật trong hôm nay (dùng cho nhóm "Đã hoàn thành hôm nay"). */
-fun Task.isUpdatedToday(): Boolean {
-    val d = parseIso8601(updatedAt) ?: return false
-    val now = Calendar.getInstance()
-    val then = Calendar.getInstance().apply { time = d }
-    return now.get(Calendar.YEAR) == then.get(Calendar.YEAR) &&
-        now.get(Calendar.DAY_OF_YEAR) == then.get(Calendar.DAY_OF_YEAR)
-}
-
-fun computeAiScore(task: Task): Double {
-    var score = 0.0
-    score += when (task.priority) {
-        "HIGH" -> 100.0
-        "MEDIUM" -> 50.0
-        else -> 20.0
-    }
-    val now = Date()
-    task.dueDate?.let { due ->
-        parseIso8601(due)?.let { dueDate ->
-            val hoursLeft = (dueDate.time - now.time) / 3600000.0
-            score += when {
-                hoursLeft < 0 -> 200.0
-                hoursLeft < 24 -> 150.0
-                hoursLeft < 72 -> 80.0
-                hoursLeft < 168 -> 40.0
-                else -> 10.0
-            }
-        }
-    }
-    if (task.status == "TODO") score += 5.0
-    return score
-}
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TaskListScreen(
@@ -142,8 +65,7 @@ fun TaskListScreen(
     taskListViewModel: TaskListViewModel = viewModel(factory = TaskListViewModel.Factory)
 ) {
     val context = LocalContext.current
-    val sessionManager = remember { SessionManager(context) }
-    val userName = remember { sessionManager.getUserName() ?: "bạn" }
+    val userName = taskListViewModel.userName
 
     val state by taskListViewModel.uiState.collectAsStateWithLifecycle()
     val tasks = state.tasks
@@ -161,16 +83,7 @@ fun TaskListScreen(
         taskListViewModel.moveTask(from.index, to.index)
     }
 
-    val aiRecommendedIds by remember(tasks) {
-        derivedStateOf {
-            tasks
-                .filter { it.status != "COMPLETED" }
-                .sortedByDescending { computeAiScore(it) }
-                .take(3)
-                .map { it.id }
-                .toSet()
-        }
-    }
+    val aiRecommendedIds = remember(tasks) { aiRecommendedIds(tasks) }
 
     var taskToDelete by remember { mutableStateOf<Task?>(null) }
 
@@ -254,7 +167,7 @@ fun TaskListScreen(
                         onSortToggle = { sortMode = !sortMode },
                         onQuickAdd = { showQuickAdd = true },
                         onLogout = {
-                            sessionManager.logout()
+                            taskListViewModel.logout()
                             navController.navigate(Screen.Login.route) {
                                 popUpTo(Screen.TaskList.route) { inclusive = true }
                             }

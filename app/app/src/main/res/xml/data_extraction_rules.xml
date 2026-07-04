@@ -1,19 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?><!--
-   Sample data extraction rules file; uncomment and customize as necessary.
-   See https://developer.android.com/about/versions/12/backup-restore#xml-changes
-   for details.
+   Quy tắc backup/transfer cho thiết bị API >= 31.
+   Loại trừ todo_app_prefs (EncryptedSharedPreferences) khỏi cloud-backup lẫn device-transfer:
+   khóa mã hóa nằm trong Keystore, không đi kèm backup nên bản restore sẽ không giải mã được.
 -->
 <data-extraction-rules>
     <cloud-backup>
-        <!-- TODO: Use <include> and <exclude> to control what is backed up.
-        <include .../>
-        <exclude .../>
-        -->
+        <exclude domain="sharedpref" path="todo_app_prefs.xml"/>
     </cloud-backup>
-    <!--
     <device-transfer>
-        <include .../>
-        <exclude .../>
+        <exclude domain="sharedpref" path="todo_app_prefs.xml"/>
     </device-transfer>
-    -->
 </data-extraction-rules>

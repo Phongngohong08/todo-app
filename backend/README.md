@@ -179,6 +179,7 @@ sudo apt update && sudo apt upgrade -y
 
 # Cài đặt Docker
 sudo apt install -y docker.io
+sudo apt install -y docker-compose-v2
 
 # Khởi chạy Docker và kích hoạt tự khởi động cùng hệ thống
 sudo systemctl enable --now docker

@@ -1,6 +1,5 @@
 package com.example.todoapplication.data.api
 
-import android.content.Context
 import com.example.todoapplication.data.model.RefreshTokenInput
 import com.example.todoapplication.data.repository.SessionEvents
 import com.example.todoapplication.data.repository.SessionManager
@@ -22,11 +21,8 @@ object NetworkClient {
     // Khóa đồng bộ để nhiều request gặp 401 cùng lúc chỉ refresh một lần
     private val refreshLock = Any()
 
-    fun getApiService(context: Context): ApiService {
+    fun getApiService(sessionManager: SessionManager): ApiService {
         if (retrofit == null) {
-            val appContext = context.applicationContext
-            val sessionManager = SessionManager(appContext)
-
             val loggingInterceptor = HttpLoggingInterceptor().apply {
                 level = HttpLoggingInterceptor.Level.BODY
             }

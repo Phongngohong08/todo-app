@@ -24,7 +24,8 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -64,6 +65,9 @@ dependencies {
     // Background reminders / notifications
     implementation(libs.androidx.work.runtime.ktx)
 
+    // Encrypted storage for auth tokens
+    implementation(libs.androidx.security.crypto)
+
     // Drag & drop reordering for LazyColumn
     implementation("sh.calvin.reorderable:reorderable:2.4.3")
 
@@ -73,6 +77,9 @@ dependencies {
     ksp(libs.androidx.room.compiler)
 
     testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.mockito.core)
+    testImplementation(libs.mockito.kotlin)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.espresso.core)

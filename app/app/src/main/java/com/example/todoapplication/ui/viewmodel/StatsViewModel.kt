@@ -6,6 +6,7 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.example.todoapplication.data.model.MemoryItem
 import com.example.todoapplication.data.model.StatsSummary
+import com.example.todoapplication.data.repository.AiRepository
 import com.example.todoapplication.data.repository.StatsRepository
 import com.example.todoapplication.di.ServiceLocator
 import com.example.todoapplication.ui.utils.parseIso8601
@@ -33,7 +34,10 @@ data class StatsUiState(
     val perfectDays: Int = 0
 )
 
-class StatsViewModel(private val repo: StatsRepository) : ViewModel() {
+class StatsViewModel(
+    private val repo: StatsRepository,
+    private val aiRepository: AiRepository
+) : ViewModel() {
     private val _uiState = MutableStateFlow(StatsUiState())
     val uiState: StateFlow<StatsUiState> = _uiState.asStateFlow()
 
@@ -85,7 +89,7 @@ class StatsViewModel(private val repo: StatsRepository) : ViewModel() {
     fun loadMemories() {
         _uiState.update { it.copy(isLoadingMemories = true) }
         viewModelScope.launch {
-            val result = ServiceLocator.aiRepository.listMemories()
+            val result = aiRepository.listMemories()
             _uiState.update { it.copy(memories = result.getOrDefault(emptyList()), isLoadingMemories = false) }
         }
     }
@@ -93,10 +97,10 @@ class StatsViewModel(private val repo: StatsRepository) : ViewModel() {
     fun triggerExtraction() {
         _uiState.update { it.copy(isExtracting = true) }
         viewModelScope.launch {
-            val result = ServiceLocator.aiRepository.triggerExtraction()
+            val result = aiRepository.triggerExtraction()
             result.fold(
                 onSuccess = { res ->
-                    val memResult = ServiceLocator.aiRepository.listMemories()
+                    val memResult = aiRepository.listMemories()
                     _uiState.update { it.copy(memories = memResult.getOrDefault(emptyList()), isExtracting = false) }
                     val msg = when {
                         res.extracted > 0 -> "Đã phân tích ${res.analyzed} hoạt động và rút ra ${res.extracted} thói quen mới."
@@ -115,7 +119,7 @@ class StatsViewModel(private val repo: StatsRepository) : ViewModel() {
 
     fun deleteMemory(id: String) {
         viewModelScope.launch {
-            if (ServiceLocator.aiRepository.deleteMemory(id)) {
+            if (aiRepository.deleteMemory(id)) {
                 _events.emit("Đã xóa trí nhớ")
                 loadMemories()
             }
@@ -124,7 +128,7 @@ class StatsViewModel(private val repo: StatsRepository) : ViewModel() {
 
     companion object {
         val Factory = viewModelFactory {
-            initializer { StatsViewModel(ServiceLocator.statsRepository) }
+            initializer { StatsViewModel(ServiceLocator.statsRepository, ServiceLocator.aiRepository) }
         }
     }
 }

@@ -48,10 +48,10 @@ class TaskRepository(
     }
 
     suspend fun createTask(input: CreateTaskInput): Result<Task> =
-        call { api.createTask(input) }.onSuccess { ReminderScheduler.schedule(appContext, it) }
+        safeApiCall { api.createTask(input) }.onSuccess { ReminderScheduler.schedule(appContext, it) }
 
     suspend fun updateTask(id: String, input: UpdateTaskInput): Result<Task> =
-        call { api.updateTask(id, input) }.onSuccess { ReminderScheduler.schedule(appContext, it) }
+        safeApiCall { api.updateTask(id, input) }.onSuccess { ReminderScheduler.schedule(appContext, it) }
 
     suspend fun deleteTask(id: String): Boolean {
         val resp = api.deleteTask(id)
@@ -61,13 +61,4 @@ class TaskRepository(
 
     /** Hoàn thành task: gọi API đánh dấu COMPLETED. */
     suspend fun completeTask(task: Task): Boolean = api.completeTask(task.id).isSuccessful
-
-    private inline fun <T> call(block: () -> retrofit2.Response<T>): Result<T> = try {
-        val resp = block()
-        val body = resp.body()
-        if (resp.isSuccessful && body != null) Result.success(body)
-        else Result.failure(IllegalStateException("HTTP ${resp.code()}"))
-    } catch (e: Exception) {
-        Result.failure(e)
-    }
 }

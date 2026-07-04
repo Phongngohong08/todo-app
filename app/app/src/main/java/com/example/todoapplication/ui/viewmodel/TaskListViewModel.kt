@@ -8,7 +8,10 @@ import com.example.todoapplication.data.model.CreateTaskInput
 import com.example.todoapplication.data.model.ParsedTask
 import com.example.todoapplication.data.model.Task
 import com.example.todoapplication.data.model.UpdateTaskInput
+import com.example.todoapplication.data.repository.AiRepository
+import com.example.todoapplication.data.repository.SessionManager
 import com.example.todoapplication.data.repository.SubtaskProgress
+import com.example.todoapplication.data.repository.SubtaskRepository
 import com.example.todoapplication.data.repository.TaskRepository
 import com.example.todoapplication.di.ServiceLocator
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -33,9 +36,17 @@ sealed interface TaskListEvent {
     data class QuickAddReady(val parsed: ParsedTask) : TaskListEvent
 }
 
-class TaskListViewModel(private val repo: TaskRepository) : ViewModel() {
+class TaskListViewModel(
+    private val repo: TaskRepository,
+    private val subtaskRepository: SubtaskRepository,
+    private val aiRepository: AiRepository,
+    private val sessionManager: SessionManager
+) : ViewModel() {
     private val _uiState = MutableStateFlow(TaskListUiState())
     val uiState: StateFlow<TaskListUiState> = _uiState.asStateFlow()
+
+    /** Tên người dùng để hiển thị lời chào — đọc một lần từ phiên đăng nhập. */
+    val userName: String = sessionManager.getUserName().ifBlank { "bạn" }
 
     private val _events = MutableSharedFlow<TaskListEvent>()
     val events: SharedFlow<TaskListEvent> = _events.asSharedFlow()
@@ -50,7 +61,7 @@ class TaskListViewModel(private val repo: TaskRepository) : ViewModel() {
         viewModelScope.launch {
             try {
                 val result = repo.loadTasks(lastCategory, lastQuery)
-                val progress = ServiceLocator.subtaskRepository.progressByTask()
+                val progress = subtaskRepository.progressByTask()
                 _uiState.update { it.copy(tasks = result.tasks, isLoading = false, isOffline = result.isOffline, subtaskProgress = progress) }
             } catch (e: Exception) {
                 _uiState.update { it.copy(isLoading = false) }
@@ -62,7 +73,7 @@ class TaskListViewModel(private val repo: TaskRepository) : ViewModel() {
     private fun reload() {
         viewModelScope.launch {
             runCatching { repo.loadTasks(lastCategory, lastQuery) }.getOrNull()?.let { result ->
-                val progress = ServiceLocator.subtaskRepository.progressByTask()
+                val progress = subtaskRepository.progressByTask()
                 _uiState.update { it.copy(tasks = result.tasks, isOffline = result.isOffline, subtaskProgress = progress) }
             }
         }
@@ -129,7 +140,7 @@ class TaskListViewModel(private val repo: TaskRepository) : ViewModel() {
     fun parseQuickAdd(text: String, localTime: String) {
         _uiState.update { it.copy(quickAddLoading = true) }
         viewModelScope.launch {
-            val result = ServiceLocator.aiRepository.parseTask(text, localTime)
+            val result = aiRepository.parseTask(text, localTime)
             _uiState.update { it.copy(quickAddLoading = false) }
             result.fold(
                 onSuccess = { _events.emit(TaskListEvent.QuickAddReady(it)) },
@@ -138,9 +149,19 @@ class TaskListViewModel(private val repo: TaskRepository) : ViewModel() {
         }
     }
 
+    /** Đăng xuất khỏi phiên hiện tại. */
+    fun logout() = sessionManager.logout()
+
     companion object {
         val Factory = viewModelFactory {
-            initializer { TaskListViewModel(ServiceLocator.taskRepository) }
+            initializer {
+                TaskListViewModel(
+                    ServiceLocator.taskRepository,
+                    ServiceLocator.subtaskRepository,
+                    ServiceLocator.aiRepository,
+                    ServiceLocator.sessionManager
+                )
+            }
         }
     }
 }

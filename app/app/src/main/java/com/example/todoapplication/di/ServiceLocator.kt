@@ -28,9 +28,9 @@ object ServiceLocator {
     }
 
     // ── Hạ tầng ──────────────────────────────────────────────────────────────
-    val apiService: ApiService by lazy { NetworkClient.getApiService(appContext) }
-    val database: AppDatabase by lazy { AppDatabase.get(appContext) }
     val sessionManager: SessionManager by lazy { SessionManager(appContext) }
+    val apiService: ApiService by lazy { NetworkClient.getApiService(sessionManager) }
+    val database: AppDatabase by lazy { AppDatabase.get(appContext) }
 
     // ── Repository ───────────────────────────────────────────────────────────
     val taskRepository: TaskRepository by lazy { TaskRepository(apiService, appContext) }

@@ -15,11 +15,33 @@ type GeminiClient struct {
 	model  string
 }
 
-func NewGeminiClient(ctx context.Context, apiKey string) (*GeminiClient, error) {
+// classifyErr bọc lỗi từ Gemini: nếu là 429/hết quota thì gắn domain.ErrAIRateLimited
+// để handler trả HTTP 429; các lỗi khác giữ nguyên.
+func classifyErr(err error) error {
+	if err == nil {
+		return nil
+	}
+	msg := err.Error()
+	if strings.Contains(msg, "RESOURCE_EXHAUSTED") || strings.Contains(msg, "Error 429") || strings.Contains(msg, "quota") {
+		return fmt.Errorf("%w: %v", domain.ErrAIRateLimited, err)
+	}
+	return err
+}
+
+// DefaultModel là model dùng khi GEMINI_MODEL không được đặt.
+const DefaultModel = "gemini-2.5-flash"
+
+// NewGeminiClient khởi tạo client. model rỗng -> dùng DefaultModel.
+// Cho phép đổi model qua biến môi trường GEMINI_MODEL mà không cần sửa code
+// (vd "gemini-2.5-flash-lite" khi model chính đã hết hạn mức).
+func NewGeminiClient(ctx context.Context, apiKey string, model string) (*GeminiClient, error) {
+	if model == "" {
+		model = DefaultModel
+	}
 	if apiKey == "" {
 		return &GeminiClient{
 			client: nil,
-			model:  "gemini-2.5-flash",
+			model:  model,
 		}, fmt.Errorf("GEMINI_API_KEY environment variable is empty")
 	}
 
@@ -29,13 +51,13 @@ func NewGeminiClient(ctx context.Context, apiKey string) (*GeminiClient, error) 
 	if err != nil {
 		return &GeminiClient{
 			client: nil,
-			model:  "gemini-2.5-flash",
+			model:  model,
 		}, fmt.Errorf("failed to create Gemini client: %w", err)
 	}
 
 	return &GeminiClient{
 		client: client,
-		model:  "gemini-2.5-flash",
+		model:  model,
 	}, nil
 }
 
@@ -115,7 +137,7 @@ Return ONLY a JSON object with exactly these keys. No markdown.`
 
 	resp, err := c.client.Models.GenerateContent(ctx, c.model, contents, config)
 	if err != nil {
-		return nil, fmt.Errorf("gemini parse task error: %w", err)
+		return nil, classifyErr(fmt.Errorf("gemini parse task error: %w", err))
 	}
 
 	raw := resp.Text()
@@ -196,7 +218,7 @@ Return ONLY a JSON array of slots with this exact structure:
 
 	resp, err := c.client.Models.GenerateContent(ctx, c.model, contents, config)
 	if err != nil {
-		return nil, fmt.Errorf("gemini generate daily plan error: %w", err)
+		return nil, classifyErr(fmt.Errorf("gemini generate daily plan error: %w", err))
 	}
 
 	rawContent := resp.Text()
@@ -276,7 +298,7 @@ Be direct but encouraging. Refer to their previous history if they have patterns
 
 	resp, err := c.client.Models.GenerateContent(ctx, c.model, contents, config)
 	if err != nil {
-		return "", err
+		return "", classifyErr(err)
 	}
 
 	return resp.Text(), nil
@@ -332,7 +354,7 @@ Return ONLY the JSON array.`
 
 	resp, err := c.client.Models.GenerateContent(ctx, c.model, contents, config)
 	if err != nil {
-		return nil, err
+		return nil, classifyErr(err)
 	}
 
 	raw := resp.Text()

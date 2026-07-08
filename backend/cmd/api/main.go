@@ -44,7 +44,7 @@ func main() {
 	}
 
 	// 3. Initialize Gemini Client
-	geminiClient, err := gemini.NewGeminiClient(context.Background(), cfg.GeminiKey)
+	geminiClient, err := gemini.NewGeminiClient(context.Background(), cfg.GeminiKey, cfg.GeminiModel)
 	if err != nil {
 		log.Printf("Warning: Failed to initialize Gemini Client: %v. AI Features will fail at runtime.", err)
 	} else if cfg.GeminiKey == "" {

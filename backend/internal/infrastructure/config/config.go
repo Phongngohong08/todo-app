@@ -17,6 +17,7 @@ type Config struct {
 	QdrantHost      string
 	QdrantPort      string
 	GeminiKey       string
+	GeminiModel     string
 	JWTSecret       string
 	AccessTokenTTL  time.Duration
 	RefreshTokenTTL time.Duration
@@ -36,6 +37,7 @@ func Load() *Config {
 		QdrantHost:      getEnv("QDRANT_HOST", "localhost"),
 		QdrantPort:      getEnv("QDRANT_PORT", "6333"),
 		GeminiKey:       getEnv("GEMINI_API_KEY", ""),
+		GeminiModel:     getEnv("GEMINI_MODEL", ""),
 		JWTSecret:       getEnv("JWT_SECRET", "super_secret_key_change_me"),
 		AccessTokenTTL:  getEnvDuration("ACCESS_TOKEN_TTL", 15*time.Minute),
 		RefreshTokenTTL: getEnvDuration("REFRESH_TOKEN_TTL", 30*24*time.Hour),

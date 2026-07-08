@@ -167,7 +167,7 @@ View (Composable) → ViewModel (StateFlow<UiState>) → Repository → REST / R
 - Độ gần với deadline (quá hạn → hôm nay → 3 ngày → 7 ngày)
 - Trạng thái (việc chưa xong)
 
-**Top 3 task điểm cao nhất** hiển thị banner "🤖 AI khuyến nghị ưu tiên" màu primary — hoàn toàn client-side, không cần API mới.
+**Khoảng 1/3 số việc đang chờ (tối đa 3, và chỉ khi có từ 3 việc trở lên)** — những task điểm cao nhất — hiển thị banner "🤖 AI khuyến nghị ưu tiên" màu primary. Hoàn toàn client-side, không cần API mới. Giới hạn 1/3 để badge còn ý nghĩa "nổi bật" thay vì dính lên mọi việc khi danh sách ngắn.
 
 ### ☰ Kéo-thả sắp xếp task (Drag & Drop)
 Nhấn icon ☰ trên greeting hero card để vào **sort mode**:

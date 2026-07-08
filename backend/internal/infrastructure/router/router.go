@@ -1,6 +1,7 @@
 package router
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -503,5 +504,13 @@ func (rm *RouteManager) handleGetStatsSummary(c *gin.Context) {
 
 func handleError(c *gin.Context, status int, err error) {
 	log.Printf("[API ERROR] %s %s | Status: %d | Error: %v", c.Request.Method, c.Request.URL.Path, status, err)
+	// Lỗi hết hạn mức/quá tải từ nhà cung cấp AI -> trả 429 kèm thông báo thân thiện,
+	// không lộ chi tiết lỗi thô của Gemini cho client.
+	if errors.Is(err, domain.ErrAIRateLimited) {
+		c.JSON(http.StatusTooManyRequests, gin.H{
+			"error": "AI đang quá tải hoặc đã hết lượt sử dụng trong ngày. Vui lòng thử lại sau ít phút.",
+		})
+		return
+	}
 	c.JSON(status, gin.H{"error": err.Error()})
 }

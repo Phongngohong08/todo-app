@@ -2,8 +2,13 @@ package domain
 
 import (
 	"context"
+	"errors"
 	"time"
 )
+
+// ErrAIRateLimited báo hiệu nhà cung cấp AI (Gemini) trả về lỗi hết hạn mức/quá tải (HTTP 429).
+// Tầng handler dùng errors.Is để trả về HTTP 429 kèm thông báo thân thiện thay vì 500.
+var ErrAIRateLimited = errors.New("AI service rate limited")
 
 type PlanSlot struct {
 	StartTime string `json:"start"`   // e.g., "08:00"

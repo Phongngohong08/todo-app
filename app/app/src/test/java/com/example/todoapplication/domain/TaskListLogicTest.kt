@@ -62,17 +62,40 @@ class TaskListLogicTest {
     }
 
     @Test
-    fun `aiRecommendedIds excludes completed tasks and caps at three`() {
-        val tasks = listOf(
-            task(id = "a", priority = "HIGH", dueDate = isoAt(-1)),
-            task(id = "b", priority = "HIGH", dueDate = isoAt(-2)),
-            task(id = "c", priority = "HIGH", dueDate = isoAt(-3)),
-            task(id = "d", priority = "HIGH", dueDate = isoAt(-4)),
-            task(id = "completed", status = "COMPLETED", priority = "HIGH", dueDate = isoAt(-10))
-        )
-        val ids = aiRecommendedIds(tasks)
+    fun `aiRecommendedIds recommends about one third and excludes completed`() {
+        // 9 việc đang chờ -> 9/3 = 3 khuyến nghị; task đã hoàn thành không tính.
+        val pending = (1..9).map { task(id = "p$it", priority = "HIGH", dueDate = isoAt(-it)) }
+        val completed = task(id = "completed", status = "COMPLETED", priority = "HIGH", dueDate = isoAt(-100))
+        val ids = aiRecommendedIds(pending + completed)
         assertEquals(3, ids.size)
         assertFalse(ids.contains("completed"))
+    }
+
+    @Test
+    fun `aiRecommendedIds caps at three even with many tasks`() {
+        val pending = (1..30).map { task(id = "p$it", priority = "HIGH", dueDate = isoAt(-it)) }
+        assertEquals(3, aiRecommendedIds(pending).size)
+    }
+
+    @Test
+    fun `aiRecommendedIds highlights only one of three tasks`() {
+        val tasks = listOf(
+            task(id = "a", priority = "HIGH", dueDate = isoAt(-1)),
+            task(id = "b", priority = "MEDIUM", dueDate = isoAt(10)),
+            task(id = "c", priority = "LOW", dueDate = isoAt(100))
+        )
+        val ids = aiRecommendedIds(tasks)
+        assertEquals(1, ids.size)
+        assertEquals(setOf("a"), ids) // việc quá hạn, ưu tiên cao nhất
+    }
+
+    @Test
+    fun `aiRecommendedIds returns empty when fewer than three pending tasks`() {
+        val tasks = listOf(
+            task(id = "a", priority = "HIGH", dueDate = isoAt(-1)),
+            task(id = "b", priority = "HIGH", dueDate = isoAt(-2))
+        )
+        assertTrue(aiRecommendedIds(tasks).isEmpty())
     }
 
     @Test

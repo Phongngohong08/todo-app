@@ -75,13 +75,22 @@ fun computeAiScore(task: Task): Double {
     return score
 }
 
-/** Danh sách id của các task được AI khuyến nghị ưu tiên (top 3 điểm cao nhất, chưa hoàn thành). */
-fun aiRecommendedIds(tasks: List<Task>): Set<String> = tasks
-    .filter { it.status != "COMPLETED" }
-    .sortedByDescending { computeAiScore(it) }
-    .take(3)
-    .map { it.id }
-    .toSet()
+/**
+ * Danh sách id các task được AI khuyến nghị ưu tiên (điểm cao nhất, chưa hoàn thành).
+ * Số lượng gợi ý ~1/3 số việc đang chờ và tối đa 3 — để badge còn ý nghĩa "nổi bật" thay vì
+ * dính lên mọi việc khi danh sách ngắn (vd 3 việc thì chỉ 1 việc được khuyến nghị).
+ */
+fun aiRecommendedIds(tasks: List<Task>): Set<String> {
+    val pending = tasks.filter { it.status != "COMPLETED" }
+    // Dưới 3 việc thì không khuyến nghị: người dùng đã thấy hết, badge không thêm giá trị.
+    if (pending.size < 3) return emptySet()
+    val count = (pending.size / 3).coerceAtMost(3)
+    return pending
+        .sortedByDescending { computeAiScore(it) }
+        .take(count)
+        .map { it.id }
+        .toSet()
+}
 
 /** Chuỗi RFC3339 (UTC) cho ngày cách hôm nay [days] ngày, vào giờ [hour]:[minute] theo giờ máy. */
 fun dueAtDayOffset(days: Int, hour: Int = 9, minute: Int = 0): String {

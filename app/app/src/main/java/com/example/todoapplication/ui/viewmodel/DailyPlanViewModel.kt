@@ -46,7 +46,18 @@ class DailyPlanViewModel(private val repo: PlanRepository) : ViewModel() {
             val localTime = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
             val result = repo.generateDaily(localTime)
             _uiState.update { it.copy(plan = result.getOrNull(), isLoading = false) }
-            _events.emit(if (result.isSuccess) "Đã tái tạo lịch trình!" else "Tái tạo thất bại")
+            // Phân biệt 3 trường hợp: lỗi mạng / AI trả lịch rỗng (hết khung giờ) / thành công.
+            // Trước đây luôn báo "thành công" kể cả khi lịch rỗng -> người dùng tưởng app hỏng.
+            val msg = when {
+                result.isFailure ->
+                    "Tạo lịch trình thất bại. Kiểm tra kết nối rồi thử lại."
+                result.getOrNull()?.planData.isNullOrEmpty() ->
+                    "AI chưa xếp được khung giờ nào — có thể đã quá giờ làm việc trong ngày. " +
+                        "Hãy nới giờ kết thúc trong Cài đặt hoặc thử lại vào ban ngày."
+                else ->
+                    "Đã tạo lịch trình!"
+            }
+            _events.emit(msg)
         }
     }
 

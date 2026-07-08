@@ -147,8 +147,10 @@ func (c *GeminiClient) GenerateDailyPlan(ctx context.Context, tasks []*domain.Ta
 Scheduling Rules:
 - Schedule each task into a time block of roughly the user's default work block size (split larger work sensibly).
 - Order tasks by priority (HIGH first) and by due date (earlier due dates first).
-- Stay within the user's morning start time and evening end time.
+- Prefer to keep slots within the user's morning start time and evening end time.
 - If a current local time is provided (e.g., "10:15"), you MUST ONLY schedule tasks starting from or after this time. Do not suggest slots in the past.
+- IMPORTANT: If the current local time is already at or after the user's evening end time, DO NOT return an empty schedule. Instead, still schedule the tasks starting from the current time into the remaining hours of the day (up to a reasonable late cutoff of 23:59). The user explicitly asked for a plan, so always provide one whenever there is at least one active task and any time left before midnight.
+- Only return an empty array if there are genuinely no active tasks to schedule, or there is truly no time left before midnight.
 - Suggest a logical, realistic daily schedule that avoids overlaps.
 
 Return ONLY a JSON array of slots with this exact structure:

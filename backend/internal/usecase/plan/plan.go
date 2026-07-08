@@ -36,10 +36,25 @@ func NewPlanUseCase(
 	}
 }
 
+// GetPlan chỉ đọc lại lịch ĐÃ lưu của một ngày (không gọi AI).
+// Ví dụ: GetPlan(ctx, "u1", 2026-07-08)  → *DailyPlan đã tạo trước đó, hoặc nil nếu ngày đó chưa có.
 func (u *PlanUseCase) GetPlan(ctx context.Context, userID string, date time.Time) (*domain.DailyPlan, error) {
 	return u.planRepo.GetByDate(ctx, userID, date)
 }
 
+// Generate dựng lịch MỚI cho một ngày bằng AI rồi lưu lại.
+// Năm bước: (1) lấy sở thích (thiếu thì dùng mặc định 08:00–18:00, khối 60') → (2) lấy task đang mở →
+// (3) nạp trí nhớ/thói quen → (4) gọi LLM GenerateDailyPlan → (5) lưu kế hoạch.
+//
+// Tham số (một trường hợp minh họa):
+//
+//	userID    = "u1"
+//	date      = 2026-07-08            // ngày cần lập lịch
+//	localTime = "10:15"               // giờ hiện tại của user → không xếp việc vào quá khứ
+//
+// Kết quả trả về:
+//
+//	&domain.DailyPlan{PlanDate: 2026-07-08, PlanData: [ {Start:"10:15",End:"11:15",Title:"Viết báo cáo"}, ... ]}
 func (u *PlanUseCase) Generate(ctx context.Context, userID string, date time.Time, localTime string) (*domain.DailyPlan, error) {
 	// 1. Fetch preferences
 	prefs, err := u.userRepo.GetPreferences(ctx, userID)

@@ -52,19 +52,22 @@ class SettingsViewModel(private val repo: PreferencesRepository) : ViewModel() {
         }
     }
 
+    // 3 hàm set: người dùng gõ tới đâu, cập nhật state tới đó (chưa lưu server). setDuration lọc chỉ giữ chữ số.
     fun setMorning(v: String) = _uiState.update { it.copy(morningStart = v) }
     fun setEvening(v: String) = _uiState.update { it.copy(eveningEnd = v) }
     fun setDuration(v: String) = _uiState.update { it.copy(workDuration = v.filter { c -> c.isDigit() }) }
 
+    // Bấm "Lưu": đọc state hiện tại, gửi PUT preferences lên server, rồi báo kết quả.
     fun save() {
         val s = _uiState.value
         _uiState.update { it.copy(isSaving = true) }
         viewModelScope.launch {
             val result = repo.update(
                 UserPreferences(
-                    userId = "",
+                    userId = "",     // server tự gán theo token; client để trống
                     morningStartTime = s.morningStart,
                     eveningEndTime = s.eveningEnd,
+                    // toIntOrNull() ?: 60 : nếu ô đang trống/không phải số thì mặc định 60 phút.
                     workDurationPreference = s.workDuration.toIntOrNull() ?: 60
                 )
             )

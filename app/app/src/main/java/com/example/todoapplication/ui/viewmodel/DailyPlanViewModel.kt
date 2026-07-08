@@ -25,7 +25,7 @@ import java.util.*
  */
 
 data class DailyPlanUiState(
-    val plan: DailyPlan? = null,
+    val plan: DailyPlan? = null,     // lịch của ngày; null = chưa có/đang tải → màn hiện gợi ý "Tạo lịch"
     val isLoading: Boolean = true
 )
 
@@ -36,16 +36,20 @@ class DailyPlanViewModel(private val repo: PlanRepository) : ViewModel() {
     private val _events = MutableSharedFlow<String>()
     val events: SharedFlow<String> = _events.asSharedFlow()
 
+    // Xem lịch ĐÃ CÓ của hôm nay (không gọi AI). Gọi khi mở màn.
     fun loadPlan() {
         _uiState.update { it.copy(isLoading = true) }
         viewModelScope.launch {
+            // Định dạng ngày "2026-07-08" và giờ "14:30" theo múi giờ máy để gửi cho backend.
             val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
             val localTime = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
             val result = repo.getDaily(today, localTime)
+            // getOrNull(): thành công thì lấy plan, lỗi thì để null (màn tự hiện trạng thái trống).
             _uiState.update { it.copy(plan = result.getOrNull(), isLoading = false) }
         }
     }
 
+    // Nhờ AI TẠO LẠI lịch (gọi Gemini bên backend, có thể mất 15-30s). Nút "Tạo lại".
     fun regenerate() {
         _uiState.update { it.copy(isLoading = true) }
         viewModelScope.launch {

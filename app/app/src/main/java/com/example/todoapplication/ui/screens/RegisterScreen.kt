@@ -35,6 +35,7 @@ fun RegisterScreen(
     navController: NavController,
     registerViewModel: RegisterViewModel = viewModel(factory = RegisterViewModel.Factory)
 ) {
+    // Cấu trúc màn này GIỐNG HỆT LoginScreen (state cục bộ cho ô nhập + collect events) — xem chú thích ở đó.
     val context = LocalContext.current
 
     var name by remember { mutableStateOf("") }
@@ -50,6 +51,7 @@ fun RegisterScreen(
         registerViewModel.events.collect { event ->
             when (event) {
                 is AuthEvent.Success -> {
+                    // Đăng ký xong KHÔNG tự đăng nhập — đưa về màn Login (và xóa màn Register khỏi lịch sử).
                     Toast.makeText(context, event.message, Toast.LENGTH_SHORT).show()
                     navController.navigate(Screen.Login.route) {
                         popUpTo(Screen.Register.route) { inclusive = true }

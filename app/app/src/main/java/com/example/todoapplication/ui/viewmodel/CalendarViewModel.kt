@@ -33,23 +33,31 @@ class CalendarViewModel(private val repo: TaskRepository) : ViewModel() {
     fun load() {
         _uiState.update { it.copy(isLoading = true) }
         viewModelScope.launch {
+            // runCatching: nếu tải lỗi thì dùng list rỗng thay vì crash (lịch chỉ để xem, không cần chặt chẽ).
             val tasks = runCatching { repo.loadTasks(null, null).tasks }.getOrDefault(emptyList())
+            // map: "ngày" → danh sách task rơi vào ngày đó. Đây chính là dữ liệu để vẽ lịch.
             val map = HashMap<String, MutableList<Task>>()
             // Chiếu lịch tới 12 tháng sau để hiển thị cả các lần lặp
             val horizon = Calendar.getInstance().apply { add(Calendar.MONTH, 12) }.time
 
             tasks.forEach { task ->
+                // Bỏ qua task không có hạn (không biết đặt vào ngày nào). return@forEach = "continue" của forEach.
                 val due = task.dueDate?.let { parseIso8601(it) } ?: return@forEach
+                // Nếu lặp theo tuần thì lấy tập các thứ cần rơi vào (vd {Thứ 2, Thứ 4}).
                 val weekdays = if (task.recurrence == "WEEKLY") parseWeekdaySet(task.recurrenceDays) else emptySet()
-                val occ = Calendar.getInstance().apply { time = due }
+                val occ = Calendar.getInstance().apply { time = due }   // "con trỏ" ngày, bắt đầu từ hạn gốc
                 var guard = 0
+                // Sinh dần các lần xuất hiện cho tới mốc 12 tháng. guard<800: chốt chặn tránh lặp vô hạn.
                 while (occ.time.before(horizon) && guard < 800) {
+                    // WEEKLY: chỉ nhận ngày đúng thứ mong muốn; các kiểu khác luôn nhận.
                     val matches = weekdays.isEmpty() || weekdays.contains(occ.get(Calendar.DAY_OF_WEEK))
-                    if (matches) map.getOrPut(dayKey(occ)) { mutableListOf() }.add(task)
+                    if (matches) map.getOrPut(dayKey(occ)) { mutableListOf() }.add(task)  // gắn task vào ngày
+                    // Nhảy tới lần lặp kế tiếp tùy kiểu tái diễn:
                     when (task.recurrence) {
-                        "DAILY" -> occ.add(Calendar.DAY_OF_MONTH, 1)
+                        "DAILY" -> occ.add(Calendar.DAY_OF_MONTH, 1)     // mỗi ngày
+                        // WEEKLY có chọn thứ: đi từng ngày để kiểm tra thứ; nếu không chọn thứ nào thì +7 ngày.
                         "WEEKLY" -> if (weekdays.isNotEmpty()) occ.add(Calendar.DAY_OF_MONTH, 1) else occ.add(Calendar.DAY_OF_MONTH, 7)
-                        "MONTHLY" -> occ.add(Calendar.MONTH, 1)
+                        "MONTHLY" -> occ.add(Calendar.MONTH, 1)          // mỗi tháng
                         else -> break // không lặp: chỉ thêm đúng ngày hạn chót
                     }
                     guard++

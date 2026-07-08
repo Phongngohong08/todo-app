@@ -47,7 +47,21 @@ type ExtractionResult struct {
 	Saved    int // số trí nhớ mới (không trùng) thực sự được lưu
 }
 
-// ExtractAndStoreMemories phân tích hoạt động trong khoảng lookback gần nhất và lưu các thói quen rút ra.
+// ExtractAndStoreMemories là "vòng học thói quen": đọc hoạt động gần đây → LLM rút ra quan sát →
+// embedding từng câu → KHỬ TRÙNG bằng vector → lưu vào Qdrant. Đây là nơi ghép mọi mảnh AI lại.
+//
+// Luồng 4 bước: (1) lấy log + chat trong lookback → (2) LLM ExtractMemories → (3) embedding mỗi câu →
+// (4) MaxSimilarity < ngưỡng thì Save (nếu đã có câu rất giống thì bỏ qua để khỏi trùng).
+//
+// Tham số (một trường hợp minh họa):
+//
+//	userID   = "u1"
+//	lookback = 30 * 24 * time.Hour   // phân tích hoạt động trong 30 ngày gần nhất
+//
+// Kết quả trả về:
+//
+//	ExtractionResult{Analyzed: 12, Saved: 2}
+//	// đã xét 12 bản ghi (log + chat), rút ra vài quan sát nhưng chỉ 2 cái đủ mới để lưu
 func (u *MemoryUseCase) ExtractAndStoreMemories(ctx context.Context, userID string, lookback time.Duration) (ExtractionResult, error) {
 	// 1. Fetch activities within the lookback window
 	since := time.Now().Add(-lookback)

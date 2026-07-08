@@ -37,20 +37,24 @@ fun LoginScreen(
 ) {
     val context = LocalContext.current
 
+    // State CỤC BỘ của màn (chỉ UI cần, không đáng đưa lên ViewModel): nội dung 2 ô nhập.
+    // remember { mutableStateOf } = ô nhớ giá trị qua các lần vẽ lại; "by" cho phép đọc/ghi như biến thường.
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    // State từ ViewModel: cờ đang đăng nhập. collectAsState... = "cắm" StateFlow vào Compose → đổi là vẽ lại.
     val isLoading by loginViewModel.isLoading.collectAsStateWithLifecycle()
 
     val primary = MaterialTheme.colorScheme.primary
     val tertiary = MaterialTheme.colorScheme.tertiary
     val bgColor = MaterialTheme.colorScheme.background
 
-    // Lắng nghe sự kiện một lần từ ViewModel
+    // Lắng nghe sự kiện DÙNG-MỘT-LẦN từ ViewModel (Toast + điều hướng). LaunchedEffect(Unit) = chạy đúng 1 lần khi mở màn.
     LaunchedEffect(Unit) {
         loginViewModel.events.collect { event ->
             when (event) {
                 is AuthEvent.Success -> {
                     Toast.makeText(context, event.message, Toast.LENGTH_SHORT).show()
+                    // Vào TaskList và XÓA màn Login khỏi lịch sử (inclusive) → bấm Back không quay lại Login.
                     navController.navigate(Screen.TaskList.route) {
                         popUpTo(Screen.Login.route) { inclusive = true }
                     }
@@ -137,9 +141,11 @@ fun LoginScreen(
 
                     Spacer(Modifier.height(4.dp))
 
+                    // Mẫu ô nhập Compose: value = state hiện tại, onValueChange = cập nhật state khi gõ.
+                    // "state xuống (value), event lên (onValueChange)" — ô nhập không tự giữ chữ, state mới là nguồn.
                     AppTextField(
                         value = email,
-                        onValueChange = { email = it },
+                        onValueChange = { email = it },   // it = chuỗi mới người dùng vừa gõ
                         label = "Email",
                         keyboardType = KeyboardType.Email,
                         modifier = Modifier.fillMaxWidth()
@@ -171,6 +177,7 @@ fun LoginScreen(
                             .clickable(enabled = !isLoading) { doLogin() },
                         contentAlignment = Alignment.Center
                     ) {
+                        // UI = f(state): đang tải thì hiện spinner, không thì hiện chữ. Đổi isLoading là nút tự đổi.
                         if (isLoading) {
                             CircularProgressIndicator(
                                 color = Color.White,

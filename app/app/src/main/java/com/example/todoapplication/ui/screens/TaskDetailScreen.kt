@@ -55,9 +55,10 @@ fun TaskDetailScreen(
     taskDetailViewModel: TaskDetailViewModel = viewModel(factory = TaskDetailViewModel.Factory)
 ) {
     val context = LocalContext.current
-    val isNewTask = taskId == "new"
+    val isNewTask = taskId == "new"   // quy ước: taskId "new" = TẠO MỚI, ngược lại = SỬA task có id đó
     val isLoading by taskDetailViewModel.isBusy.collectAsStateWithLifecycle()
 
+    // Mỗi ô trong form là một state cục bộ. Khi SỬA, chúng được điền lại từ sự kiện Loaded bên dưới.
     var title by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
     var priority by remember { mutableStateOf("MEDIUM") }
@@ -67,14 +68,15 @@ fun TaskDetailScreen(
     var recurrenceDays by remember { mutableStateOf("") } // "MON,WED,FRI" khi WEEKLY
     var reminderOffset by remember { mutableIntStateOf(0) } // phút nhắc trước hạn
     var subtaskInput by remember { mutableStateOf("") }
-    val subtasks by taskDetailViewModel.subtasks.collectAsStateWithLifecycle()
+    val subtasks by taskDetailViewModel.subtasks.collectAsStateWithLifecycle()  // bước con (từ Room)
     val calendar = remember { Calendar.getInstance() }
 
-    // Lắng nghe sự kiện từ ViewModel: nạp dữ liệu, lưu xong, hoặc lỗi
+    // Lắng nghe sự kiện từ ViewModel: nạp dữ liệu (đổ vào form), lưu xong (Toast + quay lại), hoặc lỗi.
     LaunchedEffect(Unit) {
         taskDetailViewModel.events.collect { event ->
             when (event) {
                 is TaskDetailEvent.Loaded -> {
+                    // Chế độ SỬA: đổ dữ liệu task vào từng ô của form.
                     val task = event.task
                     title = task.title
                     description = task.description ?: ""
@@ -88,18 +90,21 @@ fun TaskDetailScreen(
                 }
                 TaskDetailEvent.Saved -> {
                     Toast.makeText(context, "Đã lưu công việc thành công!", Toast.LENGTH_SHORT).show()
-                    navController.popBackStack()
+                    navController.popBackStack()   // lưu xong → quay lại màn danh sách
                 }
                 is TaskDetailEvent.Error -> Toast.makeText(context, event.message, Toast.LENGTH_LONG).show()
             }
         }
     }
 
+    // Khóa = taskId: quyết định nạp gì khi vào màn.
     LaunchedEffect(taskId) {
         if (!isNewTask) {
+            // SỬA: tải task + bước con từ kho dữ liệu.
             taskDetailViewModel.loadTask(taskId)
             taskDetailViewModel.loadSubtasks(taskId)
         } else {
+            // TẠO MỚI: nếu có "bản nháp" do AI Quick Add để lại thì điền sẵn (consume = lấy ra rồi xóa).
             QuickAddDraft.consume()?.let { draft ->
                 title = draft.title
                 description = draft.description

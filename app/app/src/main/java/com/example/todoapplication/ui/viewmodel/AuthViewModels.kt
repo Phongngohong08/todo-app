@@ -26,21 +26,26 @@ sealed interface AuthEvent {
 }
 
 class LoginViewModel(private val authRepository: AuthRepository) : ViewModel() {
+    // State: cờ đang tải (để nút hiện spinner + khóa bấm). _private ghi được, public chỉ đọc.
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
+    // Event: sự kiện dùng-một-lần (Toast + điều hướng). Dùng SharedFlow, KHÔNG để trong state
+    // vì nếu để state thì xoay màn sẽ phát lại Toast/điều hướng lần nữa.
     private val _events = MutableSharedFlow<AuthEvent>()
     val events: SharedFlow<AuthEvent> = _events.asSharedFlow()
 
     fun login(email: String, password: String) {
+        // 1. Kiểm tra đầu vào ngay tại client (chưa gọi mạng nếu bỏ trống).
         if (email.isBlank() || password.isBlank()) {
             viewModelScope.launch { _events.emit(AuthEvent.Error("Vui lòng điền đầy đủ thông tin")) }
             return
         }
-        _isLoading.value = true
-        viewModelScope.launch {
-            val result = authRepository.login(email.trim(), password)
-            _isLoading.value = false
+        _isLoading.value = true                              // 2. bật spinner
+        viewModelScope.launch {                              // 3. coroutine: gọi mạng không chặn UI
+            val result = authRepository.login(email.trim(), password)   // repo lo gọi API + lưu token
+            _isLoading.value = false                         // 4. tắt spinner (dù thành công hay lỗi)
+            // 5. fold: tách 2 nhánh của Result — thành công có data (it), thất bại có exception.
             result.fold(
                 onSuccess = { _events.emit(AuthEvent.Success("Chào mừng quay trở lại, ${it.user.name}!")) },
                 onFailure = { _events.emit(AuthEvent.Error("Tài khoản hoặc mật khẩu không chính xác")) }
@@ -55,6 +60,7 @@ class LoginViewModel(private val authRepository: AuthRepository) : ViewModel() {
     }
 }
 
+// RegisterViewModel: cấu trúc y hệt LoginViewModel ở trên, chỉ khác gọi register() và thông báo.
 class RegisterViewModel(private val authRepository: AuthRepository) : ViewModel() {
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()

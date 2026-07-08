@@ -16,6 +16,10 @@ type QdrantClient struct {
 	httpClient *http.Client
 }
 
+// NewQdrantClient tạo client trỏ tới Qdrant (vector database) qua REST.
+// "collection" giống một cái "bảng" chứa các vector — ở đây tên cố định "user_memories_gemini".
+//
+// Ví dụ: NewQdrantClient("localhost", "6333")  → gọi API tại http://localhost:6333
 func NewQdrantClient(host, port string) *QdrantClient {
 	return &QdrantClient{
 		baseURL:    fmt.Sprintf("http://%s:%s", host, port),
@@ -24,10 +28,14 @@ func NewQdrantClient(host, port string) *QdrantClient {
 	}
 }
 
-// InitCollection creates the collection if it does not exist
+// InitCollection tạo collection nếu chưa có (gọi một lần lúc khởi động server).
+// Khai báo mỗi vector dài 768 số và đo độ giống bằng "Cosine" (cùng hướng = giống nghĩa).
+// Hai con số này PHẢI khớp với embedding của Gemini (cũng 768 chiều), nếu lệch sẽ lỗi khi lưu/tìm.
+//
+// Output: nil nếu collection đã sẵn sàng (dù mới tạo hay đã tồn tại); error nếu không kết nối được Qdrant.
 func (c *QdrantClient) InitCollection(ctx context.Context) error {
 	url := fmt.Sprintf("%s/collections/%s", c.baseURL, c.collection)
-	
+
 	// Check if exists
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
@@ -49,7 +57,7 @@ func (c *QdrantClient) InitCollection(ctx context.Context) error {
 		},
 	}
 	bodyBytes, _ := json.Marshal(createPayload)
-	
+
 	req, err = http.NewRequestWithContext(ctx, "PUT", url, bytes.NewBuffer(bodyBytes))
 	if err != nil {
 		return err
@@ -75,6 +83,14 @@ type qdrantPoint struct {
 	Payload map[string]interface{} `json:"payload"`
 }
 
+// Save ghi (upsert) một trí nhớ vào Qdrant: lưu vector + kèm "payload" (dữ liệu gốc để đọc lại sau).
+// Một điểm (point) gồm: id, vector (768 số) và payload (user_id, content, ...).
+//
+// Ví dụ input:
+//
+//	item = {ID:"a1b2", UserID:"u1", Content:"Người dùng thích buổi sáng",
+//	        Vector:[]float32{0.01, -0.04, ...}(768 số), MemoryType:"observation"}
+//	→ lưu 1 điểm vào collection; wait=true nghĩa là ghi xong mới trả về (đọc lại thấy ngay).
 func (c *QdrantClient) Save(ctx context.Context, item *domain.MemoryItem) error {
 	url := fmt.Sprintf("%s/collections/%s/points?wait=true", c.baseURL, c.collection)
 
@@ -129,6 +145,18 @@ type qdrantSearchResult struct {
 	} `json:"result"`
 }
 
+// Search tìm các trí nhớ CÓ NGHĨA GIỐNG NHẤT với vector truy vấn (đây là trái tim của RAG).
+// Chỉ tìm trong trí nhớ của đúng user (Filter theo user_id), sắp theo độ giống giảm dần.
+//
+// Tham số (một trường hợp minh họa):
+//
+//	userID = "u1"
+//	vector = embedding("Tôi thấy nản, hay trì hoãn")   // vector của câu người dùng vừa hỏi
+//	limit  = 3                                          // lấy 3 trí nhớ liên quan nhất
+//
+// Kết quả trả về (giống nhất xếp trước):
+//
+//	[ {Content:"Người dùng hay trì hoãn việc học"}, {Content:"..."}, {Content:"..."} ]
 func (c *QdrantClient) Search(ctx context.Context, userID string, vector []float32, limit int) ([]*domain.MemoryItem, error) {
 	url := fmt.Sprintf("%s/collections/%s/points/search", c.baseURL, c.collection)
 
@@ -178,7 +206,19 @@ func (c *QdrantClient) Search(ctx context.Context, userID string, vector []float
 	return memories, nil
 }
 
-// MaxSimilarity tìm điểm tương đồng cao nhất giữa vector và các trí nhớ của user.
+// MaxSimilarity trả về ĐIỂM GIỐNG CAO NHẤT (thang Cosine 0..1) giữa vector và trí nhớ hiện có của user.
+// Dùng để KHỬ TRÙNG: trước khi lưu một quan sát mới, kiểm tra xem đã có cái gần giống chưa.
+//
+// Tham số (một trường hợp minh họa):
+//
+//	userID = "u1"
+//	vector = embedding("Người dùng thích làm việc buổi sáng")
+//
+// Kết quả trả về:
+//
+//	0.93  → đã có trí nhớ rất giống (thường ≥ 0.90 sẽ bị coi là trùng và bỏ qua)
+//	0.42  → khác biệt, nên lưu
+//	0     → user chưa có trí nhớ nào
 func (c *QdrantClient) MaxSimilarity(ctx context.Context, userID string, vector []float32) (float64, error) {
 	url := fmt.Sprintf("%s/collections/%s/points/search", c.baseURL, c.collection)
 
@@ -226,6 +266,8 @@ func (c *QdrantClient) MaxSimilarity(ctx context.Context, userID string, vector 
 	return searchRes.Result[0].Score, nil
 }
 
+// Delete xóa một trí nhớ theo id.
+// Ví dụ: Delete(ctx, "a1b2")  → gỡ điểm "a1b2" khỏi collection.
 func (c *QdrantClient) Delete(ctx context.Context, id string) error {
 	url := fmt.Sprintf("%s/collections/%s/points/delete?wait=true", c.baseURL, c.collection)
 
@@ -268,6 +310,11 @@ type qdrantScrollResult struct {
 	} `json:"result"`
 }
 
+// List lấy TẤT CẢ trí nhớ của một user (tối đa 100), KHÔNG cần vector truy vấn — khác Search ở chỗ
+// không xếp theo độ giống mà chỉ "cuộn" (scroll) toàn bộ. Dùng cho màn hiển thị danh sách trí nhớ
+// và cho việc lập kế hoạch ngày (nạp mọi thói quen).
+//
+// Ví dụ: List(ctx, "u1")  → [ {Content:"..."}, {Content:"..."}, ... ]  (mọi trí nhớ của u1)
 func (c *QdrantClient) List(ctx context.Context, userID string) ([]*domain.MemoryItem, error) {
 	url := fmt.Sprintf("%s/collections/%s/points/scroll", c.baseURL, c.collection)
 
@@ -316,6 +363,13 @@ func (c *QdrantClient) List(ctx context.Context, userID string) ([]*domain.Memor
 	return memories, nil
 }
 
+// mapPayloadToMemory chuyển "payload" (map JSON thô Qdrant trả về) thành struct MemoryItem gọn gàng.
+// Ví dụ:
+//
+//	id = "a1b2", payload = {"user_id":"u1","content":"...","memory_type":"observation","created_at":1.72e9}
+//	→ &MemoryItem{ID:"a1b2", UserID:"u1", Content:"...", MemoryType:"observation", CreatedAt: <time>}
+//
+// (Vector không đọc lại vì hiển thị/đọc không cần tới; ép kiểu an toàn bằng ", ok".)
 func mapPayloadToMemory(id string, payload map[string]interface{}) *domain.MemoryItem {
 	var mType, content, source string
 	var uID string

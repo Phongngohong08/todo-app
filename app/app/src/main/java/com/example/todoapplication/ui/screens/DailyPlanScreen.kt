@@ -41,6 +41,7 @@ fun DailyPlanScreen(
     dailyPlanViewModel: DailyPlanViewModel = viewModel(factory = DailyPlanViewModel.Factory)
 ) {
     val context = LocalContext.current
+    // Quan sát state: plan (lịch hôm nay) + isLoading. Đổi là màn tự vẽ lại.
     val state by dailyPlanViewModel.uiState.collectAsStateWithLifecycle()
 
     val dailyPlan = state.plan
@@ -51,6 +52,7 @@ fun DailyPlanScreen(
 
     fun regeneratePlan() = dailyPlanViewModel.regenerate()
 
+    // Hai LaunchedEffect(Unit) chạy một lần khi mở màn: (1) tải lịch, (2) lắng nghe thông báo để Toast.
     LaunchedEffect(Unit) { dailyPlanViewModel.loadPlan() }
     LaunchedEffect(Unit) {
         dailyPlanViewModel.events.collect { msg ->
@@ -58,7 +60,7 @@ fun DailyPlanScreen(
         }
     }
 
-    // Today's date display
+    // remember { } (không có khóa) = tính MỘT LẦN, nhớ qua các lần vẽ lại (khỏi format ngày lặp lại mỗi lần).
     val todayFormatted = remember {
         SimpleDateFormat("EEEE, dd MMMM", Locale("vi", "VN")).format(Date())
     }

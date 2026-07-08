@@ -42,6 +42,8 @@ fun SettingsScreen(
     settingsViewModel: SettingsViewModel = viewModel(factory = SettingsViewModel.Factory)
 ) {
     val context = LocalContext.current
+    // Quan sát state cấu hình. Lưu ý: ô nhập ở màn này lấy value TỪ state ViewModel (không remember cục bộ),
+    // vì giá trị cần tải từ server về và lưu lại — khác các ô nhập tạm ở LoginScreen.
     val state by settingsViewModel.uiState.collectAsStateWithLifecycle()
 
     val morningStart = state.morningStart
@@ -53,6 +55,7 @@ fun SettingsScreen(
     val primary = MaterialTheme.colorScheme.primary
     val tertiary = MaterialTheme.colorScheme.tertiary
 
+    // Mở màn: (1) tải cấu hình hiện tại từ server, (2) lắng nghe thông báo lưu thành công/thất bại.
     LaunchedEffect(Unit) { settingsViewModel.load() }
     LaunchedEffect(Unit) {
         settingsViewModel.events.collect { msg ->

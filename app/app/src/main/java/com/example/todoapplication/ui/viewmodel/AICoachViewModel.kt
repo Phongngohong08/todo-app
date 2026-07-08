@@ -12,7 +12,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-/** Một bong bóng chat. */
+/** Một bong bóng chat. isUser=true → tin của người dùng (bên phải); false → câu trả lời của AI (bên trái). */
 data class ChatUIModel(val text: String, val isUser: Boolean)
 
 const val COACH_GREETING =
@@ -25,8 +25,13 @@ val SUGGESTED_PROMPTS = listOf(
     "Phân tích thói quen của tôi"
 )
 
-/** Lưu lịch sử chat ở cấp tiến trình để giữ qua các lần điều hướng. */
+/**
+ * Lưu lịch sử chat ở cấp TIẾN TRÌNH (object = singleton toàn app) để giữ qua các lần điều hướng.
+ * Lý do: ViewModel bị hủy khi rời màn AI Coach; nếu giữ lịch sử trong ViewModel thì quay lại sẽ mất sạch.
+ * Đặt ở đây nên đóng/mở lại màn vẫn thấy nguyên đoạn chat cũ (chỉ mất khi tắt hẳn app).
+ */
 private object ChatHistoryStore {
+    // Khởi tạo sẵn 1 lời chào của AI để khung chat không trống khi mở lần đầu.
     var messages: List<ChatUIModel> = listOf(ChatUIModel(COACH_GREETING, isUser = false))
 }
 
@@ -43,29 +48,36 @@ class AICoachViewModel(private val repo: AiRepository) : ViewModel() {
     private val _uiState = MutableStateFlow(AICoachUiState())
     val uiState: StateFlow<AICoachUiState> = _uiState.asStateFlow()
 
+    // Thêm 1 bong bóng vào danh sách: tạo list MỚI (messages + msg) rồi đồng bộ sang store để giữ lịch sử.
+    // (Dùng "list mới" thay vì sửa list cũ vì state là bất biến — Compose so sánh để biết cần vẽ lại.)
     private fun append(msg: ChatUIModel) {
         _uiState.update { it.copy(messages = it.messages + msg) }
         ChatHistoryStore.messages = _uiState.value.messages
     }
 
+    // Người dùng gửi một tin nhắn. Luồng: hiện tin của mình ngay → bật "đang nghĩ" → gọi AI → hiện đáp.
     fun sendMessage(text: String) {
         val trimmed = text.trim()
+        // Bỏ qua nếu rỗng, hoặc đang chờ AI trả lời (chặn bấm gửi liên tục).
         if (trimmed.isBlank() || _uiState.value.isThinking) return
-        append(ChatUIModel(trimmed, isUser = true))
-        _uiState.update { it.copy(isThinking = true) }
-        viewModelScope.launch {
-            val result = repo.chat(trimmed)
-            append(
+        append(ChatUIModel(trimmed, isUser = true))          // 1. hiện tin của người dùng NGAY (không đợi mạng)
+        _uiState.update { it.copy(isThinking = true) }        // 2. bật cờ "đang nghĩ" → UI hiện dấu "..."
+        viewModelScope.launch {                              // 3. mở coroutine gọi mạng (không chặn UI)
+            val result = repo.chat(trimmed)                  //    gọi backend AI (bài coach.Chat bên backend)
+            append(                                          // 4. hiện câu trả lời của AI...
                 ChatUIModel(
+                    // getOrElse: nếu lỗi mạng thì thay bằng câu xin lỗi thay vì crash.
                     result.getOrElse { "Tôi gặp sự cố kết nối tới máy chủ AI. Vui lòng thử lại sau." },
                     isUser = false
                 )
             )
-            _uiState.update { it.copy(isThinking = false) }
+            _uiState.update { it.copy(isThinking = false) }  // 5. tắt cờ "đang nghĩ"
         }
     }
 
     companion object {
+        // Factory: "công thức" tạo ViewModel này, lấy sẵn repository từ ServiceLocator (DI thủ công).
+        // Màn hình gọi viewModel(factory = Factory) để nhận đúng instance đã ghép phụ thuộc.
         val Factory = viewModelFactory {
             initializer { AICoachViewModel(ServiceLocator.aiRepository) }
         }

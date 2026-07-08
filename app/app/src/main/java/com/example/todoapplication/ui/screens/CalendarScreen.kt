@@ -37,15 +37,18 @@ fun CalendarScreen(
     navController: NavController,
     calendarViewModel: CalendarViewModel = viewModel(factory = CalendarViewModel.Factory)
 ) {
+    // state.tasksByDay: map "ngày" → task rơi vào ngày đó (ViewModel đã khai triển việc lặp).
     val state by calendarViewModel.uiState.collectAsStateWithLifecycle()
     val primary = MaterialTheme.colorScheme.primary
 
+    // State cục bộ điều khiển việc HIỂN THỊ lịch (tháng/năm đang xem, ngày đang chọn) — không đụng dữ liệu.
+    // mutableIntStateOf = bản tối ưu của mutableStateOf cho kiểu Int (tránh đóng hộp).
     val today = remember { Calendar.getInstance() }
     var shownYear by remember { mutableIntStateOf(today.get(Calendar.YEAR)) }
     var shownMonth by remember { mutableIntStateOf(today.get(Calendar.MONTH)) } // 0-based
     var selectedDay by remember { mutableStateOf(CalendarViewModel.keyOf(today.get(Calendar.YEAR), today.get(Calendar.MONTH), today.get(Calendar.DAY_OF_MONTH))) }
 
-    LaunchedEffect(Unit) { calendarViewModel.load() }
+    LaunchedEffect(Unit) { calendarViewModel.load() }   // tải & khai triển task một lần khi mở màn
 
     val monthNames = listOf(
         "Tháng 1", "Tháng 2", "Tháng 3", "Tháng 4", "Tháng 5", "Tháng 6",

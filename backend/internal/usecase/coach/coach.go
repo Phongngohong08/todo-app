@@ -44,6 +44,20 @@ type ChatResponse struct {
 	Reply string `json:"reply"`
 }
 
+// Chat xử lý một lượt trò chuyện với AI Coach theo đúng mô hình RAG (Retrieval-Augmented Generation):
+// LẤY ngữ cảnh liên quan (task đang mở + trí nhớ tìm bằng vector + lịch sử) rồi mới nhờ LLM trả lời.
+//
+// Sáu bước: (1) lưu tin của user → (2) lấy task đang mở → (3) embedding câu hỏi rồi Search 3 trí nhớ
+// giống nhất (đây là bước "Retrieval") → (4) lấy 10 tin gần nhất → (5) gọi LLM → (6) lưu lại câu trả lời.
+//
+// Tham số (một trường hợp minh họa):
+//
+//	userID      = "u1"
+//	messageText = "Tôi hay trì hoãn, làm sao khắc phục?"
+//
+// Kết quả trả về (chuỗi trả lời đã được cá nhân hóa nhờ trí nhớ):
+//
+//	"Mình thấy bạn hay hoãn việc viết báo cáo. Thử quy tắc 15 phút: chỉ cần bắt đầu..."
 func (u *CoachUseCase) Chat(ctx context.Context, userID string, messageText string) (string, error) {
 	// 1. Save user message to database
 	userMsg := &domain.ChatMessage{

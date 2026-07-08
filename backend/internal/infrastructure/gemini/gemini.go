@@ -61,6 +61,15 @@ func NewGeminiClient(ctx context.Context, apiKey string, model string) (*GeminiC
 	}, nil
 }
 
+// CreateEmbedding biến một đoạn text thành "vector ngữ nghĩa" gồm 768 số thực (embedding).
+// Hiểu nôm na: vector là "tọa độ" của câu trong không gian nghĩa — 2 câu ý nghĩa giống nhau
+// thì 2 vector nằm gần nhau. Đây là bước cốt lõi để lưu & tìm trí nhớ trong vector DB (Qdrant).
+//
+// Ví dụ:
+//
+//	text = "Người dùng hay trì hoãn việc viết báo cáo"
+//	→ []float32{0.0123, -0.0456, 0.0789, ...}   // đúng 768 phần tử
+//	(nếu chưa cấu hình GEMINI_API_KEY → trả lỗi "not initialized")
 func (c *GeminiClient) CreateEmbedding(ctx context.Context, text string) ([]float32, error) {
 	if c == nil || c.client == nil {
 		return nil, fmt.Errorf("Gemini client is not initialized. Please set a valid GEMINI_API_KEY in your .env file")
@@ -93,8 +102,24 @@ func (c *GeminiClient) CreateEmbedding(ctx context.Context, text string) ([]floa
 	return resp.Embeddings[0].Values, nil
 }
 
-// ParseTask tách một câu ngôn ngữ tự nhiên thành task có cấu trúc.
-// nowContext là thời điểm hiện tại của người dùng (RFC3339) để suy ra các mốc tương đối ("ngày mai", "thứ 6").
+// ParseTask nhờ LLM tách một câu ngôn ngữ tự nhiên thành task có cấu trúc (JSON).
+//
+// Tham số (lấy một trường hợp cụ thể để dễ hình dung):
+//
+//	text       = "họp team lúc 3h chiều mai bàn về dự án"   // câu người dùng gõ
+//	nowContext = "2026-07-08T09:00:00+07:00"                // thời điểm hiện tại (RFC3339), để suy ra "mai"
+//
+// Kết quả trả về:
+//
+//	&domain.ParsedTask{
+//	    Title:       "Họp team bàn về dự án",
+//	    Description: "",
+//	    Priority:    "MEDIUM",
+//	    DueDate:     "2026-07-09T15:00:00+07:00",   // "3h chiều mai" đã quy ra mốc tuyệt đối
+//	    Category:    "WORK",
+//	}
+//
+// (Temperature 0.2 = ưu tiên ổn định, ít "sáng tạo". Câu trả về được ép JSON qua ResponseMIMEType.)
 func (c *GeminiClient) ParseTask(ctx context.Context, text string, nowContext string) (*domain.ParsedTask, error) {
 	if c == nil || c.client == nil {
 		return nil, fmt.Errorf("Gemini client is not initialized. Please set a valid GEMINI_API_KEY in your .env file")
@@ -155,6 +180,20 @@ Return ONLY a JSON object with exactly these keys. No markdown.`
 	return &parsed, nil
 }
 
+// GenerateDailyPlan nhờ LLM xếp các task thành lịch trong ngày theo khung giờ, có cân nhắc
+// sở thích người dùng và thói quen rút ra từ trí nhớ.
+//
+// Tham số (một trường hợp minh họa):
+//
+//	tasks    = [ {Title:"Viết báo cáo", Priority:"HIGH"}, {Title:"Tập gym", Priority:"LOW"} ]
+//	prefs    = {MorningStartTime:"08:00", EveningEndTime:"18:00", WorkDurationPreference:60}  // mỗi khối 60'
+//	memories = [ {Content:"Người dùng tập trung tốt vào buổi sáng"} ]                          // để AI ưu tiên việc khó buổi sáng
+//	localTime = "10:15"   // giờ hiện tại của user → KHÔNG xếp việc trước mốc này
+//
+// Kết quả trả về (mảng khung giờ):
+//
+//	[ {Start:"10:15", End:"11:15", TaskID:"...", Title:"Viết báo cáo"},
+//	  {Start:"11:15", End:"12:15", TaskID:"...", Title:"Tập gym"} ]
 func (c *GeminiClient) GenerateDailyPlan(ctx context.Context, tasks []*domain.Task, prefs *domain.UserPreferences, memories []*domain.MemoryItem, localTime string) ([]domain.PlanSlot, error) {
 	if c == nil || c.client == nil {
 		return nil, fmt.Errorf("Gemini client is not initialized. Please set a valid GEMINI_API_KEY in your .env file")
@@ -235,6 +274,19 @@ Return ONLY a JSON array of slots with this exact structure:
 	return slots, nil
 }
 
+// GetCoachResponse sinh câu trả lời của "AI Coach" — có ngữ cảnh về task, thói quen và lịch sử chat.
+// Đây là bước cuối của luồng RAG: memories đã được tìm sẵn (bằng vector) rồi nhét vào prompt.
+//
+// Tham số (một trường hợp minh họa):
+//
+//	message  = "Dạo này tôi thấy nản, không muốn làm gì cả"     // tin nhắn mới của user
+//	tasks    = [ {Title:"Ôn thi cuối kỳ", Status:"TODO"} ]      // việc đang mở, để AI nhắc đúng ngữ cảnh
+//	memories = [ {Content:"Người dùng hay trì hoãn việc học"} ] // trí nhớ liên quan (tìm từ Qdrant)
+//	history  = [ {Role:"user",Content:"..."}, {Role:"assistant",Content:"..."} ]  // 10 tin gần nhất
+//
+// Kết quả trả về (chuỗi lời khuyên):
+//
+//	"Mình hiểu cảm giác đó. Mình để ý bạn hay hoãn việc học — thử bắt đầu chỉ 15 phút với môn dễ nhất nhé..."
 func (c *GeminiClient) GetCoachResponse(ctx context.Context, message string, tasks []*domain.Task, memories []*domain.MemoryItem, history []*domain.ChatMessage) (string, error) {
 	if c == nil || c.client == nil {
 		return "", fmt.Errorf("Gemini client is not initialized. Please set a valid GEMINI_API_KEY in your .env file")
@@ -304,6 +356,20 @@ Be direct but encouraging. Refer to their previous history if they have patterns
 	return resp.Text(), nil
 }
 
+// ExtractMemories nhờ LLM đọc lịch sử hoạt động + chat để rút ra các "thói quen/quan sát" dạng câu ngắn.
+// Đây là nguồn sinh ra trí nhớ; sau đó mỗi câu sẽ được embedding và lưu vào Qdrant (xem memory usecase).
+//
+// Tham số (một trường hợp minh họa):
+//
+//	logs = [ {Action:"POSTPONED", Details:"Viết báo cáo"},          // các sự kiện: hoãn/hoàn thành/tạo...
+//	         {Action:"COMPLETED", Details:"Trả lời email"} ]
+//	messages = [ {Role:"user", Content:"Tôi thích làm việc vào buổi sáng"} ]  // vài tin chat gần đây
+//
+// Kết quả trả về (mảng câu quan sát):
+//
+//	[ "Người dùng thường trì hoãn việc viết báo cáo",
+//	  "Người dùng thích làm việc vào buổi sáng" ]
+//	(trả về [] nếu dữ liệu rỗng hoặc không có tín hiệu gì đáng ghi)
 func (c *GeminiClient) ExtractMemories(ctx context.Context, logs []*domain.TaskLog, messages []*domain.ChatMessage) ([]string, error) {
 	if c == nil || c.client == nil {
 		return nil, fmt.Errorf("Gemini client is not initialized. Please set a valid GEMINI_API_KEY in your .env file")
@@ -371,6 +437,8 @@ Return ONLY the JSON array.`
 	return insights, nil
 }
 
+// stripCodeBlocks gỡ hàng rào markdown ```json ... ``` khi LLM lỡ bọc JSON trong code block.
+// Ví dụ: s = "```json\n{\"title\":\"X\"}\n```"  →  "{\"title\":\"X\"}"
 func stripCodeBlocks(s string) string {
 	if len(s) > 7 && s[:7] == "```json" {
 		s = s[7:]

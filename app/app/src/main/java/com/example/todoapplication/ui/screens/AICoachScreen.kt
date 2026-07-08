@@ -39,21 +39,23 @@ fun AICoachScreen(
     navController: NavController,
     aiCoachViewModel: AICoachViewModel = viewModel(factory = AICoachViewModel.Factory)
 ) {
+    // Quan sát state của ViewModel → messages (danh sách bong bóng) + isThinking (đang chờ AI).
     val state by aiCoachViewModel.uiState.collectAsStateWithLifecycle()
     val messages = state.messages
     val isThinking = state.isThinking
 
-    var messageText by remember { mutableStateOf("") }
-    val listState = rememberLazyListState()
+    var messageText by remember { mutableStateOf("") }   // nội dung ô nhập (state cục bộ)
+    val listState = rememberLazyListState()               // "điều khiển" danh sách cuộn (để tự cuộn xuống cuối)
 
     val primary = MaterialTheme.colorScheme.primary
     val tertiary = MaterialTheme.colorScheme.tertiary
 
     fun sendMessage(text: String) {
-        aiCoachViewModel.sendMessage(text)
-        messageText = ""
+        aiCoachViewModel.sendMessage(text)   // event lên ViewModel
+        messageText = ""                     // xóa ô nhập ngay
     }
 
+    // Mỗi khi có tin mới (messages.size đổi), tự cuộn xuống bong bóng cuối cùng. Khóa = messages.size.
     LaunchedEffect(messages.size) {
         if (messages.isNotEmpty()) listState.animateScrollToItem(messages.size - 1)
     }

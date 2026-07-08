@@ -52,7 +52,7 @@ fun StatsScreen(
     val context = LocalContext.current
     val state by statsViewModel.uiState.collectAsStateWithLifecycle()
 
-    var selectedTab by remember { mutableStateOf(0) }
+    var selectedTab by remember { mutableStateOf(0) }   // tab đang chọn (0/1/2) — state cục bộ của màn
     val tabTitles = listOf("📊 Thống kê", "📈 Biểu đồ", "🧠 Trí nhớ AI")
 
     val statsSummary = state.summary
@@ -66,6 +66,7 @@ fun StatsScreen(
     val primary = MaterialTheme.colorScheme.primary
     val tertiary = MaterialTheme.colorScheme.tertiary
 
+    // Khóa = selectedTab: mỗi khi ĐỔI TAB, khối này chạy lại → tải đúng dữ liệu cho tab đó (lazy load).
     LaunchedEffect(selectedTab) {
         when (selectedTab) {
             0 -> statsViewModel.loadSummary()

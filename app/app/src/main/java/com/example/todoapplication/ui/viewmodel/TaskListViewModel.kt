@@ -97,6 +97,7 @@ class TaskListViewModel(
 
     fun deleteTask(task: Task) {
         viewModelScope.launch {
+            // Chỉ báo "Đã xóa" và tải lại KHI server xác nhận xóa thành công (repo trả true).
             if (repo.deleteTask(task.id)) {
                 _events.emit(TaskListEvent.Message("Đã xóa công việc"))
                 reload()
@@ -106,8 +107,9 @@ class TaskListViewModel(
 
     /** Đổi nhanh độ ưu tiên của một task (bấm cờ trên thẻ). */
     fun setPriority(task: Task, priority: String) {
-        if (task.priority == priority) return
+        if (task.priority == priority) return   // đã đúng mức đó rồi thì khỏi gọi mạng
         viewModelScope.launch {
+            // API sửa task cần đủ các trường → sao chép mọi trường của task cũ, chỉ thay priority.
             val input = UpdateTaskInput(
                 title = task.title,
                 description = task.description ?: "",
@@ -137,6 +139,7 @@ class TaskListViewModel(
 
     /** Đổi thứ tự cục bộ (kéo-thả). */
     fun moveTask(fromIndex: Int, toIndex: Int) {
+        // CHỈ đổi thứ tự trong state (không gọi server). Bỏ phần tử ở fromIndex rồi chèn vào toIndex.
         _uiState.update { state ->
             val list = state.tasks.toMutableList()
             if (fromIndex in list.indices && toIndex in list.indices) {
@@ -146,13 +149,15 @@ class TaskListViewModel(
         }
     }
 
+    // Quick Add: nhờ AI (backend) tách câu tự nhiên thành task, rồi phát QuickAddReady để màn mở
+    // màn chi tiết điền sẵn (chưa lưu — người dùng xác nhận mới tạo).
     fun parseQuickAdd(text: String, localTime: String) {
         _uiState.update { it.copy(quickAddLoading = true) }
         viewModelScope.launch {
             val result = aiRepository.parseTask(text, localTime)
             _uiState.update { it.copy(quickAddLoading = false) }
             result.fold(
-                onSuccess = { _events.emit(TaskListEvent.QuickAddReady(it)) },
+                onSuccess = { _events.emit(TaskListEvent.QuickAddReady(it)) },   // "it" = ParsedTask AI trả về
                 onFailure = { _events.emit(TaskListEvent.Message("Không phân tích được. Hãy thử mô tả rõ hơn.")) }
             )
         }

@@ -100,6 +100,8 @@ fun TemplatesScreen(navController: NavController) {
         },
         containerColor = MaterialTheme.colorScheme.background
     ) { innerPadding ->
+        // LazyColumn = danh sách cuộn chỉ dựng item đang thấy (hiệu năng cao). Bên trong dùng item{} để
+        // phát từng dòng: mỗi nhóm 1 tiêu đề + các mẫu. key giúp Compose nhận diện item khi danh sách đổi.
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(innerPadding),
             contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp),

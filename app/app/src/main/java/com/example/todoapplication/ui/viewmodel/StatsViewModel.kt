@@ -49,6 +49,7 @@ class StatsViewModel(
     private val _events = MutableSharedFlow<String>()
     val events: SharedFlow<String> = _events.asSharedFlow()
 
+    // Tải số liệu tổng hợp (streak, tổng hoàn thành...) từ server, ĐỒNG THỜI kích hoạt gom dữ liệu năm.
     fun loadSummary() {
         _uiState.update { it.copy(isLoadingStats = true) }
         viewModelScope.launch {
@@ -62,29 +63,35 @@ class StatsViewModel(
     private fun loadYearly() {
         viewModelScope.launch {
             val result = repo.completedTasks()
+            // map: "ngày" → số việc hoàn thành ngày đó. Ví dụ {"2026-07-08": 3, "2026-07-07": 1}.
             val map = HashMap<String, Int>()
             val year = Calendar.getInstance().get(Calendar.YEAR)
             result.getOrNull()?.forEach { task ->
+                // updatedAt của việc COMPLETED ~ thời điểm hoàn thành. Bỏ qua nếu parse lỗi.
                 val d = parseIso8601(task.updatedAt) ?: return@forEach
                 val cal = Calendar.getInstance().apply { time = d }
-                if (cal.get(Calendar.YEAR) == year) {
+                if (cal.get(Calendar.YEAR) == year) {   // chỉ tính việc trong năm nay
                     val key = "%04d-%02d-%02d".format(cal.get(Calendar.YEAR), cal.get(Calendar.MONTH) + 1, cal.get(Calendar.DAY_OF_MONTH))
-                    map[key] = (map[key] ?: 0) + 1
+                    map[key] = (map[key] ?: 0) + 1       // cộng dồn: chưa có thì 0, rồi +1
                 }
             }
+            // perfectDays = số NGÀY có hoàn thành ≥1 việc = số khóa trong map (map.size).
             _uiState.update { it.copy(yearly = map, perfectDays = map.size) }
         }
     }
 
+    // Đếm số việc hoàn thành trong 7 ngày gần nhất → mảng 7 phần tử để vẽ biểu đồ cột.
     fun loadWeekly() {
         _uiState.update { it.copy(isLoadingWeekly = true) }
         viewModelScope.launch {
             val result = repo.completedTasks()
-            val counts = MutableList(7) { 0 }
+            val counts = MutableList(7) { 0 }   // [0..6], index 6 = HÔM NAY, index 0 = 6 ngày trước
             val now = Date()
             result.getOrNull()?.forEach { task ->
                 val updated = parseIso8601(task.updatedAt) ?: return@forEach
+                // Khoảng cách theo ngày từ giờ về lúc hoàn thành (0 = hôm nay, 1 = hôm qua...).
                 val daysSinceNow = ((now.time - updated.time) / (1000 * 60 * 60 * 24)).toInt()
+                // Chỉ lấy trong 7 ngày; đảo index để hôm nay nằm cuối mảng (6 - daysSinceNow).
                 if (daysSinceNow in 0..6) counts[6 - daysSinceNow]++
             }
             _uiState.update { it.copy(weekly = counts, isLoadingWeekly = false) }
@@ -99,6 +106,8 @@ class StatsViewModel(
         }
     }
 
+    // Bấm "Phân tích": nhờ backend chạy vòng trích xuất trí nhớ (đọc log 30 ngày → AI → lưu Qdrant),
+    // rồi tải lại danh sách trí nhớ và báo kết quả tùy số lượng phân tích/rút ra.
     fun triggerExtraction() {
         _uiState.update { it.copy(isExtracting = true) }
         viewModelScope.launch {

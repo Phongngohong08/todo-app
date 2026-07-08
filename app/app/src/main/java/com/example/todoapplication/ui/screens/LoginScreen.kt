@@ -29,6 +29,7 @@ import com.example.todoapplication.ui.navigation.Screen
 import com.example.todoapplication.ui.viewmodel.AuthEvent
 import com.example.todoapplication.ui.viewmodel.LoginViewModel
 
+/** [TẦNG UI · MÀN HÌNH] Đăng nhập — nhập email/mật khẩu, gọi LoginViewModel.login(), điều hướng khi thành công. */
 @Composable
 fun LoginScreen(
     navController: NavController,

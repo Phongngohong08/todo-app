@@ -79,6 +79,7 @@ val TEMPLATE_GROUPS = listOf(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+/** [TẦNG UI · MÀN HÌNH] Mẫu nhiệm vụ — danh sách mẫu tĩnh (TEMPLATE_GROUPS); chọn 1 mẫu để tạo nhanh task. */
 fun TemplatesScreen(navController: NavController) {
     Scaffold(
         topBar = {

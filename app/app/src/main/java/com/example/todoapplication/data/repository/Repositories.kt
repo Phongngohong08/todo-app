@@ -14,6 +14,12 @@ import com.example.todoapplication.data.model.StatsSummary
 import com.example.todoapplication.data.model.User
 import com.example.todoapplication.data.model.UserPreferences
 
+/*
+ * [TẦNG DATA · REPOSITORY] Nhóm repository "mỏng" bọc quanh ApiService — nguồn dữ liệu cho ViewModel.
+ * Mỗi hàm gọi 1 endpoint qua safeApiCall{...} (trả Result, không ném exception).
+ * ViewModel chỉ nói chuyện với các repository này, không đụng thẳng ApiService.
+ */
+
 /** Đăng nhập / đăng ký — lưu phiên qua [SessionManager]. */
 class AuthRepository(
     private val api: ApiService,

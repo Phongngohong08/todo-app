@@ -15,6 +15,11 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.util.*
 
+/*
+ * [TẦNG VIEWMODEL] Màn Lịch: tải mọi task rồi KHAI TRIỂN các việc lặp (DAILY/WEEKLY/MONTHLY)
+ * thành từng ngày cụ thể trong 12 tháng tới, gom theo ngày (tasksByDay) để vẽ lên lịch.
+ */
+
 data class CalendarUiState(
     val isLoading: Boolean = true,
     /** Map "yyyy-MM-dd" (giờ địa phương) → các task đến hạn ngày đó. */

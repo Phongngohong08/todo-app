@@ -19,6 +19,11 @@ import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
 
+/*
+ * [TẦNG VIEWMODEL] Màn Kế hoạch ngày: xem lịch hôm nay (getDaily) hoặc nhờ AI tạo lại (generateDaily).
+ * Điểm đáng chú ý: phân loại kết quả (hết lượt AI / lỗi mạng / lịch rỗng / thành công) để báo đúng.
+ */
+
 data class DailyPlanUiState(
     val plan: DailyPlan? = null,
     val isLoading: Boolean = true

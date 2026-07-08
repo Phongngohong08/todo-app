@@ -5,6 +5,11 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 
+/**
+ * [TẦNG DATA · ROOM] Điểm gom database cục bộ: khai báo các bảng (entities) và cung cấp DAO.
+ * get() trả về một instance duy nhất toàn app (singleton) vì mở SQLite khá tốn kém.
+ * version = số phiên bản schema; đổi cấu trúc bảng thì tăng version.
+ */
 @Database(
     entities = [TaskCacheEntity::class, SubtaskEntity::class],
     version = 4,

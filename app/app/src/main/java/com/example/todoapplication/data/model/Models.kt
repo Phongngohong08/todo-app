@@ -2,6 +2,12 @@ package com.example.todoapplication.data.model
 
 import com.google.gson.annotations.SerializedName
 
+/*
+ * [TẦNG DATA · MODEL] Các "khuôn dữ liệu" (DTO) để chuyển JSON ↔ object Kotlin.
+ * Gson đọc/ghi tự động; @SerializedName("snake_case") nối tên JSON của backend với tên camelCase ở đây
+ * (giống struct tag `json:"..."` trong Go). Xxx = dữ liệu nhận về, XxxInput = dữ liệu gửi đi.
+ */
+
 data class User(
     val id: String,
     val email: String,

@@ -34,6 +34,7 @@ import com.example.todoapplication.data.repository.ThemeMode
 import com.example.todoapplication.ui.utils.categoryLabel
 import com.example.todoapplication.ui.viewmodel.SettingsViewModel
 
+/** [TẦNG UI · MÀN HÌNH] Cài đặt — chỉnh giờ làm việc/thời lượng (cho AI) và chọn theme Sáng/Tối. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(

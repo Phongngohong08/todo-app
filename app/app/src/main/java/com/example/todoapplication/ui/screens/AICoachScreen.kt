@@ -32,6 +32,7 @@ import com.example.todoapplication.ui.viewmodel.AICoachViewModel
 import com.example.todoapplication.ui.viewmodel.ChatUIModel
 import com.example.todoapplication.ui.viewmodel.SUGGESTED_PROMPTS
 
+/** [TẦNG UI · MÀN HÌNH] Chat với AI Coach — vẽ danh sách bong bóng tin nhắn từ AICoachViewModel. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AICoachScreen(

@@ -33,6 +33,7 @@ import com.example.todoapplication.ui.viewmodel.DailyPlanViewModel
 import java.text.SimpleDateFormat
 import java.util.*
 
+/** [TẦNG UI · MÀN HÌNH] Kế hoạch ngày — hiển thị các khung giờ AI xếp; nút "Tạo lại" gọi regenerate(). */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DailyPlanScreen(

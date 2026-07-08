@@ -24,7 +24,13 @@ import com.example.todoapplication.ui.navigation.Screen
 import com.example.todoapplication.ui.screens.*
 import com.example.todoapplication.ui.theme.TodoApplicationTheme
 
+/**
+ * [TẦNG UI · ĐIỂM VÀO] Activity duy nhất của app (kiến trúc single-activity).
+ * Nhiệm vụ: dựng cây UI bằng Compose và đóng vai "router" (NavHost) chuyển giữa các màn.
+ * Mọi "màn hình" (Login, TaskList, Stats...) là Composable đổi chỗ bên trong Activity này.
+ */
 class MainActivity : ComponentActivity() {
+    // onCreate: hệ điều hành gọi khi tạo màn. Đây là nơi khai báo toàn bộ giao diện.
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -64,6 +70,7 @@ class MainActivity : ComponentActivity() {
                         Screen.Login.route
                     }
 
+                    // NavHost = "bảng định tuyến": route nào → hiển thị Composable nào (như router ở backend)
                     NavHost(
                         navController = navController,
                         startDestination = startDestination

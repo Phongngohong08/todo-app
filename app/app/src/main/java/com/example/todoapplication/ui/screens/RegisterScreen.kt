@@ -29,6 +29,7 @@ import com.example.todoapplication.ui.navigation.Screen
 import com.example.todoapplication.ui.viewmodel.AuthEvent
 import com.example.todoapplication.ui.viewmodel.RegisterViewModel
 
+/** [TẦNG UI · MÀN HÌNH] Đăng ký tài khoản — gọi RegisterViewModel.register(), thành công thì về màn đăng nhập. */
 @Composable
 fun RegisterScreen(
     navController: NavController,

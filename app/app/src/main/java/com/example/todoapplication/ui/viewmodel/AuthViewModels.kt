@@ -14,6 +14,11 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
+/*
+ * [TẦNG VIEWMODEL] Nghiệp vụ cho hai màn Đăng nhập / Đăng ký.
+ * Kiểm tra đầu vào → gọi AuthRepository → phát AuthEvent (thành công/lỗi) để màn hiện Toast + điều hướng.
+ */
+
 /** Sự kiện một lần cho màn xác thực (toast + điều hướng). */
 sealed interface AuthEvent {
     data class Success(val message: String) : AuthEvent

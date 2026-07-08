@@ -42,6 +42,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import java.util.*
 
+/** [TẦNG UI · MÀN HÌNH] Thống kê — biểu đồ tuần, bản đồ nhiệt cả năm, và khu Trí nhớ AI (StatsViewModel). */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun StatsScreen(

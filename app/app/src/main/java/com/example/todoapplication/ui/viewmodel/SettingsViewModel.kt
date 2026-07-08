@@ -16,6 +16,11 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+/*
+ * [TẦNG VIEWMODEL] Màn Cài đặt: tải/sửa/lưu cấu hình cá nhân (giờ làm việc, thời lượng mỗi việc)
+ * — dữ liệu này để backend AI dựa vào mà xếp Kế hoạch ngày. get/update qua endpoint preferences.
+ */
+
 data class SettingsUiState(
     val morningStart: String = "08:00",
     val eveningEnd: String = "18:00",

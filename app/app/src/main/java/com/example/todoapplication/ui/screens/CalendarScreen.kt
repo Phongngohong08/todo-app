@@ -30,6 +30,7 @@ import com.example.todoapplication.ui.theme.*
 import com.example.todoapplication.ui.viewmodel.CalendarViewModel
 import java.util.*
 
+/** [TẦNG UI · MÀN HÌNH] Lịch tháng — hiển thị việc theo ngày (tasksByDay từ CalendarViewModel). */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CalendarScreen(

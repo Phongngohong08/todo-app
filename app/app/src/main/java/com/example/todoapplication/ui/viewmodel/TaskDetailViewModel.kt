@@ -19,6 +19,11 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
+/*
+ * [TẦNG VIEWMODEL] Nghiệp vụ màn chi tiết công việc: tải task để sửa, tạo mới hoặc cập nhật,
+ * và quản lý các "bước con" (subtask) lưu cục bộ trong Room. Phát TaskDetailEvent để màn phản ứng.
+ */
+
 sealed interface TaskDetailEvent {
     data class Loaded(val task: Task) : TaskDetailEvent
     data object Saved : TaskDetailEvent

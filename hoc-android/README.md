@@ -44,6 +44,10 @@ Tin tốt: **80% kiến thức backend của bạn dùng lại được**. App n
 | 11 | [Kiểm thử (Testing)](./11-testing.md) | Unit test ViewModel & logic thuần | 🔹 Tham khảo |
 | 12 | [Bài tập: thêm 1 tính năng từ A→Z](./12-bai-tap-thuc-hanh.md) | Tự tay xâu chuỗi mọi tầng | 🎯 Thực hành |
 
+## 🎤 Chuẩn bị thuyết trình?
+
+Xem thư mục [thuyet-trinh/](./thuyet-trinh/) — **phương pháp truy vết code cho từng chức năng** để trả lời tự tin khi bị hỏi *"tính năng này làm thế nào, code ở đâu?"*. Có sẵn thẻ truy vết (sơ đồ + file:dòng + câu hỏi thường gặp) cho mọi chức năng của app.
+
 ## Cách học hiệu quả nhất
 
 1. **Đọc bài học → mở file thật được trích dẫn → đối chiếu.** Đừng chỉ đọc lý thuyết.

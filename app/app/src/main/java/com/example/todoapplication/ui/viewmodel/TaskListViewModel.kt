@@ -23,25 +23,33 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+// Toàn bộ những gì màn danh sách cần để tự vẽ, gom vào MỘT object ("single source of truth").
 data class TaskListUiState(
     val tasks: List<Task> = emptyList(),
     val isLoading: Boolean = true,
-    val isOffline: Boolean = false,
+    val isOffline: Boolean = false,          // true khi đang đọc từ cache (mất mạng) → UI hiện banner
     val quickAddLoading: Boolean = false,
     val subtaskProgress: Map<String, SubtaskProgress> = emptyMap()
 )
 
+// Sự kiện DÙNG-MỘT-LẦN (Toast / điều hướng) — khác state, không lặp lại khi màn vẽ lại.
 sealed interface TaskListEvent {
     data class Message(val text: String) : TaskListEvent
     data class QuickAddReady(val parsed: ParsedTask) : TaskListEvent
 }
 
+/**
+ * [TẦNG VIEWMODEL] "Bộ não" của màn danh sách công việc.
+ * Giữ state (uiState) + nghiệp vụ; nhận repository qua constructor (dễ test).
+ * Quy tắc: UI đọc `uiState`, gọi các hàm public bên dưới; ViewModel là nơi DUY NHẤT đổi state.
+ */
 class TaskListViewModel(
     private val repo: TaskRepository,
     private val subtaskRepository: SubtaskRepository,
     private val aiRepository: AiRepository,
     private val sessionManager: SessionManager
 ) : ViewModel() {
+    // Mẫu chuẩn: _uiState (private, ghi được) + uiState (public, chỉ đọc) → UI không tự sửa được state.
     private val _uiState = MutableStateFlow(TaskListUiState())
     val uiState: StateFlow<TaskListUiState> = _uiState.asStateFlow()
 
@@ -54,13 +62,14 @@ class TaskListViewModel(
     private var lastCategory: String? = null
     private var lastQuery: String? = null
 
+    // Tải danh sách theo bộ lọc/từ khóa. Bật loading NGAY, rồi tải nền, rồi đổ kết quả vào state.
     fun loadTasks(categoryFilter: String, query: String) {
         lastCategory = if (categoryFilter == "ALL") null else categoryFilter
         lastQuery = query.trim().ifEmpty { null }
         _uiState.update { it.copy(isLoading = true) }
-        viewModelScope.launch {
+        viewModelScope.launch {                        // coroutine: chạy nền, không chặn UI
             try {
-                val result = repo.loadTasks(lastCategory, lastQuery)
+                val result = repo.loadTasks(lastCategory, lastQuery)   // suspend: chờ mạng/cache
                 val progress = subtaskRepository.progressByTask()
                 _uiState.update { it.copy(tasks = result.tasks, isLoading = false, isOffline = result.isOffline, subtaskProgress = progress) }
             } catch (e: Exception) {

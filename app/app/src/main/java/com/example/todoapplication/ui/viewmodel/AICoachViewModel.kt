@@ -32,9 +32,13 @@ private object ChatHistoryStore {
 
 data class AICoachUiState(
     val messages: List<ChatUIModel> = ChatHistoryStore.messages,
-    val isThinking: Boolean = false
+    val isThinking: Boolean = false          // true khi đang chờ AI trả lời → hiện "..."
 )
 
+/**
+ * [TẦNG VIEWMODEL] Màn AI Coach (chat): gửi tin nhắn tới backend AI, nhận câu trả lời.
+ * Lịch sử chat giữ ở ChatHistoryStore (cấp tiến trình) để không mất khi chuyển màn.
+ */
 class AICoachViewModel(private val repo: AiRepository) : ViewModel() {
     private val _uiState = MutableStateFlow(AICoachUiState())
     val uiState: StateFlow<AICoachUiState> = _uiState.asStateFlow()

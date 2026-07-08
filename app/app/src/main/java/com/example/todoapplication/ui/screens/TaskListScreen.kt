@@ -58,15 +58,22 @@ import sh.calvin.reorderable.rememberReorderableLazyListState
 import java.text.SimpleDateFormat
 import java.util.*
 
+/**
+ * [TẦNG UI · MÀN HÌNH] Màn chính: danh sách công việc + tìm kiếm/lọc, tạo nhanh, kéo-thả, xem offline.
+ * Quy tắc Compose: màn "vẽ theo state" (uiState) và chỉ GỌI HÀM ViewModel khi người dùng thao tác
+ * ("state xuống, event lên"). Không tự chứa nghiệp vụ.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TaskListScreen(
     navController: NavController,
+    // Lấy ViewModel (sống-dai qua các lần vẽ lại); Factory nạp sẵn repository từ ServiceLocator.
     taskListViewModel: TaskListViewModel = viewModel(factory = TaskListViewModel.Factory)
 ) {
     val context = LocalContext.current
     val userName = taskListViewModel.userName
 
+    // Quan sát state: mỗi lần ViewModel đổi state, dòng này khiến màn tự vẽ lại phần liên quan.
     val state by taskListViewModel.uiState.collectAsStateWithLifecycle()
     val tasks = state.tasks
     val isLoading = state.isLoading

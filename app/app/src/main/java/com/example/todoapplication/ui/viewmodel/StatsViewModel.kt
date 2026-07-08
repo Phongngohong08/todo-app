@@ -20,6 +20,11 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.util.*
 
+/*
+ * [TẦNG VIEWMODEL] Màn Thống kê: tải số liệu tổng hợp + việc đã hoàn thành, rồi TỰ GOM ở client
+ * thành biểu đồ tuần, bản đồ nhiệt cả năm và "ngày hoàn hảo". Cũng quản lý phần Trí nhớ AI.
+ */
+
 data class StatsUiState(
     val summary: StatsSummary? = null,
     val isLoadingStats: Boolean = false,

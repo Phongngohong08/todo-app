@@ -46,6 +46,7 @@ import com.example.todoapplication.ui.viewmodel.TaskDetailViewModel
 import java.text.SimpleDateFormat
 import java.util.*
 
+/** [TẦNG UI · MÀN HÌNH] Chi tiết công việc — tạo mới (taskId="new") hoặc sửa; kèm danh sách bước con. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TaskDetailScreen(

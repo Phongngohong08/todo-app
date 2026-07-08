@@ -8,7 +8,11 @@ import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
 
-/** Logic nghiệp vụ cho danh sách công việc — tách khỏi UI để test được độc lập. */
+/*
+ * [TẦNG DOMAIN] Logic nghiệp vụ THUẦN cho danh sách công việc (quá hạn, sắp xếp, gợi ý...).
+ * Vào dữ liệu → ra kết quả, KHÔNG đụng Android/mạng nên test cực nhanh (xem TaskListLogicTest).
+ * Các hàm dạng "Task.xxx()" là extension function — gắn thêm hành vi vào kiểu Task có sẵn.
+ */
 
 fun Task.isOverdue(): Boolean {
     if (status == "COMPLETED") return false

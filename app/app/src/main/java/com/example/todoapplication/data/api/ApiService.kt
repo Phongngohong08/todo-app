@@ -4,6 +4,12 @@ import com.example.todoapplication.data.model.*
 import retrofit2.Response
 import retrofit2.http.*
 
+/**
+ * [TẦNG DATA · API] "Hợp đồng" giữa app và backend Go — khai báo mọi endpoint bằng annotation.
+ * Retrofit tự sinh phần hiện thực. Đọc annotation như định nghĩa route: @POST/@GET + path,
+ * @Path = tham số đường dẫn, @Query = query string, @Body = JSON body, suspend = chạy nền.
+ * Mỗi hàm ở đây tương ứng 1-1 với một route trong backend/.
+ */
 interface ApiService {
     // Auth
     @POST("auth/register")

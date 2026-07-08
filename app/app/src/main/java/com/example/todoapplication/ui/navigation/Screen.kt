@@ -1,5 +1,10 @@
 package com.example.todoapplication.ui.navigation
 
+/**
+ * [TẦNG UI · ĐIỀU HƯỚNG] Danh mục tập trung các "route" (đường dẫn) của app.
+ * Gom vào một chỗ để tránh gõ chuỗi lung tung; dùng Screen.X.route thay vì "task_list".
+ * Route có {tham_số} thì kèm hàm createRoute(...) để dựng đường dẫn cụ thể.
+ */
 sealed class Screen(val route: String) {
     object Login : Screen("login")
     object Register : Screen("register")

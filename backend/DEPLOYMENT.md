@@ -72,23 +72,24 @@ docker compose -f docker-compose.prod.yml up -d --build
 docker compose -f docker-compose.prod.yml ps     # kiểm tra postgres/qdrant/api đang chạy
 ```
 
-**Bắt buộc chạy migrations** (nếu bỏ qua, mọi request sẽ trả `500 relation "users" does not exist`):
+**Migrations chạy tự động**: các file `migrations/*.up.sql` được nhúng vào binary. Mỗi lần khởi động, API áp các
+version còn thiếu theo thứ tự và ghi lại vào bảng `schema_migrations`. DB cũ đã áp tay tới `000005` được
+nhận diện và đánh dấu sẵn, nên chỉ `000006` trở đi được chạy. Kiểm tra trong log:
 
 ```bash
-for f in 000001_init 000002_add_tags_recurrence 000003_simplify_tasks \
-         000004_custom_category 000005_reminder_and_weekdays; do
-  docker cp migrations/${f}.up.sql prod-postgres:/tmp/m.sql
-  docker exec -i prod-postgres psql -U postgres -d todo_db -f /tmp/m.sql
-done
+docker compose -f docker-compose.prod.yml logs api | grep -i migration
+# "Applied migration 000006_token_version.up.sql" rồi "Database schema is up to date"
 ```
 
-> Áp **đúng thứ tự số** `000001 → 000005`. Container Postgres tên là `prod-postgres`
-> (định nghĩa trong `docker-compose.prod.yml`).
+> Muốn tự áp migration bằng tay thì đặt `AUTO_MIGRATE=false`.
+>
+> API **từ chối khởi động** nếu cấu hình không an toàn (vd `JWT_SECRET` trống, là giá trị mẫu, hoặc ngắn hơn 32 ký tự)
+> hoặc không kết nối được Postgres sau ~20 giây. Xem nguyên nhân bằng `docker compose -f docker-compose.prod.yml logs api`.
 
 Kiểm tra nội bộ (backend nghe ở host `127.0.0.1:8080`):
 ```bash
-curl -i http://127.0.0.1:8080/api/v1/
-# Trả về "404 page not found" của Gin = backend CHẠY ĐÚNG (route gốc không tồn tại là bình thường)
+curl -i http://127.0.0.1:8080/healthz
+# {"status":"ok"} = backend chạy và kết nối được Postgres
 ```
 
 ---
@@ -255,7 +256,8 @@ docker compose -f docker-compose.prod.yml restart api
 
 | Triệu chứng | Nguyên nhân | Cách xử lý |
 | :--- | :--- | :--- |
-| `500 relation "users" does not exist` | Chưa chạy migrations | Chạy lại **Bước 3** (migrations) |
+| `500 relation "users" does not exist` | Đặt `AUTO_MIGRATE=false` mà chưa áp migration | Bật lại `AUTO_MIGRATE=true` hoặc áp tay các file trong `migrations/` |
+| Container `prod-api` khởi động lại liên tục | Cấu hình bị từ chối (JWT_SECRET...) hoặc không kết nối được Postgres | Xem `docker compose -f docker-compose.prod.yml logs api` |
 | `unknown shorthand flag: 'f' in -f` | Thiếu Docker Compose v2 | `sudo apt install -y docker-compose-v2` |
 | `curl` port 80 timeout / Certbot `Timeout during connect` | Firewall chặn 80/443 hoặc DNS trỏ sai IP | Mở Security Group + `ufw`; đối chiếu IP public với bản ghi A (**Bước 4.1**) |
 | `502 Bad Gateway` từ nginx | Container `prod-api` chết | `docker compose -f docker-compose.prod.yml logs api` |

@@ -8,7 +8,7 @@
 
 1. **Quản lý Công việc (CRUD)**: Tạo mới, xem, cập nhật, xóa và hoàn thành công việc. Trạng thái được rút gọn còn `TODO`/`COMPLETED`.
 2. **Phân loại theo Danh mục & Tìm kiếm (Category & Search)**: Mỗi task thuộc một **danh mục** (mặc định `PERSONAL`/`WORK`/`OTHER`, nhưng cho phép **danh mục tự do** do người dùng tự đặt); lọc danh sách theo `?category=` và tìm kiếm `?q=` theo tiêu đề/mô tả.
-3. **Task Lặp lại (Recurring)**: Task có thể lặp `DAILY`/`WEEKLY`/`MONTHLY`; lặp tuần có thể chọn **các thứ cụ thể** (`recurrence_days`, vd `"MON,WED,FRI"`). Khi hoàn thành một task lặp (có hạn chót), hệ thống tự sinh occurrence kế tiếp với hạn chót dời đúng chu kỳ/thứ. Mỗi task còn có **`reminder_offset_minutes`** để nhắc trước hạn (do client lập lịch local notification).
+3. **Task Lặp lại (Recurring)**: Task có thể lặp `DAILY`/`WEEKLY`/`MONTHLY`; lặp tuần có thể chọn **các thứ cụ thể** (`recurrence_days`, vd `"MON,WED,FRI"`). Khi hoàn thành một task lặp (có hạn chót), hệ thống tự sinh lần kế tiếp (id tất định, hạn luôn ở tương lai, tính theo `APP_TIMEZONE`); mở lại việc đã xong sẽ thu hồi lần kế tiếp chưa làm. Mỗi task còn có **`reminder_offset_minutes`** để nhắc trước hạn (do client lập lịch local notification).
 4. **AI Quick Add (Tạo task bằng ngôn ngữ tự nhiên)**: Gửi một câu mô tả tự nhiên, Gemini tách thành task có cấu trúc (tiêu đề, độ ưu tiên, hạn chót, **danh mục**) để người dùng xác nhận trước khi lưu.
 5. **Theo dõi Hoạt động (Activity Logging)**: Tự động lưu vết hành vi (tạo task `CREATED`, hoàn thành task `COMPLETED`) làm dữ liệu phân tích thói quen cho AI.
 6. **Lập Kế hoạch AI Hàng ngày (Daily AI Planning)**: Tự động chạy ngầm vào lúc `04:00 AM` hàng ngày để tạo lịch trình tối ưu dựa trên danh sách việc chưa hoàn thành, **độ ưu tiên + hạn chót**, cài đặt giờ giấc cá nhân và phân tích thói quen lưu trong bộ nhớ dài hạn.
@@ -55,9 +55,16 @@ Tạo một tệp tin `.env` trong thư mục gốc của dự án (hoặc thi�
 | `QDRANT_HOST` | Địa chỉ máy chủ Vector DB Qdrant | `localhost` |
 | `QDRANT_PORT` | Cổng dịch vụ Qdrant | `6333` |
 | `GEMINI_API_KEY`| Khóa bí mật Google Gemini (Bắt buộc đối với các tính năng AI) | *Không có* |
-| `JWT_SECRET` | Khóa bí mật dùng để ký mã đăng nhập JWT | *super_secret_key_change_me* |
+| `JWT_SECRET` | Khóa ký JWT. **Bắt buộc**, tối thiểu 32 ký tự (`openssl rand -hex 32`); trống/giá trị mẫu thì API từ chối khởi động | *Không có* |
 | `ACCESS_TOKEN_TTL` | Thời gian sống của access token (định dạng Go duration, vd `15m`, `1h`) | `15m` |
 | `REFRESH_TOKEN_TTL` | Thời gian sống của refresh token (định dạng Go duration, vd `720h`) | `720h` (30 ngày) |
+| `APP_TIMEZONE` | Múi giờ người dùng (IANA): giờ chạy job 01:00/04:00, "hôm nay" mặc định, mốc reset hạn mức AI | `Asia/Ho_Chi_Minh` |
+| `AUTO_MIGRATE` | Tự áp migration còn thiếu khi khởi động | `true` |
+| `AI_RATE_PER_MINUTE` | Số lượt AI mỗi phút cho một người dùng | `6` |
+| `AI_DAILY_LIMIT_PER_USER` | Số lượt AI mỗi ngày cho một người dùng (`0` = không giới hạn) | `30` |
+| `TRUSTED_PROXIES` | IP/CIDR reverse proxy được tin để đọc IP thật (rate limit theo IP) | `127.0.0.1,::1,172.16.0.0/12` |
+| `CORS_ALLOWED_ORIGINS` | Origin trình duyệt được phép gọi API; trống = tắt CORS (app Android không cần) | *(trống)* |
+| `GIN_MODE` | Đặt `release` ở production (docker-compose.prod.yml đã đặt sẵn) | `debug` |
 
 ---
 
@@ -73,10 +80,24 @@ Hệ thống dùng mô hình **access token + refresh token** (JWT HS256, không
 | `POST` | `/api/v1/auth/register` | Đăng ký tài khoản mới |
 | `POST` | `/api/v1/auth/login` | Đăng nhập, trả về `token`, `refresh_token`, `expires_in` và thông tin `user` |
 | `POST` | `/api/v1/auth/refresh` | Gửi `{ "refresh_token": "..." }`, nhận về cặp `token` + `refresh_token` mới (sliding expiration) |
+| `POST` | `/api/v1/auth/logout` | Gửi `{ "refresh_token": "..." }`: thu hồi **mọi** refresh token của tài khoản (đăng xuất khỏi tất cả thiết bị). Luôn trả `204` |
 
 Khi gặp `401` ở bất kỳ endpoint được bảo vệ nào, client nên tự động gọi `/auth/refresh` để lấy access token mới rồi phát lại request; nếu refresh token cũng hết hạn/không hợp lệ thì buộc người dùng đăng nhập lại. (Ứng dụng Android đã hiện thực luồng này tự động qua OkHttp `Authenticator`.)
 
-> **Lưu ý:** refresh token là JWT không lưu DB nên **không thể thu hồi riêng lẻ** trước khi hết hạn. Nếu cần tính năng "đăng xuất tất cả thiết bị"/thu hồi, hãy chuyển sang lưu refresh token (đã hash) trong cơ sở dữ liệu.
+> **Thu hồi:** mỗi refresh token mang claim `ver` = `users.token_version` lúc phát hành. `/auth/logout` tăng `token_version`, nên mọi refresh token cũ bị từ chối. Access token đã phát vẫn dùng được tới khi hết `ACCESS_TOKEN_TTL` (mặc định 15 phút), vì vậy giữ TTL này ngắn.
+
+### Giới hạn tần suất (HTTP 429 + header `Retry-After`)
+
+| Phạm vi | Giới hạn mặc định |
+| :--- | :--- |
+| `/auth/login` (theo IP) | 5 lần liền, sau đó 5 lần/phút |
+| `/auth/register` (theo IP) | 3 lần liền, sau đó 1 lần/phút |
+| `/auth/refresh`, `/auth/logout` (theo IP) | 10 lần liền, sau đó 30 lần/phút |
+| Mọi API đã đăng nhập (theo user) | 60 request liền, sau đó 5 request/giây |
+| AI: chat, parse-task, lập lịch, phân tích trí nhớ (theo user) | `AI_RATE_PER_MINUTE` lượt/phút và `AI_DAILY_LIMIT_PER_USER` lượt/ngày (reset 0h theo `APP_TIMEZONE`) |
+| `/ai/memories/trigger-extraction` (theo user) | Thêm: 2 lần liền, sau đó 1 lần/20 phút |
+
+Lập lịch chỉ trừ lượt AI khi người dùng còn việc chưa xong (không có việc thì trả lịch rỗng, không gọi AI). Bộ đếm nằm trong bộ nhớ tiến trình và reset khi khởi động lại; nếu chạy nhiều instance thì cần chuyển sang Redis.
 
 ---
 
@@ -90,10 +111,11 @@ Tất cả endpoint dưới đây (trừ nhóm `/auth`) yêu cầu header `Autho
 | :--- | :--- | :--- |
 | `POST` | `/api/v1/tasks` | Tạo task. Body: `title`, `description`, `priority` (`LOW`/`MEDIUM`/`HIGH`), `due_date`, **`category`** (chuỗi tự do, mặc định `OTHER`), `recurrence` (`NONE`/`DAILY`/`WEEKLY`/`MONTHLY`), **`recurrence_days`** (vd `"MON,WED,FRI"` khi lặp tuần), **`reminder_offset_minutes`** (số phút nhắc trước hạn) |
 | `GET` | `/api/v1/tasks` | Liệt kê task. Query: `status` (`TODO`/`COMPLETED`), `due_date_before`, **`q`** (tìm trong tiêu đề/mô tả), **`category`** (lọc theo danh mục) |
+| `GET` | `/api/v1/tasks/sync?since=<server_time>` | **Đồng bộ offline**: trả `{ tasks, deleted_ids, server_time }` — task thay đổi (và bị xóa) sau mốc `since`; bỏ `since` = tải toàn bộ. Client lưu `server_time` làm `since` cho lần sau |
 | `GET` | `/api/v1/tasks/{id}` | Chi tiết một task |
-| `PUT` | `/api/v1/tasks/{id}` | Cập nhật task (gồm `category`, `recurrence`, `recurrence_days`, `reminder_offset_minutes`) |
-| `DELETE` | `/api/v1/tasks/{id}` | Xóa task |
-| `POST` | `/api/v1/tasks/{id}/complete` | Đánh dấu hoàn thành. Khi `complete` một task lặp (có `due_date`), backend tự tạo occurrence kế tiếp |
+| `PUT` | `/api/v1/tasks/{id}` | Ghi **toàn bộ** trạng thái task, **tạo mới nếu id chưa có** (idempotent — id do app sinh khi offline). Body như POST, thêm `status` (`TODO`/`COMPLETED` — chuyển về `TODO` = mở lại), `completed_at`, `sort_order`, `subtasks` (`[{id,title,done,position}]`), `spawned_from`. Trường bỏ trống giữ nguyên giá trị cũ |
+| `DELETE` | `/api/v1/tasks/{id}` | Xóa **mềm** (để thiết bị khác biết khi đồng bộ); xóa lại lần nữa vẫn trả thành công |
+| `POST` | `/api/v1/tasks/{id}/complete` | Đánh dấu hoàn thành. Task lặp (có `due_date`) sinh lần kế tiếp với **id tất định** `UUIDv3(namespace, id cha)` và hạn luôn ở tương lai — app tính giống hệt nên lần lặp tạo lúc offline không bị nhân đôi |
 
 ### AI
 
@@ -101,12 +123,13 @@ Tất cả endpoint dưới đây (trừ nhóm `/auth`) yêu cầu header `Autho
 | :--- | :--- | :--- |
 | `POST` | `/api/v1/ai/parse-task` | **Quick Add**: gửi `{ "text": "...", "local_time": "<RFC3339>" }`, nhận về task có cấu trúc (`title`, `description`, `priority`, `due_date`, `category`). **Không** tự lưu task |
 | `POST` | `/api/v1/ai/chat` | Trò chuyện với AI Coach |
+| `GET` | `/api/v1/ai/chat/history?limit=50` | Lịch sử chat (cũ → mới) để app hiển thị lại cuộc trò chuyện |
 | `GET` · `DELETE` | `/api/v1/ai/memories` · `/memories/{id}` | Xem / xóa trí nhớ dài hạn |
 | `POST` | `/api/v1/ai/memories/trigger-extraction` | Phân tích thủ công (nhìn lại 30 ngày), trả `{ analyzed, extracted }` |
 
-> Các endpoint khác: `GET/PUT /preferences`, `GET/POST /plans/daily`, `GET /stats/summary`.
+> Các endpoint khác: `GET/PUT /categories` (danh mục tự tạo, `{ "categories": [...] }`, PUT thay toàn bộ), `GET/PUT /preferences` (giờ dạng `HH:mm`, kết thúc sau bắt đầu, `work_duration_preference` 15–480 phút), `GET /plans/daily?date=YYYY-MM-DD&tz=<IANA>&local_time=HH:mm`, `POST /plans/daily/generate` (cùng query), `GET /stats/summary?tz=<IANA>` (gom biểu đồ 7 ngày theo múi giờ người dùng; thiếu `tz` thì dùng `APP_TIMEZONE`), `GET /healthz`.
 
-> **Lưu ý client-side:** Biểu đồ năng suất 7 ngày và tính điểm ưu tiên AI trên ứng dụng Android đều tính **client-side** từ dữ liệu đã có (`GET /tasks?status=COMPLETED`) — không cần endpoint riêng.
+> **Lưu ý client-side:** App Android theo kiến trúc offline-first — thống kê, biểu đồ và điểm ưu tiên AI được tính trên máy từ database cục bộ (đồng bộ qua `/tasks/sync`), nên xem được khi offline. `GET /stats/summary` vẫn có cho client khác.
 
 ---
 
@@ -118,30 +141,16 @@ Khởi chạy PostgreSQL và Qdrant local bằng Docker Compose:
 docker compose up -d
 ```
 
-### 2. Khởi tạo Cấu trúc Bảng dữ liệu (Migrations)
-Áp dụng **lần lượt** các tệp SQL trong thư mục `migrations/` theo thứ tự số. Ví dụ dùng Docker CLI (không cần cài psql trên máy):
+### 2. Cấu hình & Migrations
+Tạo file `.env` rồi đặt `JWT_SECRET` (API **từ chối khởi động** nếu trống, là giá trị mẫu hoặc ngắn hơn 32 ký tự):
 ```bash
-# 000001 - schema khởi tạo
-docker cp migrations/000001_init.up.sql todo-postgres:/tmp/init.sql
-docker exec -i todo-postgres psql -U postgres -d todo_db -f /tmp/init.sql
-
-# 000002 - thêm cột tags (JSONB) và recurrence cho tasks
-docker cp migrations/000002_add_tags_recurrence.up.sql todo-postgres:/tmp/m2.sql
-docker exec -i todo-postgres psql -U postgres -d todo_db -f /tmp/m2.sql
-
-# 000003 - đơn giản hoá task: thay tags -> category, bỏ duration/khung giờ, status còn TODO/COMPLETED
-docker cp migrations/000003_simplify_tasks.up.sql todo-postgres:/tmp/m3.sql
-docker exec -i todo-postgres psql -U postgres -d todo_db -f /tmp/m3.sql
-
-# 000004 - cho phép danh mục tự do (bỏ ràng buộc CHECK, nới VARCHAR)
-docker cp migrations/000004_custom_category.up.sql todo-postgres:/tmp/m4.sql
-docker exec -i todo-postgres psql -U postgres -d todo_db -f /tmp/m4.sql
-
-# 000005 - thêm lời nhắc (reminder_offset_minutes) và lặp theo thứ (recurrence_days)
-docker cp migrations/000005_reminder_and_weekdays.up.sql todo-postgres:/tmp/m5.sql
-docker exec -i todo-postgres psql -U postgres -d todo_db -f /tmp/m5.sql
+cp .env.example .env
+# Điền JWT_SECRET=<kết quả của: openssl rand -hex 32> và GEMINI_API_KEY
 ```
-> Áp **lần lượt theo thứ tự số**. Migration `000003`/`000004` chuyển schema từ mô hình cũ (tags/duration) sang mô hình đơn giản hoá (category); `000005` thêm trường lời nhắc + lặp theo thứ. **Với DB đã có dữ liệu, bắt buộc áp đủ tới `000005` trước khi chạy bản backend mới**, nếu không các truy vấn task sẽ lỗi thiếu/thừa cột.
+
+Không cần chạy migration bằng tay: các file `migrations/*.up.sql` được nhúng vào binary, và API tự áp các version còn thiếu mỗi lần khởi động (ghi lại trong bảng `schema_migrations`). DB cũ đã áp tay tới `000005` được nhận diện và đánh dấu sẵn. Đặt `AUTO_MIGRATE=false` nếu muốn tự quản lý migration.
+
+> Thêm migration mới: tạo `migrations/000007_<mô_tả>.up.sql` (+ `.down.sql`), version tăng dần, không sửa file đã phát hành.
 
 ### 3. Cài đặt các thư viện Go Dependencies
 ```bash
@@ -204,23 +213,11 @@ newgrp docker
 docker compose -f docker-compose.prod.yml up -d --build
 ```
 
-### Bước 4: Khởi tạo dữ liệu cơ sở dữ liệu (Migrations)
-Sau khi container Postgres đã chạy, sao chép và thực thi **lần lượt** các file migration:
+### Bước 4: Kiểm tra migration & sức khỏe dịch vụ
+Migration được API tự áp khi khởi động (không cần `docker cp`/`psql`). Kiểm tra:
 ```bash
-docker cp migrations/000001_init.up.sql prod-postgres:/tmp/init.sql
-docker exec -i prod-postgres psql -U postgres -d todo_db -f /tmp/init.sql
-
-docker cp migrations/000002_add_tags_recurrence.up.sql prod-postgres:/tmp/m2.sql
-docker exec -i prod-postgres psql -U postgres -d todo_db -f /tmp/m2.sql
-
-docker cp migrations/000003_simplify_tasks.up.sql prod-postgres:/tmp/m3.sql
-docker exec -i prod-postgres psql -U postgres -d todo_db -f /tmp/m3.sql
-
-docker cp migrations/000004_custom_category.up.sql prod-postgres:/tmp/m4.sql
-docker exec -i prod-postgres psql -U postgres -d todo_db -f /tmp/m4.sql
-
-docker cp migrations/000005_reminder_and_weekdays.up.sql prod-postgres:/tmp/m5.sql
-docker exec -i prod-postgres psql -U postgres -d todo_db -f /tmp/m5.sql
+docker compose -f docker-compose.prod.yml logs api | grep -i migration
+curl -i http://127.0.0.1:8080/healthz   # {"status":"ok"}
 ```
 
 ### Bước 5: Xem logs và quản lý trạng thái

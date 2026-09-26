@@ -3,6 +3,7 @@ package db
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -17,144 +18,156 @@ func NewPostgresTaskRepository(db *sql.DB) *PostgresTaskRepository {
 	return &PostgresTaskRepository{db: db}
 }
 
-func (r *PostgresTaskRepository) Create(ctx context.Context, task *domain.Task) error {
-	query := `
-		INSERT INTO tasks (id, user_id, title, description, priority, due_date, status, category, recurrence, recurrence_days, reminder_offset_minutes, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-	`
-	_, err := r.db.ExecContext(ctx, query,
-		task.ID, task.UserID, task.Title, task.Description,
-		task.Priority, task.DueDate,
-		task.Status, task.Category, task.Recurrence,
-		task.RecurrenceDays, task.ReminderOffsetMinutes,
-		task.CreatedAt, task.UpdatedAt,
-	)
-	return err
+const taskColumns = `id, user_id, title, description, priority, due_date, status, category, recurrence,
+	recurrence_days, reminder_offset_minutes, completed_at, sort_order, subtasks, spawned_from,
+	created_at, updated_at, deleted_at`
+
+type rowScanner interface {
+	Scan(dest ...any) error
 }
 
-func (r *PostgresTaskRepository) GetByID(ctx context.Context, id string) (*domain.Task, error) {
-	query := `
-		SELECT id, user_id, title, description, priority, due_date, status, category, recurrence, recurrence_days, reminder_offset_minutes, created_at, updated_at
-		FROM tasks
-		WHERE id = $1
-	`
-	row := r.db.QueryRowContext(ctx, query, id)
-
-	var task domain.Task
+func scanTask(row rowScanner) (*domain.Task, error) {
+	var (
+		task        domain.Task
+		description sql.NullString
+		subtasks    []byte
+		spawnedFrom sql.NullString
+	)
 	err := row.Scan(
-		&task.ID, &task.UserID, &task.Title, &task.Description,
-		&task.Priority, &task.DueDate,
-		&task.Status, &task.Category, &task.Recurrence, &task.RecurrenceDays, &task.ReminderOffsetMinutes, &task.CreatedAt, &task.UpdatedAt,
+		&task.ID, &task.UserID, &task.Title, &description, &task.Priority, &task.DueDate,
+		&task.Status, &task.Category, &task.Recurrence, &task.RecurrenceDays, &task.ReminderOffsetMinutes,
+		&task.CompletedAt, &task.SortOrder, &subtasks, &spawnedFrom,
+		&task.CreatedAt, &task.UpdatedAt, &task.DeletedAt,
 	)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, domain.ErrTaskNotFound
-		}
 		return nil, err
+	}
+	task.Description = description.String
+	if spawnedFrom.Valid {
+		task.SpawnedFrom = &spawnedFrom.String
+	}
+	task.Subtasks = []domain.Subtask{}
+	if len(subtasks) > 0 {
+		if err := json.Unmarshal(subtasks, &task.Subtasks); err != nil {
+			return nil, fmt.Errorf("decode subtasks of task %s: %w", task.ID, err)
+		}
 	}
 	return &task, nil
 }
 
-func (r *PostgresTaskRepository) List(ctx context.Context, userID string, filter domain.TaskFilter) ([]*domain.Task, error) {
+func scanTasks(rows *sql.Rows) ([]*domain.Task, error) {
+	defer rows.Close()
+	var tasks []*domain.Task
+	for rows.Next() {
+		task, err := scanTask(rows)
+		if err != nil {
+			return nil, err
+		}
+		tasks = append(tasks, task)
+	}
+	return tasks, rows.Err()
+}
+
+func (r *PostgresTaskRepository) Upsert(ctx context.Context, task *domain.Task) error {
+	subtasks := task.Subtasks
+	if subtasks == nil {
+		subtasks = []domain.Subtask{}
+	}
+	subtasksJSON, err := json.Marshal(subtasks)
+	if err != nil {
+		return err
+	}
+
+	// ON CONFLICT chỉ ghi đè khi cùng chủ sở hữu — chặn ở tầng DB phòng khi caller quên kiểm tra.
 	query := `
-		SELECT id, user_id, title, description, priority, due_date, status, category, recurrence, recurrence_days, reminder_offset_minutes, created_at, updated_at
-		FROM tasks
-		WHERE user_id = $1
+		INSERT INTO tasks (` + taskColumns + `)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+		ON CONFLICT (id) DO UPDATE SET
+			title = EXCLUDED.title, description = EXCLUDED.description, priority = EXCLUDED.priority,
+			due_date = EXCLUDED.due_date, status = EXCLUDED.status, category = EXCLUDED.category,
+			recurrence = EXCLUDED.recurrence, recurrence_days = EXCLUDED.recurrence_days,
+			reminder_offset_minutes = EXCLUDED.reminder_offset_minutes, completed_at = EXCLUDED.completed_at,
+			sort_order = EXCLUDED.sort_order, subtasks = EXCLUDED.subtasks, spawned_from = EXCLUDED.spawned_from,
+			updated_at = EXCLUDED.updated_at, deleted_at = EXCLUDED.deleted_at
+		WHERE tasks.user_id = EXCLUDED.user_id
 	`
+	res, err := r.db.ExecContext(ctx, query,
+		task.ID, task.UserID, task.Title, task.Description, task.Priority, task.DueDate,
+		task.Status, task.Category, task.Recurrence, task.RecurrenceDays, task.ReminderOffsetMinutes,
+		task.CompletedAt, task.SortOrder, subtasksJSON, task.SpawnedFrom,
+		task.CreatedAt, task.UpdatedAt, task.DeletedAt,
+	)
+	if err != nil {
+		return err
+	}
+	if n, err := res.RowsAffected(); err == nil && n == 0 {
+		return domain.ErrTaskNotFound // id đã thuộc về người khác
+	}
+	return nil
+}
+
+func (r *PostgresTaskRepository) GetByID(ctx context.Context, id string) (*domain.Task, error) {
+	query := `SELECT ` + taskColumns + ` FROM tasks WHERE id = $1`
+	task, err := scanTask(r.db.QueryRowContext(ctx, query, id))
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, domain.ErrTaskNotFound
+	}
+	return task, err
+}
+
+func (r *PostgresTaskRepository) List(ctx context.Context, userID string, filter domain.TaskFilter) ([]*domain.Task, error) {
+	query := `SELECT ` + taskColumns + ` FROM tasks WHERE user_id = $1 AND deleted_at IS NULL`
 	args := []any{userID}
-	argCount := 1
 
 	if filter.Status != "" {
-		argCount++
-		query += fmt.Sprintf(" AND status = $%d", argCount)
 		args = append(args, filter.Status)
+		query += fmt.Sprintf(" AND status = $%d", len(args))
 	}
-
 	if filter.DueDateBefore != nil {
-		argCount++
-		query += fmt.Sprintf(" AND due_date <= $%d", argCount)
 		args = append(args, *filter.DueDateBefore)
+		query += fmt.Sprintf(" AND due_date <= $%d", len(args))
 	}
-
 	if filter.Query != "" {
-		argCount++
-		query += fmt.Sprintf(" AND (title ILIKE '%%' || $%d || '%%' OR description ILIKE '%%' || $%d || '%%')", argCount, argCount)
 		args = append(args, filter.Query)
+		n := len(args)
+		query += fmt.Sprintf(" AND (title ILIKE '%%' || $%d || '%%' OR description ILIKE '%%' || $%d || '%%')", n, n)
 	}
-
 	if filter.Category != "" {
-		argCount++
-		query += fmt.Sprintf(" AND category = $%d", argCount)
 		args = append(args, filter.Category)
+		query += fmt.Sprintf(" AND category = $%d", len(args))
 	}
 
-	query += " ORDER BY due_date ASC, created_at DESC"
+	query += " ORDER BY sort_order ASC, created_at DESC"
 
 	rows, err := r.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-
-	var tasks []*domain.Task
-	for rows.Next() {
-		var task domain.Task
-		err := rows.Scan(
-			&task.ID, &task.UserID, &task.Title, &task.Description,
-			&task.Priority, &task.DueDate,
-			&task.Status, &task.Category, &task.Recurrence, &task.RecurrenceDays, &task.ReminderOffsetMinutes, &task.CreatedAt, &task.UpdatedAt,
-		)
-		if err != nil {
-			return nil, err
-		}
-		tasks = append(tasks, &task)
-	}
-
-	return tasks, nil
+	return scanTasks(rows)
 }
 
-func (r *PostgresTaskRepository) Update(ctx context.Context, task *domain.Task) error {
-	query := `
-		UPDATE tasks
-		SET title = $1, description = $2, priority = $3, due_date = $4,
-		    status = $5, category = $6, recurrence = $7, recurrence_days = $8,
-		    reminder_offset_minutes = $9, updated_at = $10
-		WHERE id = $11
-	`
-	res, err := r.db.ExecContext(ctx, query,
-		task.Title, task.Description, task.Priority, task.DueDate,
-		task.Status, task.Category, task.Recurrence, task.RecurrenceDays,
-		task.ReminderOffsetMinutes, task.UpdatedAt, task.ID,
+func (r *PostgresTaskRepository) ListChangedSince(ctx context.Context, userID string, since *time.Time) ([]*domain.Task, error) {
+	var (
+		rows *sql.Rows
+		err  error
 	)
+	if since == nil {
+		query := `SELECT ` + taskColumns + ` FROM tasks WHERE user_id = $1 AND deleted_at IS NULL`
+		rows, err = r.db.QueryContext(ctx, query, userID)
+	} else {
+		query := `SELECT ` + taskColumns + ` FROM tasks WHERE user_id = $1 AND updated_at > $2`
+		rows, err = r.db.QueryContext(ctx, query, userID, *since)
+	}
 	if err != nil {
-		return err
+		return nil, err
 	}
-	
-	rows, err := res.RowsAffected()
-	if err != nil {
-		return err
-	}
-	if rows == 0 {
-		return domain.ErrTaskNotFound
-	}
-	return nil
+	return scanTasks(rows)
 }
 
-func (r *PostgresTaskRepository) Delete(ctx context.Context, id string) error {
-	query := `DELETE FROM tasks WHERE id = $1`
-	res, err := r.db.ExecContext(ctx, query, id)
-	if err != nil {
-		return err
-	}
-
-	rows, err := res.RowsAffected()
-	if err != nil {
-		return err
-	}
-	if rows == 0 {
-		return domain.ErrTaskNotFound
-	}
-	return nil
+func (r *PostgresTaskRepository) SoftDelete(ctx context.Context, id string, at time.Time) error {
+	query := `UPDATE tasks SET deleted_at = $1, updated_at = $1 WHERE id = $2 AND deleted_at IS NULL`
+	_, err := r.db.ExecContext(ctx, query, at, id)
+	return err
 }
 
 func (r *PostgresTaskRepository) CreateLog(ctx context.Context, log *domain.TaskLog) error {
@@ -184,12 +197,13 @@ func (r *PostgresTaskRepository) ListLogs(ctx context.Context, userID string, si
 	var logs []*domain.TaskLog
 	for rows.Next() {
 		var log domain.TaskLog
-		err := rows.Scan(&log.ID, &log.TaskID, &log.UserID, &log.Action, &log.Details, &log.CreatedAt)
-		if err != nil {
+		var details sql.NullString
+		if err := rows.Scan(&log.ID, &log.TaskID, &log.UserID, &log.Action, &details, &log.CreatedAt); err != nil {
 			return nil, err
 		}
+		log.Details = details.String
 		logs = append(logs, &log)
 	}
 
-	return logs, nil
+	return logs, rows.Err()
 }

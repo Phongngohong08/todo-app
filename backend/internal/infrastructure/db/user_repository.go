@@ -4,8 +4,14 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"time"
 	"todo-backend/internal/domain"
+
+	"github.com/lib/pq"
 )
+
+// Mã lỗi Postgres khi vi phạm ràng buộc UNIQUE.
+const pgUniqueViolation = "23505"
 
 type PostgresUserRepository struct {
 	db *sql.DB
@@ -28,6 +34,12 @@ func (r *PostgresUserRepository) Create(ctx context.Context, user *domain.User) 
 	`
 	_, err = tx.ExecContext(ctx, queryUser, user.ID, user.Email, user.PasswordHash, user.Name, user.CreatedAt, user.UpdatedAt)
 	if err != nil {
+		// Hai request đăng ký cùng email chạy song song: request sau vượt qua bước kiểm tra
+		// GetByEmail nhưng bị ràng buộc UNIQUE chặn lại.
+		var pqErr *pq.Error
+		if errors.As(err, &pqErr) && pqErr.Code == pgUniqueViolation {
+			return domain.ErrEmailExists
+		}
 		return err
 	}
 
@@ -45,47 +57,41 @@ func (r *PostgresUserRepository) Create(ctx context.Context, user *domain.User) 
 
 func (r *PostgresUserRepository) GetByID(ctx context.Context, id string) (*domain.User, error) {
 	query := `
-		SELECT id, email, password_hash, name, created_at, updated_at
+		SELECT id, email, password_hash, name, token_version, created_at, updated_at
 		FROM users
 		WHERE id = $1
 	`
-	row := r.db.QueryRowContext(ctx, query, id)
-	
-	var user domain.User
-	err := row.Scan(&user.ID, &user.Email, &user.PasswordHash, &user.Name, &user.CreatedAt, &user.UpdatedAt)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, nil
-		}
-		return nil, err
-	}
-
-	return &user, nil
+	return r.scanUser(r.db.QueryRowContext(ctx, query, id))
 }
 
 func (r *PostgresUserRepository) GetByEmail(ctx context.Context, email string) (*domain.User, error) {
 	query := `
-		SELECT id, email, password_hash, name, created_at, updated_at
+		SELECT id, email, password_hash, name, token_version, created_at, updated_at
 		FROM users
 		WHERE email = $1
 	`
-	row := r.db.QueryRowContext(ctx, query, email)
-	
+	return r.scanUser(r.db.QueryRowContext(ctx, query, email))
+}
+
+func (r *PostgresUserRepository) scanUser(row *sql.Row) (*domain.User, error) {
 	var user domain.User
-	err := row.Scan(&user.ID, &user.Email, &user.PasswordHash, &user.Name, &user.CreatedAt, &user.UpdatedAt)
+	err := row.Scan(&user.ID, &user.Email, &user.PasswordHash, &user.Name, &user.TokenVersion, &user.CreatedAt, &user.UpdatedAt)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
 		return nil, err
 	}
-
 	return &user, nil
 }
 
-func (r *PostgresUserRepository) ListAllUserIDs(ctx context.Context) ([]string, error) {
-	query := `SELECT id FROM users`
-	rows, err := r.db.QueryContext(ctx, query)
+func (r *PostgresUserRepository) ListActiveUserIDs(ctx context.Context, since time.Time) ([]string, error) {
+	query := `
+		SELECT user_id FROM task_logs WHERE created_at >= $1
+		UNION
+		SELECT user_id FROM chat_messages WHERE created_at >= $1
+	`
+	rows, err := r.db.QueryContext(ctx, query, since)
 	if err != nil {
 		return nil, err
 	}
@@ -99,7 +105,13 @@ func (r *PostgresUserRepository) ListAllUserIDs(ctx context.Context) ([]string, 
 		}
 		ids = append(ids, id)
 	}
-	return ids, nil
+	return ids, rows.Err()
+}
+
+func (r *PostgresUserRepository) IncrementTokenVersion(ctx context.Context, userID string) error {
+	query := `UPDATE users SET token_version = token_version + 1, updated_at = $1 WHERE id = $2`
+	_, err := r.db.ExecContext(ctx, query, time.Now(), userID)
+	return err
 }
 
 func (r *PostgresUserRepository) GetPreferences(ctx context.Context, userID string) (*domain.UserPreferences, error) {
@@ -109,7 +121,7 @@ func (r *PostgresUserRepository) GetPreferences(ctx context.Context, userID stri
 		WHERE user_id = $1
 	`
 	row := r.db.QueryRowContext(ctx, query, userID)
-	
+
 	var prefs domain.UserPreferences
 	err := row.Scan(&prefs.UserID, &prefs.MorningStartTime, &prefs.EveningEndTime, &prefs.WorkDurationPreference, &prefs.UpdatedAt)
 	if err != nil {

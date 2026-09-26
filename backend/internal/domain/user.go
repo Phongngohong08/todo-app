@@ -10,6 +10,7 @@ type User struct {
 	Email        string    `json:"email"`
 	PasswordHash string    `json:"-"`
 	Name         string    `json:"name"`
+	TokenVersion int       `json:"-"` // tăng khi đăng xuất → thu hồi mọi refresh token đã phát
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
 }
@@ -26,8 +27,12 @@ type UserRepository interface {
 	Create(ctx context.Context, user *User) error
 	GetByID(ctx context.Context, id string) (*User, error)
 	GetByEmail(ctx context.Context, email string) (*User, error)
-	ListAllUserIDs(ctx context.Context) ([]string, error)
-	
+	// ListActiveUserIDs trả về user có hoạt động (log task hoặc chat) kể từ since — job ngầm dùng
+	// để không tốn lượt AI cho tài khoản bỏ không.
+	ListActiveUserIDs(ctx context.Context, since time.Time) ([]string, error)
+	// IncrementTokenVersion vô hiệu hóa mọi refresh token đã phát cho user.
+	IncrementTokenVersion(ctx context.Context, userID string) error
+
 	GetPreferences(ctx context.Context, userID string) (*UserPreferences, error)
 	UpdatePreferences(ctx context.Context, prefs *UserPreferences) error
 }

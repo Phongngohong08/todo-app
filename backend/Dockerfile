@@ -21,12 +21,12 @@ FROM alpine:latest
 
 WORKDIR /app
 
-# Copy ca-certificates for OpenAI HTTPS requests
+# Copy ca-certificates for Gemini HTTPS requests
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 
 # Copy binary from builder
 COPY --from=builder /app/api /app/api
-COPY --from=builder /app/migrations /app/migrations
+# Migrations được nhúng vào binary (package migrations) và tự áp khi API khởi động
 
 # Expose port
 EXPOSE 8080

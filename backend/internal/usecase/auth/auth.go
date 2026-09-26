@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 	"todo-backend/internal/domain"
 
@@ -14,6 +15,9 @@ import (
 const (
 	tokenTypeAccess  = "access"
 	tokenTypeRefresh = "refresh"
+
+	// bcrypt chỉ dùng 72 byte đầu của mật khẩu (Go trả lỗi nếu dài hơn) — chặn sớm thành lỗi 400.
+	maxPasswordBytes = 72
 )
 
 type AuthUseCase struct {
@@ -40,13 +44,13 @@ func NewAuthUseCase(userRepo domain.UserRepository, jwtSecret string, accessToke
 }
 
 type RegisterInput struct {
-	Email    string `json:"email" binding:"required,email"`
+	Email    string `json:"email" binding:"required,email,max=255"`
 	Password string `json:"password" binding:"required,min=6"`
-	Name     string `json:"name" binding:"required"`
+	Name     string `json:"name" binding:"required,max=100"`
 }
 
 type LoginInput struct {
-	Email    string `json:"email" binding:"required,email"`
+	Email    string `json:"email" binding:"required,email,max=255"`
 	Password string `json:"password" binding:"required"`
 }
 
@@ -58,12 +62,20 @@ type AuthResponse struct {
 }
 
 func (u *AuthUseCase) Register(ctx context.Context, input RegisterInput) (*domain.User, error) {
+	if len(input.Password) > maxPasswordBytes {
+		return nil, domain.NewValidationError("Mật khẩu quá dài (tối đa 72 byte)")
+	}
+	name := strings.TrimSpace(input.Name)
+	if name == "" {
+		return nil, domain.NewValidationError("Tên không được để trống")
+	}
+
 	existing, err := u.userRepo.GetByEmail(ctx, input.Email)
 	if err != nil {
 		return nil, err
 	}
 	if existing != nil {
-		return nil, errors.New("email already exists")
+		return nil, domain.ErrEmailExists
 	}
 
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(input.Password), bcrypt.DefaultCost)
@@ -76,7 +88,7 @@ func (u *AuthUseCase) Register(ctx context.Context, input RegisterInput) (*domai
 		ID:           uuid.New().String(),
 		Email:        input.Email,
 		PasswordHash: string(hashedPassword),
-		Name:         input.Name,
+		Name:         name,
 		CreatedAt:    now,
 		UpdatedAt:    now,
 	}
@@ -95,12 +107,12 @@ func (u *AuthUseCase) Login(ctx context.Context, input LoginInput) (*AuthRespons
 		return nil, err
 	}
 	if user == nil {
-		return nil, errors.New("invalid email or password")
+		return nil, domain.ErrInvalidCredentials
 	}
 
 	err = bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(input.Password))
 	if err != nil {
-		return nil, errors.New("invalid email or password")
+		return nil, domain.ErrInvalidCredentials
 	}
 
 	return u.buildAuthResponse(user)
@@ -108,32 +120,58 @@ func (u *AuthUseCase) Login(ctx context.Context, input LoginInput) (*AuthRespons
 
 // Refresh đổi một refresh token hợp lệ lấy cặp access/refresh token mới (sliding expiration).
 func (u *AuthUseCase) Refresh(ctx context.Context, refreshToken string) (*AuthResponse, error) {
-	userID, tokenType, err := u.parseToken(refreshToken)
+	user, err := u.userFromRefreshToken(ctx, refreshToken)
 	if err != nil {
 		return nil, err
 	}
-	if tokenType != tokenTypeRefresh {
-		return nil, errors.New("not a refresh token")
+	return u.buildAuthResponse(user)
+}
+
+// Logout thu hồi mọi refresh token của chủ sở hữu token (đăng xuất khỏi tất cả thiết bị).
+// Token không hợp lệ/đã hết hạn thì coi như đã đăng xuất (idempotent). Access token đang còn hạn
+// vẫn dùng được tới khi hết ACCESS_TOKEN_TTL — vì vậy TTL đó nên ngắn.
+func (u *AuthUseCase) Logout(ctx context.Context, refreshToken string) error {
+	user, err := u.userFromRefreshToken(ctx, refreshToken)
+	if errors.Is(err, domain.ErrInvalidToken) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	return u.userRepo.IncrementTokenVersion(ctx, user.ID)
+}
+
+// userFromRefreshToken xác thực refresh token (chữ ký, hạn, loại, version) và trả về user sở hữu.
+func (u *AuthUseCase) userFromRefreshToken(ctx context.Context, refreshToken string) (*domain.User, error) {
+	claims, err := u.parseToken(refreshToken)
+	if err != nil {
+		return nil, domain.ErrInvalidToken
+	}
+	if claims.tokenType != tokenTypeRefresh {
+		return nil, domain.ErrInvalidToken
 	}
 
-	user, err := u.userRepo.GetByID(ctx, userID)
+	user, err := u.userRepo.GetByID(ctx, claims.userID)
 	if err != nil {
 		return nil, err
 	}
 	if user == nil {
-		return nil, errors.New("user no longer exists")
+		return nil, domain.ErrInvalidToken
 	}
-
-	return u.buildAuthResponse(user)
+	// Token phát trước lần đăng xuất gần nhất → đã bị thu hồi.
+	if claims.version != user.TokenVersion {
+		return nil, domain.ErrInvalidToken
+	}
+	return user, nil
 }
 
 // buildAuthResponse sinh cặp access + refresh token cho user.
 func (u *AuthUseCase) buildAuthResponse(user *domain.User) (*AuthResponse, error) {
-	accessToken, err := u.generateToken(user.ID, tokenTypeAccess, u.accessTokenTTL)
+	accessToken, err := u.generateToken(user.ID, tokenTypeAccess, u.accessTokenTTL, nil)
 	if err != nil {
 		return nil, err
 	}
-	refreshToken, err := u.generateToken(user.ID, tokenTypeRefresh, u.refreshTokenTTL)
+	refreshToken, err := u.generateToken(user.ID, tokenTypeRefresh, u.refreshTokenTTL, &user.TokenVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -146,18 +184,28 @@ func (u *AuthUseCase) buildAuthResponse(user *domain.User) (*AuthResponse, error
 	}, nil
 }
 
-// generateToken tạo một JWT HS256 với claim sub (userID), typ (loại token) và exp.
-func (u *AuthUseCase) generateToken(userID, tokenType string, ttl time.Duration) (string, error) {
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+// generateToken tạo một JWT HS256 với claim sub (userID), typ (loại token), exp và — với refresh token — ver.
+func (u *AuthUseCase) generateToken(userID, tokenType string, ttl time.Duration, version *int) (string, error) {
+	claims := jwt.MapClaims{
 		"sub": userID,
 		"typ": tokenType,
 		"exp": time.Now().Add(ttl).Unix(),
-	})
+	}
+	if version != nil {
+		claims["ver"] = *version
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString([]byte(u.jwtSecret))
 }
 
-// parseToken xác thực chữ ký + hạn dùng, trả về userID và loại token.
-func (u *AuthUseCase) parseToken(tokenString string) (string, string, error) {
+type tokenClaims struct {
+	userID    string
+	tokenType string
+	version   int
+}
+
+// parseToken xác thực chữ ký + hạn dùng, trả về các claim cần dùng.
+func (u *AuthUseCase) parseToken(tokenString string) (*tokenClaims, error) {
 	token, err := jwt.Parse(tokenString, func(t *jwt.Token) (any, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, errors.New("unexpected signing method")
@@ -165,34 +213,39 @@ func (u *AuthUseCase) parseToken(tokenString string) (string, string, error) {
 		return []byte(u.jwtSecret), nil
 	})
 	if err != nil {
-		return "", "", err
+		return nil, err
 	}
 
 	claims, ok := token.Claims.(jwt.MapClaims)
 	if !ok || !token.Valid {
-		return "", "", errors.New("invalid token")
+		return nil, errors.New("invalid token")
 	}
 
 	userID, ok := claims["sub"].(string)
 	if !ok {
-		return "", "", errors.New("invalid subject claim")
+		return nil, errors.New("invalid subject claim")
 	}
 	// typ có thể vắng ở token cũ; coi như access để không phá phiên đang đăng nhập
 	tokenType, _ := claims["typ"].(string)
 	if tokenType == "" {
 		tokenType = tokenTypeAccess
 	}
-	return userID, tokenType, nil
+	// ver vắng ở refresh token phát trước khi có cơ chế thu hồi → coi là 0 (khớp token_version mặc định)
+	version := 0
+	if v, ok := claims["ver"].(float64); ok {
+		version = int(v)
+	}
+	return &tokenClaims{userID: userID, tokenType: tokenType, version: version}, nil
 }
 
 // VerifyToken dùng cho middleware: chỉ chấp nhận access token.
 func (u *AuthUseCase) VerifyToken(tokenString string) (string, error) {
-	userID, tokenType, err := u.parseToken(tokenString)
+	claims, err := u.parseToken(tokenString)
 	if err != nil {
-		return "", err
+		return "", domain.ErrInvalidToken
 	}
-	if tokenType != tokenTypeAccess {
-		return "", errors.New("not an access token")
+	if claims.tokenType != tokenTypeAccess {
+		return "", domain.ErrInvalidToken
 	}
-	return userID, nil
+	return claims.userID, nil
 }

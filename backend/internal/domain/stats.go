@@ -1,6 +1,9 @@
 package domain
 
-import "context"
+import (
+	"context"
+	"time"
+)
 
 // DailyCount là số việc hoàn thành trong một ngày (cho biểu đồ cột 7 ngày).
 type DailyCount struct {
@@ -16,5 +19,6 @@ type StatsSummary struct {
 }
 
 type StatsRepository interface {
-	GetSummary(ctx context.Context, userID string) (*StatsSummary, error)
+	// loc: múi giờ của người dùng, dùng để gom số liệu theo "ngày" của họ.
+	GetSummary(ctx context.Context, userID string, loc *time.Location) (*StatsSummary, error)
 }

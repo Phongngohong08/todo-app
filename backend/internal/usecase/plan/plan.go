@@ -42,6 +42,16 @@ func (u *PlanUseCase) GetPlan(ctx context.Context, userID string, date time.Time
 	return u.planRepo.GetByDate(ctx, userID, date)
 }
 
+// HasActiveTasks cho biết user còn việc chưa xong không — tức là Generate có thực sự gọi AI hay không.
+// Handler dùng để chỉ trừ hạn mức AI khi cần.
+func (u *PlanUseCase) HasActiveTasks(ctx context.Context, userID string) (bool, error) {
+	tasks, err := u.taskRepo.List(ctx, userID, domain.TaskFilter{Status: domain.StatusTodo})
+	if err != nil {
+		return false, err
+	}
+	return len(tasks) > 0, nil
+}
+
 // Generate dựng lịch MỚI cho một ngày bằng AI rồi lưu lại.
 // Năm bước: (1) lấy sở thích (thiếu thì dùng mặc định 08:00–18:00, khối 60') → (2) lấy task đang mở →
 // (3) nạp trí nhớ/thói quen → (4) gọi LLM GenerateDailyPlan → (5) lưu kế hoạch.
@@ -85,6 +95,17 @@ func (u *PlanUseCase) Generate(ctx context.Context, userID string, date time.Tim
 		}
 	}
 
+	// Không có việc cần xếp → trả lịch rỗng, KHÔNG gọi AI (tiết kiệm lượt) và KHÔNG lưu, để khi người dùng
+	// thêm việc sau đó thì lần mở màn tiếp theo vẫn tự tạo được lịch.
+	if len(activeTasks) == 0 {
+		return &domain.DailyPlan{
+			UserID:    userID,
+			PlanDate:  date,
+			PlanData:  []domain.PlanSlot{},
+			CreatedAt: time.Now(),
+		}, nil
+	}
+
 	// 3. Fetch memories if memoryRepo is configured
 	var memories []*domain.MemoryItem
 	if u.memoryRepo != nil {
@@ -95,6 +116,9 @@ func (u *PlanUseCase) Generate(ctx context.Context, userID string, date time.Tim
 	slots, err := u.aiClient.GenerateDailyPlan(ctx, activeTasks, prefs, memories, localTime)
 	if err != nil {
 		return nil, err
+	}
+	if slots == nil {
+		slots = []domain.PlanSlot{}
 	}
 
 	// 5. Save the generated plan

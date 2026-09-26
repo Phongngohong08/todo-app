@@ -37,7 +37,9 @@ services:
       - "${PORT:-8080}:8080"
     environment:
       - PORT=8080
-      - JWT_SECRET=${JWT_SECRET}
+      - GIN_MODE=release
+      # API từ chối khởi động nếu JWT_SECRET trống, là giá trị mẫu, hoặc ngắn hơn 32 ký tự
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET must be set in .env}
       - ACCESS_TOKEN_TTL=${ACCESS_TOKEN_TTL:-15m}
       - REFRESH_TOKEN_TTL=${REFRESH_TOKEN_TTL:-720h}
       - DB_HOST=postgres
@@ -49,7 +51,21 @@ services:
       - QDRANT_PORT=6333
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - GEMINI_MODEL=${GEMINI_MODEL:-gemini-2.5-flash}
+      - APP_TIMEZONE=${APP_TIMEZONE:-Asia/Ho_Chi_Minh}
+      - AUTO_MIGRATE=${AUTO_MIGRATE:-true}
+      - AI_RATE_PER_MINUTE=${AI_RATE_PER_MINUTE:-6}
+      - AI_DAILY_LIMIT_PER_USER=${AI_DAILY_LIMIT_PER_USER:-30}
+      - TRUSTED_PROXIES=${TRUSTED_PROXIES:-127.0.0.1,::1,172.16.0.0/12}
+      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-}
     restart: unless-stopped
+    # Chờ tối đa 30s cho request đang chạy (vd gọi Gemini) hoàn tất khi docker stop
+    stop_grace_period: 30s
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
     depends_on:
       postgres:
         condition: service_healthy

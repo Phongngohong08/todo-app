@@ -2,7 +2,6 @@ package quickadd
 
 import (
 	"context"
-	"errors"
 	"strings"
 	"todo-backend/internal/domain"
 )
@@ -34,7 +33,7 @@ func NewQuickAddUseCase(parser TaskParser) *QuickAddUseCase {
 //	                   DueDate:"2026-07-08T20:00:00+07:00", Category:"PERSONAL"}
 func (u *QuickAddUseCase) Parse(ctx context.Context, text string, nowContext string) (*domain.ParsedTask, error) {
 	if strings.TrimSpace(text) == "" {
-		return nil, errors.New("text is empty")
+		return nil, domain.NewValidationError("Nội dung không được để trống")
 	}
 	return u.parser.ParseTask(ctx, text, nowContext)
 }

@@ -28,6 +28,9 @@ func classifyErr(err error) error {
 	return err
 }
 
+// errNotInitialized: chưa có GEMINI_API_KEY → handler trả 503 thay vì 500.
+var errNotInitialized = fmt.Errorf("%w: GEMINI_API_KEY is not set", domain.ErrAIUnavailable)
+
 // DefaultModel là model dùng khi GEMINI_MODEL không được đặt.
 const DefaultModel = "gemini-2.5-flash"
 
@@ -72,7 +75,7 @@ func NewGeminiClient(ctx context.Context, apiKey string, model string) (*GeminiC
 //	(nếu chưa cấu hình GEMINI_API_KEY → trả lỗi "not initialized")
 func (c *GeminiClient) CreateEmbedding(ctx context.Context, text string) ([]float32, error) {
 	if c == nil || c.client == nil {
-		return nil, fmt.Errorf("Gemini client is not initialized. Please set a valid GEMINI_API_KEY in your .env file")
+		return nil, errNotInitialized
 	}
 
 	contents := []*genai.Content{
@@ -122,7 +125,7 @@ func (c *GeminiClient) CreateEmbedding(ctx context.Context, text string) ([]floa
 // (Temperature 0.2 = ưu tiên ổn định, ít "sáng tạo". Câu trả về được ép JSON qua ResponseMIMEType.)
 func (c *GeminiClient) ParseTask(ctx context.Context, text string, nowContext string) (*domain.ParsedTask, error) {
 	if c == nil || c.client == nil {
-		return nil, fmt.Errorf("Gemini client is not initialized. Please set a valid GEMINI_API_KEY in your .env file")
+		return nil, errNotInitialized
 	}
 
 	systemPrompt := `You convert a user's natural-language note into ONE structured to-do task as JSON.
@@ -175,7 +178,7 @@ Return ONLY a JSON object with exactly these keys. No markdown.`
 	}
 
 	if parsed.Title == "" {
-		return nil, fmt.Errorf("could not extract a task title from the note")
+		return nil, domain.NewValidationError("Không tách được công việc từ câu đã nhập. Hãy mô tả rõ hơn.")
 	}
 	return &parsed, nil
 }
@@ -196,7 +199,7 @@ Return ONLY a JSON object with exactly these keys. No markdown.`
 //	  {Start:"11:15", End:"12:15", TaskID:"...", Title:"Tập gym"} ]
 func (c *GeminiClient) GenerateDailyPlan(ctx context.Context, tasks []*domain.Task, prefs *domain.UserPreferences, memories []*domain.MemoryItem, localTime string) ([]domain.PlanSlot, error) {
 	if c == nil || c.client == nil {
-		return nil, fmt.Errorf("Gemini client is not initialized. Please set a valid GEMINI_API_KEY in your .env file")
+		return nil, errNotInitialized
 	}
 
 	systemPrompt := `You are an AI scheduler. Your job is to output a structured daily schedule in JSON format based on:
@@ -289,7 +292,7 @@ Return ONLY a JSON array of slots with this exact structure:
 //	"Mình hiểu cảm giác đó. Mình để ý bạn hay hoãn việc học — thử bắt đầu chỉ 15 phút với môn dễ nhất nhé..."
 func (c *GeminiClient) GetCoachResponse(ctx context.Context, message string, tasks []*domain.Task, memories []*domain.MemoryItem, history []*domain.ChatMessage) (string, error) {
 	if c == nil || c.client == nil {
-		return "", fmt.Errorf("Gemini client is not initialized. Please set a valid GEMINI_API_KEY in your .env file")
+		return "", errNotInitialized
 	}
 
 	systemPrompt := `You are an empathetic, insightful AI Coach for a To-Do application. Your goal is to guide, motivate, and counsel the user regarding their task completions and habits.
@@ -372,7 +375,7 @@ Be direct but encouraging. Refer to their previous history if they have patterns
 //	(trả về [] nếu dữ liệu rỗng hoặc không có tín hiệu gì đáng ghi)
 func (c *GeminiClient) ExtractMemories(ctx context.Context, logs []*domain.TaskLog, messages []*domain.ChatMessage) ([]string, error) {
 	if c == nil || c.client == nil {
-		return nil, fmt.Errorf("Gemini client is not initialized. Please set a valid GEMINI_API_KEY in your .env file")
+		return nil, errNotInitialized
 	}
 
 	systemPrompt := `You are a background behavioral analyst. Analyze the following user logs (events, status changes, postponements) and chat messages.

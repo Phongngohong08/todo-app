@@ -37,7 +37,7 @@ func NewCoachUseCase(
 }
 
 type ChatInput struct {
-	Message string `json:"message" binding:"required"`
+	Message string `json:"message" binding:"required,max=4000"`
 }
 
 type ChatResponse struct {
@@ -59,6 +59,10 @@ type ChatResponse struct {
 //
 //	"Mình thấy bạn hay hoãn việc viết báo cáo. Thử quy tắc 15 phút: chỉ cần bắt đầu..."
 func (u *CoachUseCase) Chat(ctx context.Context, userID string, messageText string) (string, error) {
+	// Lấy lịch sử TRƯỚC khi lưu tin mới: tin hiện tại được gửi riêng cho LLM, nếu lấy sau khi lưu
+	// thì nó nằm cả trong history lẫn message → prompt bị lặp.
+	history, _ := u.chatRepo.GetHistory(ctx, userID, 10)
+
 	// 1. Save user message to database
 	userMsg := &domain.ChatMessage{
 		ID:        uuid.New().String(),
@@ -89,8 +93,7 @@ func (u *CoachUseCase) Chat(ctx context.Context, userID string, messageText stri
 		}
 	}
 
-	// 4. Retrieve chat history context (last 10 messages)
-	history, _ := u.chatRepo.GetHistory(ctx, userID, 10)
+	// 4. Chat history (10 tin gần nhất) đã lấy ở đầu hàm
 
 	// 5. Query OpenAI Coach Client
 	replyText, err := u.aiClient.GetCoachResponse(ctx, messageText, activeTasks, relevantMemories, history)
@@ -109,4 +112,16 @@ func (u *CoachUseCase) Chat(ctx context.Context, userID string, messageText stri
 	_ = u.chatRepo.Save(ctx, assistantMsg)
 
 	return replyText, nil
+}
+
+// History trả về tối đa limit tin nhắn gần nhất theo thứ tự thời gian (cũ → mới) để app hiển thị lại cuộc trò chuyện.
+func (u *CoachUseCase) History(ctx context.Context, userID string, limit int) ([]*domain.ChatMessage, error) {
+	messages, err := u.chatRepo.GetHistory(ctx, userID, limit)
+	if err != nil {
+		return nil, err
+	}
+	if messages == nil {
+		messages = []*domain.ChatMessage{}
+	}
+	return messages, nil
 }

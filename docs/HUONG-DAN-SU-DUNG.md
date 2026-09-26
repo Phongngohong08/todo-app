@@ -27,7 +27,8 @@
 - **Đăng ký**: mở app lần đầu → nhấn **"Đăng ký ngay"** → nhập Họ tên, Email, Mật khẩu (tối thiểu 6 ký tự) → **Tạo tài khoản**.
 - **Đăng nhập**: nhập Email + Mật khẩu → **Đăng nhập**.
 - Phiên đăng nhập được giữ tự động; nếu hết hạn, app sẽ tự đưa bạn về màn đăng nhập.
-- **Đăng xuất**: nhấn biểu tượng thoát ở góc phải thẻ chào mừng trên màn hình chính.
+- **Đăng xuất**: nhấn biểu tượng thoát ở góc phải thẻ chào mừng trên màn hình chính. App sẽ gửi nốt các thay đổi chưa đồng bộ trước khi đăng xuất; nếu đang mất mạng, app hỏi lại vì đăng xuất lúc đó sẽ làm mất các thay đổi chưa gửi. Đăng xuất sẽ thoát phiên trên **mọi thiết bị** của tài khoản.
+- Toàn bộ dữ liệu (công việc, bước con, danh mục tự tạo, thứ tự sắp xếp, lịch sử chat AI) lưu theo tài khoản — đăng nhập trên máy khác sẽ thấy đầy đủ.
 
 ---
 
@@ -45,24 +46,27 @@ Khu vực trên cùng là **thẻ chào mừng** hiển thị lời chào, số 
 
 Bên dưới:
 - **Ô tìm kiếm**: gõ để lọc theo tiêu đề/mô tả.
-- **Bộ lọc danh mục**: Tất cả / Cá nhân / Công việc / Khác.
-- **Danh sách công việc** được nhóm thành **Hôm nay** (việc đến hạn hôm nay hoặc chưa đặt hạn), **Tương lai** (việc có hạn sau hôm nay) và **Đã hoàn thành**.
+- **Bộ lọc danh mục**: Tất cả / Cá nhân / Công việc / Khác và các danh mục bạn tự tạo.
+- **Danh sách công việc** được nhóm thành **Hôm nay** (việc đến hạn hôm nay, quá hạn, hoặc chưa đặt hạn), **Tương lai** (việc có hạn sau hôm nay) và **Đã hoàn thành hôm nay**.
+- **Kéo danh sách xuống** để đồng bộ ngay với máy chủ.
 
 ### Thao tác trên một thẻ công việc
-- **Tick vào ô tròn** bên trái: đánh dấu **Hoàn thành** nhanh.
+- **Tick vào ô tròn** bên trái: đánh dấu **Hoàn thành** nhanh. Tick lại vào việc đã xong để **mở lại**.
 - **Vuốt sang phải**: cũng đánh dấu **Hoàn thành**.
+- Sau khi hoàn thành hoặc xóa, thanh thông báo phía dưới có nút **Hoàn tác** nếu bạn bấm nhầm.
 - **Bấm vào thẻ**: mở chi tiết để chỉnh sửa.
 - **Bấm biểu tượng cờ 🚩**: đổi nhanh **độ ưu tiên** (Cao / Trung bình / Thấp).
 - **Menu ⋮**: Chỉnh sửa / Xóa.
 - Thẻ có vạch màu bên trái thể hiện **độ ưu tiên** (đỏ = Cao, cam = Trung bình, xanh = Thấp).
 - Chip danh mục, chip hạn chót, và chip **☑ 2/5** (tiến độ các bước con) hiển thị ở đáy thẻ.
+- Biểu tượng **☁** nhỏ cạnh tiêu đề: thay đổi đã lưu trên máy nhưng chưa gửi lên máy chủ (sẽ tự gửi).
 - Thẻ có nhãn **🤖 AI khuyến nghị ưu tiên** là các việc AI gợi ý nên làm trước (dựa trên hạn chót + độ ưu tiên).
 
 ### Sắp xếp danh sách
-Nhấn nút **Sắp xếp** (góc phải, trên danh sách) để đổi thứ tự hiển thị: **Mặc định / Hạn chót / Ưu tiên / Tên (A-Z)**.
+Nhấn nút **Sắp xếp** (góc phải, trên danh sách) để đổi thứ tự hiển thị: **Thủ công** (thứ tự bạn kéo-thả) / **Hạn chót / Ưu tiên / Tên (A-Z)**.
 
 ### Sắp xếp thủ công (kéo-thả)
-Nhấn **☰** trên thẻ chào mừng → giữ và kéo thẻ để đổi thứ tự → nhấn **Xong**.
+Nhấn **☰** trên thẻ chào mừng → giữ biểu tượng ☰ trên thẻ và kéo để đổi thứ tự → nhấn **Xong**. Thứ tự được lưu và đồng bộ sang các thiết bị khác.
 
 ---
 
@@ -84,7 +88,8 @@ Bấm vào một thẻ để sửa, hoặc chọn **Chi tiết hơn** khi thêm.
 1. **📝 Tên & Mô tả** — tiêu đề (bắt buộc) và mô tả.
 2. **🎯 Độ ưu tiên** — chọn Thấp / Trung bình / Cao.
 3. **📅 Hạn chót** — chọn nhanh (Hôm nay / Ngày mai / 3 ngày sau / Cuối tuần / Không) hoặc chọn ngày + giờ cụ thể.
-4. **🏷️ Danh mục & Lặp lại** — chọn danh mục **Cá nhân / Công việc / Khác**, hoặc gõ **danh mục mới** vào ô "Thêm danh mục mới" rồi nhấn **Thêm** (danh mục mới sẽ xuất hiện ở mọi nơi: chọn, lọc, tạo nhanh); chọn lặp Không / Hàng ngày / Hàng tuần / Hàng tháng (lặp lại cần có hạn chót). Khi chọn **Hàng tuần**, có lưới chọn **các thứ lặp lại** (T2…CN).
+4. **🏷️ Danh mục & Lặp lại** — chọn danh mục **Cá nhân / Công việc / Khác**, hoặc gõ **danh mục mới** (tối đa 50 ký tự) vào ô "Thêm danh mục mới" rồi nhấn **Thêm** (danh mục mới xuất hiện ở mọi nơi: chọn, lọc, tạo nhanh — và trên các thiết bị khác của bạn); chọn lặp Không / Hàng ngày / Hàng tuần / Hàng tháng (lặp lại cần có hạn chót). Khi chọn **Hàng tuần**, có lưới chọn **các thứ lặp lại** (T2…CN).
+   - Khi bạn hoàn thành một việc lặp, **lần kế tiếp được tạo ngay** (kể cả khi offline) với hạn luôn ở tương lai — hoàn thành trễ vài ngày cũng không sinh ra việc đã quá hạn. Mở lại việc vừa hoàn thành sẽ thu hồi lần kế tiếp nếu nó chưa được làm.
 5. **🔔 Lời nhắc** — chọn nhắc **Đúng giờ / Trước 5 / 10 / 30 phút / 1 giờ** so với hạn chót (cần đặt hạn chót).
 6. **✅ Các bước con** — checklist (xem mục 5).
 
@@ -106,13 +111,12 @@ Nhấn **Tạo công việc** / **Lưu thay đổi** ở dưới cùng.
 ## 5. Các bước con (Checklist)
 
 Chia một công việc lớn thành nhiều bước nhỏ:
-- Mở chi tiết một công việc **đã lưu** → kéo xuống mục **✅ Các bước con**.
+- Mở chi tiết một công việc (kể cả khi **đang tạo mới**) → kéo xuống mục **✅ Các bước con**.
 - Gõ tên bước → **Thêm**.
 - Tích ô vuông để đánh dấu hoàn thành; thanh phần trăm tự cập nhật.
 - Nhấn ✕ để xóa một bước.
 - Tiến độ hiển thị dưới dạng chip **☑ done/total** trên thẻ ở danh sách.
-
-> Lưu ý: hãy lưu công việc trước, sau đó mở lại để thêm bước con.
+- Bước con được lưu cùng công việc trên máy chủ, nên không mất khi đăng xuất hay đổi điện thoại. Việc lặp lại sẽ chép checklist (chưa tích) sang lần kế tiếp.
 
 ---
 
@@ -121,7 +125,7 @@ Chia một công việc lớn thành nhiều bước nhỏ:
 Mở tab **Lịch** (thanh điều hướng dưới):
 - Dùng **◀ ▶** để chuyển tháng.
 - Ngày có công việc được đánh **chấm màu** theo độ ưu tiên.
-- Công việc **lặp lại** (hàng ngày/tuần/tháng) được hiển thị chấm ở **tất cả các ngày lặp** trong tương lai, không chỉ ngày đầu.
+- Công việc **lặp lại** (hàng ngày/tuần/tháng) được hiển thị ở **tất cả các ngày lặp** trong 12 tháng tới. Các lần lặp tương lai hiện **mờ** với nhãn "dự kiến" — chúng thành việc thật khi bạn hoàn thành lần trước.
 - **Bấm vào một ngày** để xem danh sách việc đến hạn ngày đó ở bên dưới; bấm việc để mở chi tiết.
 
 ---
@@ -141,6 +145,8 @@ Tab **AI Coach**:
 - Nhắn tin để được tư vấn sắp xếp công việc, tạo động lực, phân tích thói quen trì hoãn.
 - Có sẵn các **gợi ý câu hỏi** khi bắt đầu.
 - AI ghi nhớ thói quen của bạn theo thời gian để đưa lời khuyên sát hơn.
+- Cuộc trò chuyện được lưu lại: đóng/mở lại app hay đăng nhập máy khác vẫn thấy lịch sử.
+- Mỗi người có giới hạn lượt dùng AI mỗi phút/mỗi ngày; khi hết lượt app sẽ báo và bạn thử lại sau.
 
 ---
 
@@ -149,6 +155,7 @@ Tab **AI Coach**:
 Tab **Thống kê** có 3 mục:
 - **📊 Thống kê** (hồ sơ của bạn): tên người dùng; số việc **Hoàn thành**, **Đang chờ**, **Ngày hoàn hảo** (số ngày trong năm có hoàn thành việc); **Bản đồ nhiệt hằng năm** (mỗi ô là một ngày, đậm dần theo số việc hoàn thành); và phân bố việc đang chờ theo **danh mục**.
 - **📈 Biểu đồ**: biểu đồ cột số việc hoàn thành trong 7 ngày qua + ngày năng suất nhất.
+- Số liệu thống kê và biểu đồ **cập nhật ngay** khi bạn hoàn thành việc, tính theo thời điểm hoàn thành thực tế và xem được cả khi offline.
 - **🧠 Trí nhớ AI**: các thói quen AI quan sát được. Nhấn **Phân tích thói quen bằng AI** để cập nhật; có thể xóa từng mục.
 
 ---
@@ -157,8 +164,8 @@ Tab **Thống kê** có 3 mục:
 
 Mở **Thiết lập** (biểu tượng ⚙ ở tab Thống kê):
 - **🌗 Giao diện**: chọn **Sáng / Tối / Theo hệ thống** — đổi tức thì toàn app.
-- **🕐 Nhịp sinh hoạt**: đặt giờ bắt đầu buổi sáng, kết thúc buổi tối, thời lượng phiên làm việc — AI dùng để sắp xếp lịch trình. Nhấn **Lưu thiết lập**.
-- **🏷️ Danh mục**: xem tất cả danh mục, **thêm danh mục mới** hoặc **xoá danh mục tự thêm** (3 danh mục mặc định không xoá được).
+- **🕐 Nhịp sinh hoạt**: đặt giờ bắt đầu buổi sáng, kết thúc buổi tối (dạng HH:mm, giờ kết thúc phải sau giờ bắt đầu), thời lượng phiên làm việc (15–480 phút) — AI dùng để sắp xếp lịch trình. Nhấn **Lưu thiết lập**.
+- **🏷️ Danh mục**: xem tất cả danh mục, **thêm danh mục mới** hoặc **xoá danh mục tự thêm** (3 danh mục mặc định không xoá được). Danh mục lưu theo tài khoản.
 - **ℹ️ Giới thiệu**: thông tin phiên bản và phần **Hỏi đáp nhanh**.
 
 ---
@@ -167,7 +174,7 @@ Mở **Thiết lập** (biểu tượng ⚙ ở tab Thống kê):
 
 - Công việc có **hạn chót** sẽ được nhắc bằng thông báo (không cần mạng, hoạt động nền). Thời điểm nhắc theo lựa chọn **🔔 Lời nhắc** (đúng giờ hoặc trước hạn 5/10/30 phút, 1 giờ).
 - Trên thông báo có 2 nút:
-  - **Hoàn thành** — đánh dấu xong ngay.
+  - **Hoàn thành** — đánh dấu xong ngay (hoạt động cả khi không có mạng).
   - **Hoãn 1 giờ** — nhắc lại sau 60 phút.
 - Lần đầu chạy, hãy **cho phép quyền thông báo** để nhận nhắc nhở (Android 13+).
 
@@ -179,15 +186,18 @@ Mở **Thiết lập** (biểu tượng ⚙ ở tab Thống kê):
 1. Nhấn giữ vùng trống màn hình chính → **Widgets**.
 2. Tìm **TaskFlow AI** → kéo widget ra màn hình.
 3. Widget hiển thị các việc cần làm; **bấm vào widget** để mở app.
-4. Widget tự cập nhật mỗi khi bạn mở app và đồng bộ công việc.
+4. Widget tự cập nhật ngay sau mỗi thay đổi công việc (kể cả thay đổi đồng bộ từ thiết bị khác).
 
 ---
 
 ## 13. Chế độ Offline
 
-- Khi **mất mạng**, app vẫn hiển thị danh sách công việc đã tải gần nhất (lưu trên máy), kèm **banner "📴 Chế độ offline"**.
-- Widget cũng đọc dữ liệu này nên vẫn xem được khi offline.
-- Khi có mạng trở lại, mở app để đồng bộ dữ liệu mới.
+App lưu mọi thứ trên máy trước, nên **dùng bình thường khi mất mạng**:
+- Thêm, sửa, hoàn thành, xóa, sắp xếp, thêm bước con, thêm danh mục — tất cả vẫn hoạt động.
+- Banner phía trên danh sách cho biết đang offline và số thay đổi đang chờ gửi; thẻ chưa gửi có biểu tượng **☁**.
+- Khi có mạng trở lại, app **tự đồng bộ** (không cần mở app) — hoặc kéo danh sách xuống để đồng bộ ngay.
+- Thay đổi từ thiết bị khác được tải về khi mở app, định kỳ khoảng 30 phút, hoặc khi kéo để làm mới.
+- Các tính năng AI (Quick Add, Coach, Lịch trình AI, Trí nhớ AI) cần có mạng.
 
 ---
 
@@ -199,8 +209,14 @@ Mở **Thiết lập** (biểu tượng ⚙ ở tab Thống kê):
 **AI Quick Add hiểu sai?**
 → Mô tả rõ hơn về thời gian/độ ưu tiên, hoặc chỉnh tay lại form trước khi lưu.
 
-**Không thêm được bước con cho công việc mới?**
-→ Hãy lưu công việc trước, rồi mở lại để thêm checklist.
+**Bấm hoàn thành hoặc xóa nhầm?**
+→ Bấm **Hoàn tác** trên thanh thông báo phía dưới. Nếu đã lỡ mất thanh thông báo, tick lại vào việc ở nhóm "Đã hoàn thành hôm nay" để mở lại.
+
+**Đổi sang máy khác có mất dữ liệu không?**
+→ Không — công việc, bước con, danh mục và lịch sử chat đều lưu theo tài khoản. Chỉ cần đăng nhập, dữ liệu tự tải về.
+
+**Thay đổi làm trên máy A chưa thấy ở máy B?**
+→ Kéo danh sách xuống trên máy B để đồng bộ ngay. Nếu cả hai máy cùng sửa một việc khi offline, bản đồng bộ sau cùng sẽ được giữ.
 
 **Widget không cập nhật?**
-→ Mở app một lần để đồng bộ; widget sẽ tự làm mới sau đó.
+→ Mở app một lần; widget tự làm mới sau mỗi thay đổi.

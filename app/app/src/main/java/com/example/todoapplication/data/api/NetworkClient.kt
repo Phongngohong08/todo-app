@@ -1,5 +1,6 @@
 package com.example.todoapplication.data.api
 
+import com.example.todoapplication.BuildConfig
 import com.example.todoapplication.data.model.RefreshTokenInput
 import com.example.todoapplication.data.repository.SessionEvents
 import com.example.todoapplication.data.repository.SessionManager
@@ -7,6 +8,7 @@ import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
+import java.io.IOException
 import java.util.concurrent.TimeUnit
 
 object NetworkClient {
@@ -23,8 +25,11 @@ object NetworkClient {
 
     fun getApiService(sessionManager: SessionManager): ApiService {
         if (retrofit == null) {
+            // Chỉ log ở bản debug: body chứa mật khẩu, header chứa token -> không được lọt ra Logcat bản release
             val loggingInterceptor = HttpLoggingInterceptor().apply {
-                level = HttpLoggingInterceptor.Level.BODY
+                level = if (BuildConfig.DEBUG) HttpLoggingInterceptor.Level.BODY
+                else HttpLoggingInterceptor.Level.NONE
+                redactHeader("Authorization")
             }
 
             // Client "trần" chỉ dùng để gọi endpoint refresh - KHÔNG gắn authenticator để tránh đệ quy
@@ -81,29 +86,28 @@ object NetworkClient {
                             return@authenticator null
                         }
 
-                        val newAccessToken = try {
-                            val refreshResp = bareApi.refreshToken(RefreshTokenInput(refreshToken)).execute()
-                            val body = refreshResp.body()
-                            if (refreshResp.isSuccessful && body != null) {
-                                sessionManager.saveTokens(body.token, body.refreshToken)
-                                body.token
-                            } else {
-                                null
-                            }
-                        } catch (e: Exception) {
-                            null
-                        }
-
-                        if (newAccessToken == null) {
-                            // Refresh token hết hạn/không hợp lệ -> xóa phiên, buộc đăng nhập lại
-                            sessionManager.logout()
-                            SessionEvents.notifyForcedLogout()
+                        val refreshResp = try {
+                            bareApi.refreshToken(RefreshTokenInput(refreshToken)).execute()
+                        } catch (e: IOException) {
+                            // Lỗi mạng tạm thời: GIỮ phiên (refresh token vẫn còn hạn), chỉ bỏ qua request này
                             return@authenticator null
                         }
 
-                        response.request.newBuilder()
-                            .header("Authorization", "Bearer $newAccessToken")
-                            .build()
+                        val body = refreshResp.body()
+                        if (refreshResp.isSuccessful && body != null) {
+                            sessionManager.saveTokens(body.token, body.refreshToken)
+                            return@authenticator response.request.newBuilder()
+                                .header("Authorization", "Bearer ${body.token}")
+                                .build()
+                        }
+
+                        if (refreshResp.code() in 400..499) {
+                            // Server từ chối refresh token (hết hạn/không hợp lệ) -> xóa phiên, buộc đăng nhập lại
+                            sessionManager.logout()
+                            SessionEvents.notifyForcedLogout()
+                        }
+                        // 5xx: lỗi phía server, giữ phiên để lần sau thử lại
+                        null
                     }
                 }
                 .build()

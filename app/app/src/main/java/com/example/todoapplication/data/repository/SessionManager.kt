@@ -7,6 +7,7 @@ import androidx.security.crypto.MasterKey
 
 /** Token JWT + refresh token là dữ liệu nhạy cảm nên lưu qua EncryptedSharedPreferences (mã hóa bằng Android Keystore). */
 class SessionManager(context: Context) {
+    private val appContext = context.applicationContext
     private val prefs: SharedPreferences = createEncryptedPrefs(context)
 
     companion object {
@@ -48,6 +49,8 @@ class SessionManager(context: Context) {
         }
     }
 
+    fun getUserId(): String? = prefs.getString(KEY_USER_ID, null)
+
     fun getUserName(): String {
         return prefs.getString(KEY_USER_NAME, "") ?: ""
     }
@@ -56,8 +59,10 @@ class SessionManager(context: Context) {
         return prefs.getString(KEY_USER_EMAIL, "") ?: ""
     }
 
+    /** Xóa phiên VÀ dữ liệu cục bộ của tài khoản (cache, nhắc việc, chat) — xem [UserDataCleaner]. */
     fun logout() {
         prefs.edit().clear().apply()
+        UserDataCleaner.clear(appContext)
     }
 
     fun isLoggedIn(): Boolean {

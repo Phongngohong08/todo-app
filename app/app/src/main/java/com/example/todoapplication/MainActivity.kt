@@ -12,14 +12,17 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.todoapplication.data.repository.SessionEvents
-import com.example.todoapplication.data.repository.SessionManager
+import com.example.todoapplication.di.ServiceLocator
 import com.example.todoapplication.ui.navigation.Screen
 import com.example.todoapplication.ui.screens.*
 import com.example.todoapplication.ui.theme.TodoApplicationTheme
@@ -41,7 +44,7 @@ class MainActivity : ComponentActivity() {
                     color = MaterialTheme.colorScheme.background
                 ) {
                     val navController = rememberNavController()
-                    val sessionManager = SessionManager(this)
+                    val sessionManager = ServiceLocator.sessionManager
 
                     // Xin quyền thông báo (Android 13+) để gửi nhắc nhở công việc
                     val notifPermissionLauncher = rememberLauncherForActivityResult(
@@ -51,6 +54,11 @@ class MainActivity : ComponentActivity() {
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                             notifPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                         }
+                    }
+
+                    // Mỗi lần app trở lại màn hình (ON_START): kéo thay đổi từ thiết bị khác, đẩy thay đổi còn tồn đọng
+                    LifecycleEventEffect(Lifecycle.Event.ON_START) {
+                        if (sessionManager.isLoggedIn()) ServiceLocator.syncController.requestSync()
                     }
 
                     // Khi phiên hết hiệu lực (refresh thất bại), đưa người dùng về màn Login và xóa backstack
@@ -63,11 +71,10 @@ class MainActivity : ComponentActivity() {
                         }
                     }
 
-                    // Determine start destination
-                    val startDestination = if (sessionManager.isLoggedIn()) {
-                        Screen.TaskList.route
-                    } else {
-                        Screen.Login.route
+                    // Chọn màn bắt đầu MỘT lần (remember): đăng xuất sau đó đã tự điều hướng về Login,
+                    // không để startDestination của NavHost đổi giữa chừng khi recompose.
+                    val startDestination = remember {
+                        if (sessionManager.isLoggedIn()) Screen.TaskList.route else Screen.Login.route
                     }
 
                     // NavHost = "bảng định tuyến": route nào → hiển thị Composable nào (như router ở backend)

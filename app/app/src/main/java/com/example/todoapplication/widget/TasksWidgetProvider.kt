@@ -10,7 +10,7 @@ import com.example.todoapplication.MainActivity
 import com.example.todoapplication.R
 
 /**
- * Widget màn hình chính hiển thị danh sách việc cần làm (đọc từ Room cache).
+ * Widget màn hình chính hiển thị danh sách việc cần làm (đọc từ Room).
  * Dùng collection widget: ListView + RemoteViewsService/Factory.
  */
 class TasksWidgetProvider : AppWidgetProvider() {
@@ -40,7 +40,7 @@ class TasksWidgetProvider : AppWidgetProvider() {
     }
 
     companion object {
-        /** Gọi để widget tải lại dữ liệu (sau khi app cập nhật cache task). */
+        /** Gọi để widget tải lại dữ liệu (sau mỗi thay đổi task — xem TaskEffects). */
         fun refresh(context: Context) {
             val manager = AppWidgetManager.getInstance(context)
             val ids = manager.getAppWidgetIds(

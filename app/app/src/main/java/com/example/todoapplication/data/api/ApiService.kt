@@ -8,7 +8,9 @@ import retrofit2.http.*
  * [TẦNG DATA · API] "Hợp đồng" giữa app và backend Go — khai báo mọi endpoint bằng annotation.
  * Retrofit tự sinh phần hiện thực. Đọc annotation như định nghĩa route: @POST/@GET + path,
  * @Path = tham số đường dẫn, @Query = query string, @Body = JSON body, suspend = chạy nền.
- * Mỗi hàm ở đây tương ứng 1-1 với một route trong backend/.
+ *
+ * Công việc KHÔNG được UI gọi trực tiếp: UI đọc/ghi Room, còn SyncEngine dùng các endpoint
+ * `tasks/sync`, `PUT tasks/{id}`, `DELETE tasks/{id}` để đồng bộ hai chiều.
  */
 interface ApiService {
     // Auth
@@ -22,6 +24,11 @@ interface ApiService {
     @POST("auth/refresh")
     fun refreshToken(@Body input: RefreshTokenInput): retrofit2.Call<AuthResponse>
 
+    // Thu hồi refresh token phía server (đăng xuất mọi thiết bị). Gửi refresh token trong body nên vẫn
+    // chạy được khi access token đã hết hạn.
+    @POST("auth/logout")
+    suspend fun logout(@Body input: RefreshTokenInput): Response<Unit>
+
     // Preferences
     @GET("preferences")
     suspend fun getPreferences(): Response<UserPreferences>
@@ -29,45 +36,47 @@ interface ApiService {
     @PUT("preferences")
     suspend fun updatePreferences(@Body prefs: UserPreferences): Response<UserPreferences>
 
-    // Tasks
-    @POST("tasks")
-    suspend fun createTask(@Body input: CreateTaskInput): Response<Task>
+    // ── Đồng bộ công việc ──
+    /** Thay đổi kể từ [since] (server_time lần trước); null = tải toàn bộ lần đầu. */
+    @GET("tasks/sync")
+    suspend fun syncTasks(@Query("since") since: String?): Response<TaskChangesDto>
 
-    @GET("tasks")
-    suspend fun listTasks(
-        @Query("status") status: String? = null,
-        @Query("due_date_before") dueDateBefore: String? = null,
-        @Query("q") query: String? = null,
-        @Query("category") category: String? = null
-    ): Response<List<Task>>
-
-    @GET("tasks/{id}")
-    suspend fun getTask(@Path("id") id: String): Response<Task>
-
+    /** Ghi toàn bộ trạng thái task; server tạo mới nếu id chưa có. Gửi lại nhiều lần vẫn an toàn. */
     @PUT("tasks/{id}")
-    suspend fun updateTask(@Path("id") id: String, @Body input: UpdateTaskInput): Response<Task>
+    suspend fun saveTask(@Path("id") id: String, @Body input: TaskInputDto): Response<TaskDto>
 
     @DELETE("tasks/{id}")
     suspend fun deleteTask(@Path("id") id: String): Response<Unit>
 
-    @POST("tasks/{id}/complete")
-    suspend fun completeTask(@Path("id") id: String): Response<Task>
+    // ── Danh mục tự tạo ──
+    @GET("categories")
+    suspend fun getCategories(): Response<CategoriesDto>
+
+    @PUT("categories")
+    suspend fun replaceCategories(@Body input: CategoriesDto): Response<CategoriesDto>
 
     // Daily Plans
     @GET("plans/daily")
     suspend fun getDailyPlan(
         @Query("date") date: String? = null,
-        @Query("local_time") localTime: String? = null
+        @Query("local_time") localTime: String? = null,
+        @Query("tz") timezone: String? = null
     ): Response<DailyPlan>
 
+    // date = ngày theo lịch của máy, để server không lấy nhầm ngày UTC (0h–7h sáng giờ VN vẫn là "hôm qua" ở UTC)
     @POST("plans/daily/generate")
     suspend fun generateDailyPlan(
-        @Query("local_time") localTime: String? = null
+        @Query("date") date: String? = null,
+        @Query("local_time") localTime: String? = null,
+        @Query("tz") timezone: String? = null
     ): Response<DailyPlan>
 
     // AI Coach
     @POST("ai/chat")
     suspend fun chat(@Body input: ChatInput): Response<ChatResponse>
+
+    @GET("ai/chat/history")
+    suspend fun chatHistory(@Query("limit") limit: Int): Response<List<ChatMessage>>
 
     // AI Quick Add: tách câu ngôn ngữ tự nhiên thành task có cấu trúc (chưa lưu)
     @POST("ai/parse-task")
@@ -81,8 +90,4 @@ interface ApiService {
 
     @DELETE("ai/memories/{id}")
     suspend fun deleteMemory(@Path("id") id: String): Response<Unit>
-
-    // Statistics
-    @GET("stats/summary")
-    suspend fun getStatsSummary(): Response<StatsSummary>
 }

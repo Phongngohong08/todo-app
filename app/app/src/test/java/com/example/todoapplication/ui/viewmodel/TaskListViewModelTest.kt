@@ -1,15 +1,22 @@
 package com.example.todoapplication.ui.viewmodel
 
-import com.example.todoapplication.data.model.Task
 import com.example.todoapplication.data.repository.AiRepository
+import com.example.todoapplication.data.repository.AuthRepository
+import com.example.todoapplication.data.repository.CategoryRepository
 import com.example.todoapplication.data.repository.SessionManager
-import com.example.todoapplication.data.repository.SubtaskRepository
-import com.example.todoapplication.data.repository.TaskListResult
 import com.example.todoapplication.data.repository.TaskRepository
+import com.example.todoapplication.data.sync.SyncController
+import com.example.todoapplication.data.sync.SyncResult
+import com.example.todoapplication.domain.model.Task
+import com.example.todoapplication.domain.model.TaskStatus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
@@ -19,48 +26,56 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
-import org.mockito.kotlin.any
+import org.mockito.kotlin.anyOrNull
 import org.mockito.kotlin.mock
+import org.mockito.kotlin.never
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.verifyBlocking
 import org.mockito.kotlin.whenever
 
 /**
- * Test ViewModel với repository giả lập (Mockito) — trước đây không thể test vì
- * ViewModel gọi thẳng ServiceLocator (singleton static) thay vì nhận qua constructor.
+ * Test ViewModel với repository giả lập (Mockito). ViewModel nhận mọi phụ thuộc qua constructor
+ * (kể cả đồng hồ và dispatcher tính toán) nên chạy tất định trên dispatcher của test.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class TaskListViewModelTest {
 
     private val dispatcher = StandardTestDispatcher()
+    private val now = 1_780_000_000_000L // mốc cố định
+    private val hour = 3_600_000L
 
     private lateinit var taskRepository: TaskRepository
-    private lateinit var subtaskRepository: SubtaskRepository
+    private lateinit var categoryRepository: CategoryRepository
+    private lateinit var sync: SyncController
     private lateinit var aiRepository: AiRepository
+    private lateinit var authRepository: AuthRepository
     private lateinit var sessionManager: SessionManager
-    private lateinit var viewModel: TaskListViewModel
+    private val tasks = MutableStateFlow<List<Task>>(emptyList())
 
-    private fun task(id: String = "1", status: String = "TODO") = Task(
-        id = id,
-        userId = "u1",
-        title = "Task $id",
-        description = null,
-        priority = "MEDIUM",
-        dueDate = null,
-        status = status,
-        createdAt = "2026-01-01T00:00:00Z",
-        updatedAt = "2026-01-01T00:00:00Z"
+    private fun task(id: String, status: String = TaskStatus.TODO, dueAt: Long? = null, completedAt: Long? = null) =
+        Task(id = id, title = "Task $id", status = status, dueAt = dueAt, completedAt = completedAt)
+
+    private fun viewModel(session: SessionManager = sessionManager) = TaskListViewModel(
+        taskRepository, categoryRepository, sync, aiRepository, authRepository, session,
+        clock = { now },
+        computeDispatcher = dispatcher
     )
 
     @Before
     fun setUp() {
         Dispatchers.setMain(dispatcher)
         taskRepository = mock()
-        subtaskRepository = mock()
+        categoryRepository = mock()
+        sync = mock()
         aiRepository = mock()
+        authRepository = mock()
         sessionManager = mock()
         whenever(sessionManager.getUserName()).thenReturn("Phong")
-        viewModel = TaskListViewModel(taskRepository, subtaskRepository, aiRepository, sessionManager)
+        whenever(taskRepository.observeTasks(anyOrNull(), anyOrNull())).thenReturn(tasks)
+        whenever(taskRepository.observePendingSyncCount()).thenReturn(flowOf(0))
+        whenever(categoryRepository.observeAll()).thenReturn(flowOf(CategoryRepository.DEFAULTS))
+        whenever(sync.isOnline).thenReturn(flowOf(true))
+        whenever(sync.hasSyncedOnce).thenReturn(flowOf(true))
     }
 
     @After
@@ -68,75 +83,129 @@ class TaskListViewModelTest {
         Dispatchers.resetMain()
     }
 
+    /** uiState dùng WhileSubscribed → phải có người lắng nghe thì mới tính. */
+    private fun TestScope.observe(vm: TaskListViewModel) {
+        backgroundScope.launch { vm.uiState.collect {} }
+    }
+
     @Test
     fun `userName falls back to default when session has no name`() {
         val emptySession: SessionManager = mock()
         whenever(emptySession.getUserName()).thenReturn("")
-        val vm = TaskListViewModel(taskRepository, subtaskRepository, aiRepository, emptySession)
-        assertEquals("bạn", vm.userName)
+        assertEquals("bạn", viewModel(emptySession).userName)
     }
 
     @Test
-    fun `loadTasks populates state on success`() = runTest(dispatcher) {
-        val tasks = listOf(task("1"), task("2", status = "COMPLETED"))
-        whenever(taskRepository.loadTasks(null, null)).thenReturn(TaskListResult(tasks, isOffline = false))
-        whenever(subtaskRepository.progressByTask()).thenReturn(emptyMap())
+    fun `tasks from Room are grouped into sections with counts`() = runTest(dispatcher) {
+        val vm = viewModel()
+        observe(vm)
+        tasks.value = listOf(
+            task("overdue", dueAt = now - 2 * hour),
+            task("future", dueAt = now + 72 * hour),
+            task("done", status = TaskStatus.COMPLETED, completedAt = now)
+        )
+        advanceUntilIdle()
 
-        viewModel.loadTasks("ALL", "")
-        dispatcher.scheduler.advanceUntilIdle()
-
-        val state = viewModel.uiState.value
-        assertEquals(2, state.tasks.size)
+        val state = vm.uiState.value
         assertFalse(state.isLoading)
-        assertFalse(state.isOffline)
+        assertEquals(listOf("overdue"), state.sections.today.map { it.id })
+        assertEquals(listOf("future"), state.sections.future.map { it.id })
+        assertEquals(listOf("done"), state.sections.completedToday.map { it.id })
+        assertEquals(2, state.pendingCount)
+        assertEquals(1, state.overdueCount)
     }
 
     @Test
-    fun `loadTasks emits message event and stops loading on failure`() = runTest(dispatcher) {
-        whenever(taskRepository.loadTasks(any(), any())).thenThrow(RuntimeException("network down"))
+    fun `search query is debounced before hitting the repository`() = runTest(dispatcher) {
+        val vm = viewModel()
+        observe(vm)
+        vm.setQuery("h")
+        vm.setQuery("họp")
+        advanceUntilIdle()
 
+        verify(taskRepository).observeTasks(null, "họp")
+        verify(taskRepository, never()).observeTasks(null, "h")
+    }
+
+    @Test
+    fun `completing a task writes to Room and offers undo`() = runTest(dispatcher) {
+        whenever(taskRepository.setCompleted("1", true)).thenReturn(true)
+        val vm = viewModel()
         val events = mutableListOf<TaskListEvent>()
-        val job = launch { viewModel.events.collect { events.add(it) } }
+        backgroundScope.launch { vm.events.collect { events += it } }
 
-        viewModel.loadTasks("ALL", "")
-        dispatcher.scheduler.advanceUntilIdle()
+        vm.completeTask(task("1"))
+        advanceUntilIdle()
 
-        assertFalse(viewModel.uiState.value.isLoading)
-        assertTrue(events.any { it is TaskListEvent.Message })
-        job.cancel()
+        verifyBlocking(taskRepository) { setCompleted("1", true) }
+        assertTrue(events.single() is TaskListEvent.Completed)
+
+        vm.reopenTask("1")
+        advanceUntilIdle()
+        verifyBlocking(taskRepository) { setCompleted("1", false) }
     }
 
     @Test
-    fun `completeTask calls repository then reloads with last filters`() = runTest(dispatcher) {
-        val t = task("1")
-        whenever(taskRepository.loadTasks(null, null)).thenReturn(TaskListResult(emptyList(), isOffline = false))
-        whenever(subtaskRepository.progressByTask()).thenReturn(emptyMap())
-
-        viewModel.completeTask(t)
-        dispatcher.scheduler.advanceUntilIdle()
-
-        verifyBlocking(taskRepository) { completeTask(t) }
-        verifyBlocking(taskRepository) { loadTasks(null, null) }
-    }
-
-    @Test
-    fun `deleteTask emits message only when repository confirms deletion`() = runTest(dispatcher) {
-        val t = task("1")
-        whenever(taskRepository.deleteTask(t.id)).thenReturn(false)
-
+    fun `deleting a task can be undone`() = runTest(dispatcher) {
+        whenever(taskRepository.delete("1")).thenReturn(true)
+        val vm = viewModel()
         val events = mutableListOf<TaskListEvent>()
-        val job = launch { viewModel.events.collect { events.add(it) } }
+        backgroundScope.launch { vm.events.collect { events += it } }
 
-        viewModel.deleteTask(t)
-        dispatcher.scheduler.advanceUntilIdle()
+        vm.deleteTask(task("1"))
+        advanceUntilIdle()
+        assertEquals(TaskListEvent.Deleted("1", "Task 1"), events.single())
 
-        assertTrue(events.isEmpty())
-        job.cancel()
+        vm.undoDelete("1")
+        advanceUntilIdle()
+        verifyBlocking(taskRepository) { restore("1") }
     }
 
     @Test
-    fun `logout delegates to sessionManager`() {
-        viewModel.logout()
-        verify(sessionManager).logout()
+    fun `logout goes straight through when nothing is waiting to sync`() = runTest(dispatcher) {
+        whenever(taskRepository.pendingSyncCount()).thenReturn(0)
+        val vm = viewModel()
+        val events = mutableListOf<TaskListEvent>()
+        backgroundScope.launch { vm.events.collect { events += it } }
+
+        vm.requestLogout()
+        advanceUntilIdle()
+
+        verify(authRepository).logout()
+        assertEquals(TaskListEvent.LoggedOut, events.single())
+    }
+
+    @Test
+    fun `logout asks for confirmation when unsynced changes cannot be pushed`() = runTest(dispatcher) {
+        whenever(taskRepository.pendingSyncCount()).thenReturn(3)
+        whenever(sync.syncNow()).thenReturn(SyncResult.NetworkError)
+        val vm = viewModel()
+        val events = mutableListOf<TaskListEvent>()
+        backgroundScope.launch { vm.events.collect { events += it } }
+
+        vm.requestLogout()
+        advanceUntilIdle()
+
+        verifyBlocking(sync) { syncNow() }
+        verify(authRepository, never()).logout()
+        assertEquals(TaskListEvent.ConfirmLogout(3), events.single())
+    }
+
+    @Test
+    fun `drag and drop persists only when the finger is lifted`() = runTest(dispatcher) {
+        val vm = viewModel()
+        observe(vm)
+        tasks.value = listOf(task("a"), task("b"), task("c"))
+        advanceUntilIdle()
+
+        vm.onDragStart("c")
+        vm.onDragMove("c", "a")
+        advanceUntilIdle()
+        assertEquals(listOf("c", "a", "b"), vm.uiState.value.manualOrder.map { it.id })
+        verifyBlocking(taskRepository, never()) { move(anyOrNull(), anyOrNull()) }
+
+        vm.onDragEnd()
+        advanceUntilIdle()
+        verifyBlocking(taskRepository) { move(listOf("c", "a", "b"), "c") }
     }
 }

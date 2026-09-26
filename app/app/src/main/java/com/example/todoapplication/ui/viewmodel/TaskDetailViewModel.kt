@@ -1,112 +1,142 @@
 package com.example.todoapplication.ui.viewmodel
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
-import com.example.todoapplication.data.local.SubtaskEntity
-import com.example.todoapplication.data.model.CreateTaskInput
-import com.example.todoapplication.data.model.Task
-import com.example.todoapplication.data.model.UpdateTaskInput
-import com.example.todoapplication.data.repository.SubtaskRepository
+import com.example.todoapplication.data.repository.CategoryRepository
 import com.example.todoapplication.data.repository.TaskRepository
 import com.example.todoapplication.di.ServiceLocator
+import com.example.todoapplication.domain.model.Subtask
+import com.example.todoapplication.domain.model.Task
+import com.example.todoapplication.domain.model.TaskDraft
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.util.UUID
 
-/*
- * [TẦNG VIEWMODEL] Nghiệp vụ màn chi tiết công việc: tải task để sửa, tạo mới hoặc cập nhật,
- * và quản lý các "bước con" (subtask) lưu cục bộ trong Room. Phát TaskDetailEvent để màn phản ứng.
- */
-
-// Sự kiện một lần của màn chi tiết: đã tải xong task (kèm dữ liệu) / đã lưu / có lỗi.
+/** Sự kiện một lần của màn chi tiết: đã tải xong task (kèm dữ liệu) / đã lưu / có lỗi. */
 sealed interface TaskDetailEvent {
     data class Loaded(val task: Task) : TaskDetailEvent   // mang theo task để màn đổ vào các ô nhập
-    data object Saved : TaskDetailEvent                    // lưu xong → màn thường popBackStack về danh sách
+    data object Saved : TaskDetailEvent                    // lưu xong → màn popBackStack về danh sách
     data class Error(val message: String) : TaskDetailEvent
 }
 
+/**
+ * [TẦNG VIEWMODEL] Màn chi tiết công việc: tạo mới hoặc sửa, kèm checklist các bước con.
+ *
+ * taskId lấy từ [SavedStateHandle] — Navigation Compose tự đặt tham số route vào đó, và SavedStateHandle
+ * còn sống sót qua cả việc hệ điều hành giết tiến trình khi app ở nền.
+ * Mọi thao tác ghi đi vào Room nên tức thì và dùng được khi offline.
+ */
 class TaskDetailViewModel(
-    private val repo: TaskRepository,          // task lưu trên SERVER (qua API)
-    private val subtaskRepo: SubtaskRepository // bước con lưu CỤC BỘ (Room) — hai nguồn dữ liệu khác nhau
+    savedStateHandle: SavedStateHandle,
+    private val repo: TaskRepository,
+    private val categoryRepository: CategoryRepository
 ) : ViewModel() {
-    // isBusy: đang tải/đang lưu → màn khóa nút, hiện spinner.
+
+    val taskId: String = savedStateHandle.get<String>("taskId") ?: NEW_TASK
+    val isNew: Boolean = taskId == NEW_TASK
+
     private val _isBusy = MutableStateFlow(false)
     val isBusy: StateFlow<Boolean> = _isBusy.asStateFlow()
 
     private val _events = MutableSharedFlow<TaskDetailEvent>()
     val events: SharedFlow<TaskDetailEvent> = _events.asSharedFlow()
 
-    // Danh sách bước con là STATE (bền, hiển thị liên tục) nên dùng StateFlow, khác events ở trên.
-    private val _subtasks = MutableStateFlow<List<SubtaskEntity>>(emptyList())
-    val subtasks: StateFlow<List<SubtaskEntity>> = _subtasks.asStateFlow()
+    val categories: StateFlow<List<String>> = categoryRepository.observeAll()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), CategoryRepository.DEFAULTS)
 
-    // Nạp bước con của task từ Room. Gọi khi mở màn chi tiết.
-    fun loadSubtasks(taskId: String) {
-        viewModelScope.launch { _subtasks.value = subtaskRepo.getForTask(taskId) }
-    }
+    // Task mới chưa có trong database → giữ checklist trong bộ nhớ, lưu cùng lúc với task.
+    // Task đã có → đọc thẳng từ Room (Flow), mỗi thao tác ghi ngay và tự hiện lên.
+    private val draftSubtasks = MutableStateFlow<List<Subtask>>(emptyList())
+    private val subtaskSource: Flow<List<Subtask>> = if (isNew) draftSubtasks else repo.observeSubtasks(taskId)
+    val subtasks: StateFlow<List<Subtask>> =
+        subtaskSource.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    // Thêm 1 bước con rồi ĐỌC LẠI từ Room để state khớp DB (mẫu "ghi xong tải lại" lặp ở cả toggle/delete).
-    fun addSubtask(taskId: String, title: String) {
-        if (title.isBlank()) return
+    /** Tải task để điền form (chỉ chế độ sửa). */
+    fun loadTask() {
+        if (isNew) return
         viewModelScope.launch {
-            subtaskRepo.add(taskId, title, _subtasks.value.size)   // position = số bước hiện có (thêm vào cuối)
-            _subtasks.value = subtaskRepo.getForTask(taskId)
-        }
-    }
-
-    fun toggleSubtask(item: SubtaskEntity) {
-        viewModelScope.launch {
-            subtaskRepo.toggle(item)
-            _subtasks.value = subtaskRepo.getForTask(item.taskId)
-        }
-    }
-
-    fun deleteSubtask(item: SubtaskEntity) {
-        viewModelScope.launch {
-            subtaskRepo.delete(item)
-            _subtasks.value = subtaskRepo.getForTask(item.taskId)
-        }
-    }
-
-    // Tải 1 task để SỬA (chế độ edit). Xong thì phát Loaded(task) để màn điền vào form.
-    fun loadTask(id: String) {
-        _isBusy.value = true
-        viewModelScope.launch {
-            val task = repo.getTask(id)
-            _isBusy.value = false
+            val task = repo.getTask(taskId)
             if (task != null) _events.emit(TaskDetailEvent.Loaded(task))
-            else _events.emit(TaskDetailEvent.Error("Không thể tải chi tiết công việc"))
+            else _events.emit(TaskDetailEvent.Error("Công việc không còn tồn tại (có thể đã bị xóa trên thiết bị khác)"))
         }
     }
 
-    // create/update dùng chung logic lưu bên dưới, chỉ khác lời gọi repo → gom vào save{} cho gọn (DRY).
-    fun create(input: CreateTaskInput) = save { repo.createTask(input) }
+    fun addSubtask(title: String) {
+        val clean = title.trim()
+        if (clean.isEmpty()) return
+        if (isNew) {
+            draftSubtasks.update { it + Subtask(UUID.randomUUID().toString(), clean, isDone = false, position = it.size) }
+        } else {
+            viewModelScope.launch { repo.addSubtask(taskId, clean) }
+        }
+    }
 
-    fun update(id: String, input: UpdateTaskInput) = save { repo.updateTask(id, input) }
+    fun toggleSubtask(item: Subtask) {
+        if (isNew) {
+            draftSubtasks.update { list -> list.map { if (it.id == item.id) it.copy(isDone = !it.isDone) else it } }
+        } else {
+            viewModelScope.launch { repo.toggleSubtask(taskId, item.id) }
+        }
+    }
 
-    // Nhận một "khối lệnh lưu" (lambda suspend) rồi chạy chung: bật busy → gọi → phát Saved/Error.
-    // Nhờ vậy không phải viết lặp phần bận/kết quả ở cả create lẫn update.
-    private fun save(block: suspend () -> Result<Task>) {
+    fun deleteSubtask(item: Subtask) {
+        if (isNew) {
+            draftSubtasks.update { list -> list.filter { it.id != item.id } }
+        } else {
+            viewModelScope.launch { repo.deleteSubtask(taskId, item.id) }
+        }
+    }
+
+    /** Thêm danh mục mới; trả tên đã chuẩn hoá qua [onAdded] để form chọn luôn danh mục đó. */
+    fun addCategory(name: String, onAdded: (String) -> Unit) {
+        viewModelScope.launch {
+            val added = categoryRepository.add(name)
+            if (added.isNotEmpty()) onAdded(added)
+        }
+    }
+
+    fun save(draft: TaskDraft) {
+        if (_isBusy.value) return // chặn bấm Lưu hai lần
         _isBusy.value = true
         viewModelScope.launch {
-            val result = block()
+            val ok = if (isNew) {
+                repo.create(draft, draftSubtasks.value)
+                true
+            } else {
+                repo.update(taskId, draft)
+            }
             _isBusy.value = false
-            result.fold(
-                onSuccess = { _events.emit(TaskDetailEvent.Saved) },
-                onFailure = { _events.emit(TaskDetailEvent.Error("Không thể lưu công việc")) }
+            _events.emit(
+                if (ok) TaskDetailEvent.Saved
+                else TaskDetailEvent.Error("Không thể lưu: công việc đã bị xóa trên thiết bị khác")
             )
         }
     }
 
     companion object {
+        const val NEW_TASK = "new"
+
         val Factory = viewModelFactory {
-            initializer { TaskDetailViewModel(ServiceLocator.taskRepository, ServiceLocator.subtaskRepository) }
+            initializer {
+                TaskDetailViewModel(
+                    createSavedStateHandle(),
+                    ServiceLocator.taskRepository,
+                    ServiceLocator.categoryRepository
+                )
+            }
         }
     }
 }

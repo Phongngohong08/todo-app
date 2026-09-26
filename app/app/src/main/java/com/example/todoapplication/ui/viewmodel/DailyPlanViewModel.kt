@@ -5,9 +5,11 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.example.todoapplication.data.model.DailyPlan
-import com.example.todoapplication.data.repository.ApiException
+import com.example.todoapplication.data.repository.aiFailureMessage
 import com.example.todoapplication.data.repository.PlanRepository
 import com.example.todoapplication.di.ServiceLocator
+import com.example.todoapplication.ui.utils.nowLocalClock
+import com.example.todoapplication.ui.utils.todayLocalDate
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -16,8 +18,6 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import java.text.SimpleDateFormat
-import java.util.*
 
 /*
  * [TẦNG VIEWMODEL] Màn Kế hoạch ngày: xem lịch hôm nay (getDaily) hoặc nhờ AI tạo lại (generateDaily).
@@ -40,10 +40,8 @@ class DailyPlanViewModel(private val repo: PlanRepository) : ViewModel() {
     fun loadPlan() {
         _uiState.update { it.copy(isLoading = true) }
         viewModelScope.launch {
-            // Định dạng ngày "2026-07-08" và giờ "14:30" theo múi giờ máy để gửi cho backend.
-            val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
-            val localTime = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
-            val result = repo.getDaily(today, localTime)
+            // Ngày "2026-07-08" và giờ "14:30" theo múi giờ máy để gửi cho backend.
+            val result = repo.getDaily(todayLocalDate(), nowLocalClock())
             // getOrNull(): thành công thì lấy plan, lỗi thì để null (màn tự hiện trạng thái trống).
             _uiState.update { it.copy(plan = result.getOrNull(), isLoading = false) }
         }
@@ -53,20 +51,19 @@ class DailyPlanViewModel(private val repo: PlanRepository) : ViewModel() {
     fun regenerate() {
         _uiState.update { it.copy(isLoading = true) }
         viewModelScope.launch {
-            val localTime = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
-            val result = repo.generateDaily(localTime)
+            // Gửi kèm ngày của máy: không có thì server lấy "hôm nay" theo múi giờ mặc định của nó.
+            val result = repo.generateDaily(todayLocalDate(), nowLocalClock())
             _uiState.update { it.copy(plan = result.getOrNull(), isLoading = false) }
-            // Phân biệt các trường hợp: hết lượt AI (429) / lỗi mạng / lịch rỗng (hết khung giờ) / thành công.
+            // Phân biệt các trường hợp: hết lượt AI (429) / lỗi mạng / lịch rỗng / thành công.
             // Trước đây luôn báo "thành công" kể cả khi lịch rỗng -> người dùng tưởng app hỏng.
             val error = result.exceptionOrNull()
             val msg = when {
-                error is ApiException && error.isRateLimited ->
-                    "AI đang quá tải hoặc đã hết lượt hôm nay. Hãy thử lại sau ít phút."
-                result.isFailure ->
-                    "Tạo lịch trình thất bại. Kiểm tra kết nối rồi thử lại."
+                error != null ->
+                    error.aiFailureMessage("Tạo lịch trình thất bại. Kiểm tra kết nối rồi thử lại.")
                 result.getOrNull()?.planData.isNullOrEmpty() ->
-                    "AI chưa xếp được khung giờ nào — có thể đã quá giờ làm việc trong ngày. " +
-                        "Hãy nới giờ kết thúc trong Cài đặt hoặc thử lại vào ban ngày."
+                    // Server trả lịch rỗng khi không còn việc chưa xong, hoặc khi đã hết giờ trong ngày
+                    "Chưa xếp được khung giờ nào. Hãy kiểm tra còn công việc chưa hoàn thành, " +
+                        "hoặc nới giờ kết thúc trong Cài đặt."
                 else ->
                     "Đã tạo lịch trình!"
             }

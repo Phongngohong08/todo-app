@@ -5,12 +5,16 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.example.todoapplication.data.model.UserPreferences
+import com.example.todoapplication.data.repository.ApiException
+import com.example.todoapplication.data.repository.CategoryRepository
 import com.example.todoapplication.data.repository.PreferencesRepository
 import com.example.todoapplication.di.ServiceLocator
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
@@ -29,12 +33,27 @@ data class SettingsUiState(
     val isSaving: Boolean = false
 )
 
-class SettingsViewModel(private val repo: PreferencesRepository) : ViewModel() {
+class SettingsViewModel(
+    private val repo: PreferencesRepository,
+    private val categoryRepository: CategoryRepository
+) : ViewModel() {
     private val _uiState = MutableStateFlow(SettingsUiState())
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
 
     private val _events = MutableSharedFlow<String>()
     val events: SharedFlow<String> = _events.asSharedFlow()
+
+    /** Danh mục (mặc định + tự tạo) từ Room — thêm/xóa được cả khi offline, đồng bộ theo tài khoản. */
+    val categories: StateFlow<List<String>> = categoryRepository.observeAll()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), CategoryRepository.DEFAULTS)
+
+    fun addCategory(name: String) {
+        viewModelScope.launch { categoryRepository.add(name) }
+    }
+
+    fun removeCategory(name: String) {
+        viewModelScope.launch { categoryRepository.remove(name) }
+    }
 
     fun load() {
         _uiState.update { it.copy(isLoading = true) }
@@ -72,13 +91,22 @@ class SettingsViewModel(private val repo: PreferencesRepository) : ViewModel() {
                 )
             )
             _uiState.update { it.copy(isSaving = false) }
-            _events.emit(if (result.isSuccess) "Cấu hình đã được lưu!" else "Lưu cấu hình thất bại")
+            val error = result.exceptionOrNull()
+            _events.emit(
+                when {
+                    error == null -> "Cấu hình đã được lưu!"
+                    // Server kiểm tra: giờ dạng HH:mm, giờ kết thúc sau giờ bắt đầu, thời lượng 15–480 phút
+                    (error as? ApiException)?.code == 400 ->
+                        "Cấu hình chưa hợp lệ: giờ dạng HH:mm, giờ kết thúc sau giờ bắt đầu, thời lượng 15–480 phút."
+                    else -> "Lưu cấu hình thất bại"
+                }
+            )
         }
     }
 
     companion object {
         val Factory = viewModelFactory {
-            initializer { SettingsViewModel(ServiceLocator.preferencesRepository) }
+            initializer { SettingsViewModel(ServiceLocator.preferencesRepository, ServiceLocator.categoryRepository) }
         }
     }
 }

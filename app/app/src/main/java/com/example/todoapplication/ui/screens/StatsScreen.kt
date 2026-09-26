@@ -33,8 +33,8 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.example.todoapplication.data.api.NetworkClient
 import com.example.todoapplication.data.model.MemoryItem
-import com.example.todoapplication.data.model.StatsSummary
-import com.example.todoapplication.data.repository.SessionManager
+import com.example.todoapplication.domain.model.StatsSummary
+import com.example.todoapplication.di.ServiceLocator
 import com.example.todoapplication.ui.navigation.Screen
 import com.example.todoapplication.ui.theme.*
 import com.example.todoapplication.ui.viewmodel.StatsViewModel
@@ -66,13 +66,9 @@ fun StatsScreen(
     val primary = MaterialTheme.colorScheme.primary
     val tertiary = MaterialTheme.colorScheme.tertiary
 
-    // Khóa = selectedTab: mỗi khi ĐỔI TAB, khối này chạy lại → tải đúng dữ liệu cho tab đó (lazy load).
+    // Thống kê và biểu đồ là Flow từ Room (tự cập nhật). Chỉ Trí nhớ AI cần tải từ server khi mở tab đó.
     LaunchedEffect(selectedTab) {
-        when (selectedTab) {
-            0 -> statsViewModel.loadSummary()
-            1 -> statsViewModel.loadWeekly()
-            2 -> statsViewModel.loadMemories()
-        }
+        if (selectedTab == 2) statsViewModel.loadMemories()
     }
     LaunchedEffect(Unit) {
         statsViewModel.events.collect { msg ->
@@ -176,7 +172,7 @@ fun StatsScreen(
                         ) {
                             // Header hồ sơ
                             item {
-                                val userName = remember { SessionManager(context).getUserName() ?: "bạn" }
+                                val userName = remember { ServiceLocator.sessionManager.getUserName().ifBlank { "bạn" } }
                                 Row(
                                     modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
                                     verticalAlignment = Alignment.CenterVertically

@@ -1,13 +1,12 @@
 package com.example.todoapplication.ui.screens
 
-import android.widget.Toast
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
@@ -15,15 +14,20 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.CloudOff
+import androidx.compose.material.icons.outlined.CloudUpload
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
@@ -32,36 +36,37 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
-import com.example.todoapplication.data.model.Task
-import com.example.todoapplication.data.repository.CategoryStore
+import com.example.todoapplication.data.model.ParsedTask
 import com.example.todoapplication.data.repository.QuickAddDraft
-import com.example.todoapplication.domain.aiRecommendedIds
-import com.example.todoapplication.domain.dueAtDayOffset
 import com.example.todoapplication.domain.daysUntilSunday
-import com.example.todoapplication.domain.isFuture
+import com.example.todoapplication.domain.dueAtDayOffset
 import com.example.todoapplication.domain.isOverdue
-import com.example.todoapplication.domain.isUpdatedToday
+import com.example.todoapplication.domain.model.Task
+import com.example.todoapplication.domain.model.TaskDraft
 import com.example.todoapplication.domain.sortLabel
-import com.example.todoapplication.domain.sortTasks
 import com.example.todoapplication.ui.components.AppBottomBar
 import com.example.todoapplication.ui.components.EmptyState
 import com.example.todoapplication.ui.components.LoadingState
 import com.example.todoapplication.ui.navigation.Screen
 import com.example.todoapplication.ui.theme.*
-import com.example.todoapplication.ui.utils.formatUtcToLocal
-import com.example.todoapplication.ui.utils.priorityLabel
 import com.example.todoapplication.ui.utils.categoryLabel
+import com.example.todoapplication.ui.utils.formatDateTime
+import com.example.todoapplication.ui.utils.priorityLabel
+import com.example.todoapplication.ui.utils.toIsoString
+import com.example.todoapplication.ui.viewmodel.ALL_CATEGORIES
 import com.example.todoapplication.ui.viewmodel.TaskListEvent
+import com.example.todoapplication.ui.viewmodel.TaskListUiState
 import com.example.todoapplication.ui.viewmodel.TaskListViewModel
+import kotlinx.coroutines.launch
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
 import java.text.SimpleDateFormat
 import java.util.*
 
 /**
- * [TẦNG UI · MÀN HÌNH] Màn chính: danh sách công việc + tìm kiếm/lọc, tạo nhanh, kéo-thả, xem offline.
+ * [TẦNG UI · MÀN HÌNH] Màn chính: danh sách công việc + tìm kiếm/lọc, tạo nhanh, kéo-thả, kéo-để-làm-mới.
  * Quy tắc Compose: màn "vẽ theo state" (uiState) và chỉ GỌI HÀM ViewModel khi người dùng thao tác
- * ("state xuống, event lên"). Không tự chứa nghiệp vụ.
+ * ("state xuống, event lên"). Nhóm/sắp xếp đã được ViewModel tính sẵn trên luồng nền.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -70,63 +75,56 @@ fun TaskListScreen(
     // Lấy ViewModel (sống-dai qua các lần vẽ lại); Factory nạp sẵn repository từ ServiceLocator.
     taskListViewModel: TaskListViewModel = viewModel(factory = TaskListViewModel.Factory)
 ) {
-    val context = LocalContext.current
-    val userName = taskListViewModel.userName
-
-    // Quan sát state: mỗi lần ViewModel đổi state, dòng này khiến màn tự vẽ lại phần liên quan.
     val state by taskListViewModel.uiState.collectAsStateWithLifecycle()
-    val tasks = state.tasks
-    val isLoading = state.isLoading
-    val isOffline = state.isOffline
-    val quickAddLoading = state.quickAddLoading
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
 
-    var selectedCategoryFilter by remember { mutableStateOf("ALL") }
-    var searchQuery by remember { mutableStateOf("") }
-    var sortMode by remember { mutableStateOf(false) }
-    var sortBy by remember { mutableStateOf("DEFAULT") } // DEFAULT/DUE/PRIORITY/TITLE
-
-    val lazyListState = rememberLazyListState()
-    val reorderState = rememberReorderableLazyListState(lazyListState) { from, to ->
-        taskListViewModel.moveTask(from.index, to.index)
-    }
-
-    val aiRecommendedIds = remember(tasks) { aiRecommendedIds(tasks) }
-
-    var taskToDelete by remember { mutableStateOf<Task?>(null) }
-
+    // Ô tìm kiếm giữ text cục bộ: TextField cần cập nhật đồng bộ từng phím gõ, không thể đợi state
+    // vòng qua ViewModel (sẽ giật con trỏ). ViewModel chỉ nhận giá trị để lọc (có debounce).
+    var searchText by rememberSaveable { mutableStateOf(state.query) }
+    var sortMode by rememberSaveable { mutableStateOf(false) }
     var showQuickAdd by remember { mutableStateOf(false) }
     var quickAddText by remember { mutableStateOf("") }
-
-    // Thanh tạo nhanh (kiểu app tham khảo)
     var showQuickCreate by remember { mutableStateOf(false) }
+    var confirmLogoutCount by remember { mutableStateOf<Int?>(null) }
+
+    val lazyListState = rememberLazyListState()
+    val haptics = LocalHapticFeedback.current
+    val reorderState = rememberReorderableLazyListState(lazyListState) { from, to ->
+        taskListViewModel.onDragMove(from.key, to.key)
+        haptics.performHapticFeedback(HapticFeedbackType.SegmentFrequentTick)
+    }
 
     // Lắng nghe sự kiện một lần từ ViewModel
     LaunchedEffect(Unit) {
         taskListViewModel.events.collect { event ->
             when (event) {
-                is TaskListEvent.Message ->
-                    Toast.makeText(context, event.text, Toast.LENGTH_SHORT).show()
+                is TaskListEvent.Message -> scope.launch { snackbarHostState.showSnackbar(event.text) }
+                is TaskListEvent.Completed -> scope.launch {
+                    val text = if (event.spawnedNext) "Đã hoàn thành · đã tạo lần lặp kế tiếp" else "Đã hoàn thành: ${event.title}"
+                    val result = snackbarHostState.showSnackbar(text, actionLabel = "Hoàn tác", duration = SnackbarDuration.Short)
+                    if (result == SnackbarResult.ActionPerformed) taskListViewModel.reopenTask(event.taskId)
+                }
+                is TaskListEvent.Deleted -> scope.launch {
+                    val result = snackbarHostState.showSnackbar("Đã xóa: ${event.title}", actionLabel = "Hoàn tác", duration = SnackbarDuration.Long)
+                    if (result == SnackbarResult.ActionPerformed) taskListViewModel.undoDelete(event.taskId)
+                }
                 is TaskListEvent.QuickAddReady -> {
                     QuickAddDraft.set(event.parsed)
                     showQuickAdd = false
                     quickAddText = ""
                     navController.navigate(Screen.TaskDetail.createRoute("new"))
                 }
+                is TaskListEvent.ConfirmLogout -> confirmLogoutCount = event.pendingChanges
+                TaskListEvent.LoggedOut -> navController.navigate(Screen.Login.route) {
+                    popUpTo(Screen.TaskList.route) { inclusive = true }
+                }
             }
         }
     }
 
-    LaunchedEffect(selectedCategoryFilter, searchQuery) {
-        kotlinx.coroutines.delay(300)
-        taskListViewModel.loadTasks(selectedCategoryFilter, searchQuery)
-    }
-
-    // Derived stats
-    val pendingCount = tasks.count { it.status != "COMPLETED" }
-    val completedCount = tasks.count { it.status == "COMPLETED" }
-    val overdueCount = tasks.count { it.isOverdue() }
-
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         floatingActionButton = {
             FloatingActionButton(
                 onClick = { showQuickCreate = true },
@@ -137,401 +135,192 @@ fun TaskListScreen(
                 Icon(Icons.Default.Add, contentDescription = "Thêm công việc")
             }
         },
-        bottomBar = {
-            BottomNavigationBar(navController, activeTab = 0)
-        },
+        bottomBar = { BottomNavigationBar(navController, activeTab = 0) },
         containerColor = MaterialTheme.colorScheme.background
     ) { innerPadding ->
-        if (isLoading) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding),
-                contentAlignment = Alignment.Center
-            ) {
+        if (state.isLoading) {
+            Box(modifier = Modifier.fillMaxSize().padding(innerPadding), contentAlignment = Alignment.Center) {
                 LoadingState()
             }
-        } else {
+            return@Scaffold
+        }
+
+        // Kéo xuống để đồng bộ ngay với server
+        PullToRefreshBox(
+            isRefreshing = state.isRefreshing,
+            onRefresh = taskListViewModel::refresh,
+            modifier = Modifier.fillMaxSize().padding(top = innerPadding.calculateTopPadding())
+        ) {
             LazyColumn(
                 state = lazyListState,
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(
-                    top = innerPadding.calculateTopPadding() + 16.dp,
+                    top = 16.dp,
                     bottom = innerPadding.calculateBottomPadding() + 8.dp,
                     start = 16.dp,
                     end = 16.dp
                 ),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                // Greeting hero card
-                item {
+                item(key = "hero", contentType = "hero") {
                     GreetingHeroCard(
-                        userName = userName,
-                        pendingCount = pendingCount,
-                        completedCount = completedCount,
-                        overdueCount = overdueCount,
+                        userName = taskListViewModel.userName,
+                        pendingCount = state.pendingCount,
+                        completedCount = state.completedCount,
+                        overdueCount = state.overdueCount,
                         sortMode = sortMode,
-                        onSortToggle = { sortMode = !sortMode },
+                        onSortToggle = {
+                            sortMode = !sortMode
+                            if (!sortMode) taskListViewModel.endSortMode()
+                        },
                         onQuickAdd = { showQuickAdd = true },
-                        onLogout = {
-                            taskListViewModel.logout()
-                            navController.navigate(Screen.Login.route) {
-                                popUpTo(Screen.TaskList.route) { inclusive = true }
-                            }
+                        onLogout = taskListViewModel::requestLogout
+                    )
+                }
+
+                syncBanner(state)
+
+                item(key = "search", contentType = "search") {
+                    SearchField(
+                        value = searchText,
+                        onValueChange = {
+                            searchText = it
+                            taskListViewModel.setQuery(it)
                         }
                     )
                 }
 
-                // Offline banner
-                if (isOffline) {
-                    item {
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = StatePostponed.copy(alpha = 0.13f),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
+                item(key = "filters", contentType = "filters") {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        (listOf(ALL_CATEGORIES) + state.categories).forEach { filterName ->
+                            StatusFilterChip(
+                                text = categoryLabel(filterName),
+                                selected = state.selectedCategory == filterName,
+                                onClick = { taskListViewModel.setCategory(filterName) }
+                            )
+                        }
+                    }
+                }
+
+                val hasTasks = !state.sections.isEmpty
+                if (!sortMode && hasTasks) {
+                    item(key = "sort", contentType = "sort") {
+                        SortMenu(sortBy = state.sortBy, onSelect = taskListViewModel::setSortBy)
+                    }
+                }
+
+                when {
+                    !hasTasks -> item(key = "empty", contentType = "empty") {
+                        Box(modifier = Modifier.fillMaxWidth().padding(top = 40.dp), contentAlignment = Alignment.Center) {
+                            EmptyState(
+                                emoji = "🗒️",
+                                title = if (state.hasFilter) "Không tìm thấy công việc" else "Chưa có công việc nào",
+                                subtitle = if (state.hasFilter) "Thử từ khóa hoặc danh mục khác nhé." else "Nhấn + để thêm, hoặc ⭐ để thêm nhanh bằng AI."
+                            )
+                        }
+                    }
+
+                    sortMode -> {
+                        item(key = "sort-hint", contentType = "hint") {
                             Row(
-                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 2.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text("📴", fontSize = 15.sp)
-                                Spacer(Modifier.width(8.dp))
-                                Text(
-                                    "Chế độ offline — hiển thị dữ liệu đã lưu trên máy",
-                                    color = StatePostponed,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Medium
+                                Text("☰  Giữ và kéo để sắp xếp thứ tự", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                                Spacer(Modifier.weight(1f))
+                                TextButton(onClick = { sortMode = false; taskListViewModel.endSortMode() }) {
+                                    Text("Xong", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                        items(state.manualOrder, key = { it.id }, contentType = { "task" }) { task ->
+                            ReorderableItem(reorderState, key = task.id) { isDragging ->
+                                val elevation = if (isDragging) 10.dp else 0.dp
+                                TaskCard(
+                                    task = task,
+                                    modifier = Modifier.shadow(elevation, RoundedCornerShape(16.dp)),
+                                    onCardClick = { navController.navigate(Screen.TaskDetail.createRoute(task.id)) },
+                                    onToggleComplete = { taskListViewModel.completeTask(task) },
+                                    onDeleteClick = { taskListViewModel.deleteTask(task) },
+                                    isAiRecommended = task.id in state.aiRecommendedIds,
+                                    onSetPriority = { p -> taskListViewModel.setPriority(task, p) },
+                                    dragHandleModifier = Modifier.draggableHandle(
+                                        onDragStarted = {
+                                            haptics.performHapticFeedback(HapticFeedbackType.GestureThresholdActivate)
+                                            taskListViewModel.onDragStart(task.id)
+                                        },
+                                        onDragStopped = {
+                                            haptics.performHapticFeedback(HapticFeedbackType.GestureEnd)
+                                            taskListViewModel.onDragEnd()
+                                        }
+                                    )
                                 )
                             }
                         }
                     }
-                }
 
-                // Search bar
-                item {
-                    OutlinedTextField(
-                        value = searchQuery,
-                        onValueChange = { searchQuery = it },
-                        placeholder = {
-                            Text(
-                                "Tìm công việc...",
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        },
-                        leadingIcon = {
-                            Icon(
-                                Icons.Default.Search,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        },
-                        trailingIcon = {
-                            if (searchQuery.isNotEmpty()) {
-                                IconButton(onClick = { searchQuery = "" }) {
-                                    Icon(
-                                        Icons.Default.Close,
-                                        contentDescription = "Xóa",
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                            }
-                        },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(20.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = MaterialTheme.colorScheme.primary,
-                            unfocusedBorderColor = Color.Transparent,
-                            focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
-                            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant
-                        )
-                    )
-                }
-
-                // Category filter chips
-                item {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        (listOf("ALL") + CategoryStore.all()).forEach { filterName ->
-                            StatusFilterChip(
-                                text = categoryLabel(filterName),
-                                selected = selectedCategoryFilter == filterName,
-                                onClick = { selectedCategoryFilter = filterName }
-                            )
-                        }
-                    }
-                }
-
-                // Thanh sắp xếp (ẩn khi đang ở chế độ kéo-thả)
-                if (!sortMode && tasks.isNotEmpty()) {
-                    item {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Spacer(Modifier.weight(1f))
-                            var sortMenu by remember { mutableStateOf(false) }
-                            Box {
-                                Surface(
-                                    shape = RoundedCornerShape(20.dp),
-                                    color = MaterialTheme.colorScheme.surfaceVariant,
-                                    onClick = { sortMenu = true }
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Icon(Icons.Default.List, contentDescription = null, modifier = Modifier.size(15.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                                        Spacer(Modifier.width(5.dp))
-                                        Text("Sắp xếp: ${sortLabel(sortBy)}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    }
-                                }
-                                DropdownMenu(
-                                    expanded = sortMenu,
-                                    onDismissRequest = { sortMenu = false },
-                                    modifier = Modifier.background(MaterialTheme.colorScheme.surface)
-                                ) {
-                                    listOf("DEFAULT", "DUE", "PRIORITY", "TITLE").forEach { opt ->
-                                        DropdownMenuItem(
-                                            text = { Text(sortLabel(opt), color = if (sortBy == opt) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface) },
-                                            onClick = { sortBy = opt; sortMenu = false }
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // Task list or empty state
-                if (tasks.isEmpty()) {
-                    item {
-                        Box(modifier = Modifier.fillMaxWidth().padding(top = 40.dp), contentAlignment = Alignment.Center) {
-                            EmptyState(
-                                emoji = "🗒️",
-                                title = if (searchQuery.isNotBlank()) "Không tìm thấy công việc" else "Chưa có công việc nào",
-                                subtitle = if (searchQuery.isNotBlank()) "Thử từ khóa khác nhé." else "Nhấn + để thêm, hoặc ⭐ để thêm nhanh bằng AI."
-                            )
-                        }
-                    }
-                } else if (sortMode) {
-                    // Sort mode: drag & drop, no swipe-to-dismiss
-                    item {
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 2.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text("☰  Giữ và kéo để sắp xếp thứ tự", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
-                            Spacer(Modifier.weight(1f))
-                            TextButton(onClick = { sortMode = false }) { Text("Xong", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold) }
-                        }
-                    }
-                    items(tasks, key = { it.id }) { task ->
-                        ReorderableItem(reorderState, key = task.id) { isDragging ->
-                            TaskCard(
-                                task = task,
-                                onCardClick = { navController.navigate(Screen.TaskDetail.createRoute(task.id)) },
-                                onCompleteClick = { taskListViewModel.completeTask(task) },
-                                onDeleteClick = { taskToDelete = task },
-                                isAiRecommended = task.id in aiRecommendedIds,
-                                subtaskDone = state.subtaskProgress[task.id]?.done ?: 0,
-                                subtaskTotal = state.subtaskProgress[task.id]?.total ?: 0,
-                                onSetPriority = { p -> taskListViewModel.setPriority(task, p) },
-                                dragHandleModifier = Modifier.draggableHandle()
-                            )
-                        }
-                    }
-                } else {
-                    // Nhóm theo: Hôm nay / Tương lai / Đã hoàn thành (giống ảnh tham khảo)
-                    val pending = sortTasks(tasks.filter { it.status != "COMPLETED" }, sortBy)
-                    val todayTasks = pending.filter { !it.isFuture() }
-                    val futureTasks = pending.filter { it.isFuture() }
-                    val completedTasks = tasks.filter { it.status == "COMPLETED" && it.isUpdatedToday() }
-
-                    if (todayTasks.isNotEmpty()) {
-                        item { SectionHeader("Hôm nay", todayTasks.size) }
-                        items(todayTasks, key = { it.id }) { task ->
-                            SwipeableTaskCard(
-                                task = task,
-                                isAiRecommended = task.id in aiRecommendedIds,
-                                subtaskDone = state.subtaskProgress[task.id]?.done ?: 0,
-                                subtaskTotal = state.subtaskProgress[task.id]?.total ?: 0,
-                                onCardClick = { navController.navigate(Screen.TaskDetail.createRoute(task.id)) },
-                                onComplete = { taskListViewModel.completeTask(task) },
-                                onDelete = { taskToDelete = task },
-                                onSetPriority = { p -> taskListViewModel.setPriority(task, p) }
-                            )
-                        }
-                    }
-                    if (futureTasks.isNotEmpty()) {
-                        item { SectionHeader("Tương lai", futureTasks.size) }
-                        items(futureTasks, key = { it.id }) { task ->
-                            SwipeableTaskCard(
-                                task = task,
-                                isAiRecommended = task.id in aiRecommendedIds,
-                                subtaskDone = state.subtaskProgress[task.id]?.done ?: 0,
-                                subtaskTotal = state.subtaskProgress[task.id]?.total ?: 0,
-                                onCardClick = { navController.navigate(Screen.TaskDetail.createRoute(task.id)) },
-                                onComplete = { taskListViewModel.completeTask(task) },
-                                onDelete = { taskToDelete = task },
-                                onSetPriority = { p -> taskListViewModel.setPriority(task, p) }
-                            )
-                        }
-                    }
-                    if (completedTasks.isNotEmpty()) {
-                        item { SectionHeader("Đã hoàn thành hôm nay", completedTasks.size) }
-                        items(completedTasks, key = { it.id }) { task ->
-                            TaskCard(
-                                task = task,
-                                onCardClick = { navController.navigate(Screen.TaskDetail.createRoute(task.id)) },
-                                onCompleteClick = { },
-                                onDeleteClick = { taskToDelete = task },
-                                subtaskDone = state.subtaskProgress[task.id]?.done ?: 0,
-                                subtaskTotal = state.subtaskProgress[task.id]?.total ?: 0,
-                                onSetPriority = { p -> taskListViewModel.setPriority(task, p) }
-                            )
-                        }
+                    else -> {
+                        taskSection("Hôm nay", state.sections.today, state, navController, taskListViewModel, swipeable = true)
+                        taskSection("Tương lai", state.sections.future, state, navController, taskListViewModel, swipeable = true)
+                        taskSection("Đã hoàn thành hôm nay", state.sections.completedToday, state, navController, taskListViewModel, swipeable = false)
                     }
                 }
             }
         }
     }
 
-    taskToDelete?.let { task ->
+    confirmLogoutCount?.let { pending ->
         AlertDialog(
-            onDismissRequest = { taskToDelete = null },
-            title = { Text("Xóa công việc?", color = MaterialTheme.colorScheme.onSurface) },
-            text = { Text("\"${task.title}\" sẽ bị xóa vĩnh viễn.", color = MaterialTheme.colorScheme.onSurfaceVariant) },
+            onDismissRequest = { confirmLogoutCount = null },
+            title = { Text("Đăng xuất khi chưa đồng bộ?", color = MaterialTheme.colorScheme.onSurface) },
+            text = {
+                Text(
+                    "Còn $pending thay đổi chưa gửi được lên máy chủ (đang offline). Đăng xuất bây giờ sẽ làm mất các thay đổi này.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            },
             confirmButton = {
                 TextButton(onClick = {
-                    taskListViewModel.deleteTask(task)
-                    taskToDelete = null
-                }) { Text("Xóa", color = PriorityHighColor) }
+                    confirmLogoutCount = null
+                    taskListViewModel.logoutNow()
+                }) { Text("Vẫn đăng xuất", color = PriorityHighColor) }
             },
             dismissButton = {
-                TextButton(onClick = { taskToDelete = null }) {
-                    Text("Quay lại", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                TextButton(onClick = { confirmLogoutCount = null }) {
+                    Text("Ở lại", color = MaterialTheme.colorScheme.primary)
                 }
             },
             containerColor = MaterialTheme.colorScheme.surface
         )
     }
 
-    // AI Quick Add bottom sheet
     if (showQuickAdd) {
-        ModalBottomSheet(
-            onDismissRequest = { showQuickAdd = false },
-            containerColor = MaterialTheme.colorScheme.surface,
-            shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp)
-                    .padding(bottom = 32.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier = Modifier
-                            .size(36.dp)
-                            .background(
-                                Brush.linearGradient(
-                                    listOf(
-                                        MaterialTheme.colorScheme.primary,
-                                        MaterialTheme.colorScheme.tertiary
-                                    )
-                                ),
-                                CircleShape
-                            ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(Icons.Default.Star, contentDescription = null, modifier = Modifier.size(18.dp), tint = Color.White)
-                    }
-                    Spacer(Modifier.width(10.dp))
-                    Column {
-                        Text("Thêm nhanh bằng AI", fontWeight = FontWeight.Bold, fontSize = 17.sp, color = MaterialTheme.colorScheme.onSurface)
-                        Text("AI sẽ tự phân tích và điền form cho bạn", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
-                    }
-                }
-                OutlinedTextField(
-                    value = quickAddText,
-                    onValueChange = { quickAddText = it },
-                    placeholder = {
-                        Text(
-                            "VD: Họp với sếp thứ 6 lúc 3h chiều, khoảng 1 tiếng",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    minLines = 2,
-                    enabled = !quickAddLoading,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = MaterialTheme.colorScheme.primary,
-                        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
-                        focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
-                        focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant
-                    )
-                )
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(52.dp)
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(
-                            if (!quickAddLoading && quickAddText.isNotBlank())
-                                Brush.horizontalGradient(
-                                    listOf(
-                                        MaterialTheme.colorScheme.primary,
-                                        MaterialTheme.colorScheme.tertiary
-                                    )
-                                )
-                            else Brush.horizontalGradient(listOf(
-                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
-                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
-                            ))
-                        )
-                        .clickable(enabled = !quickAddLoading && quickAddText.isNotBlank()) {
-                            val nowRfc = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", Locale.getDefault()).format(Date())
-                            taskListViewModel.parseQuickAdd(quickAddText, nowRfc)
-                        },
-                    contentAlignment = Alignment.Center
-                ) {
-                    if (quickAddLoading) {
-                        CircularProgressIndicator(color = Color.White, modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
-                    } else {
-                        Text("Phân tích bằng AI", fontWeight = FontWeight.SemiBold, color = Color.White, fontSize = 15.sp)
-                    }
-                }
+        AiQuickAddSheet(
+            text = quickAddText,
+            onTextChange = { quickAddText = it },
+            isLoading = state.quickAddLoading,
+            onDismiss = { showQuickAdd = false },
+            onSubmit = {
+                val nowRfc = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", Locale.US).format(Date())
+                taskListViewModel.parseQuickAdd(quickAddText, nowRfc)
             }
-        }
+        )
     }
 
     // Thanh tạo nhanh (gõ tiêu đề + chọn nhanh ngày/danh mục, giống app tham khảo)
     if (showQuickCreate) {
         QuickCreateSheet(
+            categories = state.categories,
             onDismiss = { showQuickCreate = false },
-            onCreate = { input ->
-                taskListViewModel.createQuickTask(input)
+            onCreate = { draft ->
+                taskListViewModel.createQuickTask(draft)
                 showQuickCreate = false
             },
-            onMoreDetails = { title, category, dueDate ->
-                QuickAddDraft.set(
-                    com.example.todoapplication.data.model.ParsedTask(
-                        title = title,
-                        category = category,
-                        dueDate = dueDate
-                    )
-                )
+            onMoreDetails = { title, category, dueAt ->
+                QuickAddDraft.set(ParsedTask(title = title, category = category, dueDate = dueAt?.let(::toIsoString)))
                 showQuickCreate = false
                 navController.navigate(Screen.TaskDetail.createRoute("new"))
             },
@@ -544,6 +333,221 @@ fun TaskListScreen(
                 navController.navigate(Screen.Templates.route)
             }
         )
+    }
+}
+
+/** Một nhóm task có tiêu đề. animateItem(): thẻ trượt mượt sang nhóm khác khi hoàn thành/mở lại. */
+private fun LazyListScope.taskSection(
+    title: String,
+    tasks: List<Task>,
+    state: TaskListUiState,
+    navController: NavController,
+    viewModel: TaskListViewModel,
+    swipeable: Boolean
+) {
+    if (tasks.isEmpty()) return
+    item(key = "header-$title", contentType = "header") {
+        SectionHeader(title, tasks.size, Modifier.animateItem())
+    }
+    items(tasks, key = { it.id }, contentType = { "task" }) { task ->
+        val onToggle = { if (task.isCompleted) viewModel.reopenTask(task.id) else viewModel.completeTask(task) }
+        val card = @Composable {
+            TaskCard(
+                task = task,
+                onCardClick = { navController.navigate(Screen.TaskDetail.createRoute(task.id)) },
+                onToggleComplete = onToggle,
+                onDeleteClick = { viewModel.deleteTask(task) },
+                isAiRecommended = task.id in state.aiRecommendedIds,
+                onSetPriority = { p -> viewModel.setPriority(task, p) }
+            )
+        }
+        Box(Modifier.animateItem()) {
+            if (swipeable) SwipeToCompleteBox(onComplete = { viewModel.completeTask(task) }) { card() } else card()
+        }
+    }
+}
+
+/** Banner trạng thái đồng bộ: offline / còn thay đổi chưa gửi. */
+private fun LazyListScope.syncBanner(state: TaskListUiState) {
+    val (icon, text) = when {
+        !state.isOnline && state.pendingSyncCount > 0 ->
+            Icons.Outlined.CloudOff to "Đang offline — ${state.pendingSyncCount} thay đổi đã lưu trên máy, sẽ tự đồng bộ khi có mạng"
+        !state.isOnline -> Icons.Outlined.CloudOff to "Đang offline — bạn vẫn thêm/sửa công việc bình thường"
+        state.pendingSyncCount > 0 -> Icons.Outlined.CloudUpload to "Đang đồng bộ ${state.pendingSyncCount} thay đổi…"
+        else -> return
+    }
+    item(key = "sync-banner", contentType = "banner") {
+        Surface(
+            shape = RoundedCornerShape(12.dp),
+            color = StatePostponed.copy(alpha = 0.13f),
+            modifier = Modifier.fillMaxWidth().animateItem()
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(icon, contentDescription = null, tint = StatePostponed, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(text, color = StatePostponed, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+            }
+        }
+    }
+}
+
+@Composable
+private fun SearchField(value: String, onValueChange: (String) -> Unit) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        placeholder = { Text("Tìm công việc...", color = MaterialTheme.colorScheme.onSurfaceVariant) },
+        leadingIcon = {
+            Icon(Icons.Default.Search, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        },
+        trailingIcon = {
+            if (value.isNotEmpty()) {
+                IconButton(onClick = { onValueChange("") }) {
+                    Icon(Icons.Default.Close, contentDescription = "Xóa", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        },
+        singleLine = true,
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedBorderColor = MaterialTheme.colorScheme.primary,
+            unfocusedBorderColor = Color.Transparent,
+            focusedTextColor = MaterialTheme.colorScheme.onSurface,
+            unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant
+        )
+    )
+}
+
+@Composable
+private fun SortMenu(sortBy: String, onSelect: (String) -> Unit) {
+    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Spacer(Modifier.weight(1f))
+        var expanded by remember { mutableStateOf(false) }
+        Box {
+            Surface(
+                shape = RoundedCornerShape(20.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                onClick = { expanded = true }
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Default.List, contentDescription = null, modifier = Modifier.size(15.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.width(5.dp))
+                    Text("Sắp xếp: ${sortLabel(sortBy)}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            DropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false },
+                modifier = Modifier.background(MaterialTheme.colorScheme.surface)
+            ) {
+                listOf("DEFAULT", "DUE", "PRIORITY", "TITLE").forEach { option ->
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                sortLabel(option),
+                                color = if (sortBy == option) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                            )
+                        },
+                        onClick = { onSelect(option); expanded = false }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AiQuickAddSheet(
+    text: String,
+    onTextChange: (String) -> Unit,
+    isLoading: Boolean,
+    onDismiss: () -> Unit,
+    onSubmit: () -> Unit
+) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = MaterialTheme.colorScheme.surface,
+        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 32.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .background(
+                            Brush.linearGradient(listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.tertiary)),
+                            CircleShape
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Default.Star, contentDescription = null, modifier = Modifier.size(18.dp), tint = Color.White)
+                }
+                Spacer(Modifier.width(10.dp))
+                Column {
+                    Text("Thêm nhanh bằng AI", fontWeight = FontWeight.Bold, fontSize = 17.sp, color = MaterialTheme.colorScheme.onSurface)
+                    Text("AI sẽ tự phân tích và điền form cho bạn", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                }
+            }
+            OutlinedTextField(
+                value = text,
+                onValueChange = onTextChange,
+                placeholder = {
+                    Text("VD: Họp với sếp thứ 6 lúc 3h chiều, khoảng 1 tiếng", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                minLines = 2,
+                enabled = !isLoading,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                    focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                    focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant
+                )
+            )
+            val enabled = !isLoading && text.isNotBlank()
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(
+                        if (enabled) Brush.horizontalGradient(listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.tertiary))
+                        else Brush.horizontalGradient(
+                            listOf(
+                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
+                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
+                            )
+                        )
+                    )
+                    .clickable(enabled = enabled, onClick = onSubmit),
+                contentAlignment = Alignment.Center
+            ) {
+                if (isLoading) {
+                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
+                } else {
+                    Text("Phân tích bằng AI", fontWeight = FontWeight.SemiBold, color = Color.White, fontSize = 15.sp)
+                }
+            }
+        }
     }
 }
 
@@ -564,19 +568,20 @@ private val QUICK_TEMPLATES = listOf(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun QuickCreateSheet(
+    categories: List<String>,
     onDismiss: () -> Unit,
-    onCreate: (com.example.todoapplication.data.model.CreateTaskInput) -> Unit,
-    onMoreDetails: (title: String, category: String, dueDate: String?) -> Unit,
+    onCreate: (TaskDraft) -> Unit,
+    onMoreDetails: (title: String, category: String, dueAt: Long?) -> Unit,
     onAiAdd: () -> Unit,
     onTemplates: () -> Unit
 ) {
     var title by remember { mutableStateOf("") }
     // Preset ngày: 0=Hôm nay,1=Ngày mai,3=3 ngày sau, -2=Cuối tuần, -1=Không
-    var datePreset by remember { mutableStateOf(-1) }
+    var datePreset by remember { mutableIntStateOf(-1) }
     var category by remember { mutableStateOf("OTHER") }
     var priority by remember { mutableStateOf("MEDIUM") }
 
-    fun resolveDue(): String? = when (datePreset) {
+    fun resolveDue(): Long? = when (datePreset) {
         0 -> dueAtDayOffset(0)
         1 -> dueAtDayOffset(1)
         3 -> dueAtDayOffset(3)
@@ -637,31 +642,26 @@ private fun QuickCreateSheet(
                 }
             }
 
-            // Chọn nhanh ngày
             Text("Hạn chót", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Row(
                 modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                listOf(
-                    0 to "Hôm nay", 1 to "Ngày mai", 3 to "3 ngày sau", -2 to "Cuối tuần", -1 to "Không"
-                ).forEach { (value, label) ->
+                listOf(0 to "Hôm nay", 1 to "Ngày mai", 3 to "3 ngày sau", -2 to "Cuối tuần", -1 to "Không").forEach { (value, label) ->
                     StatusFilterChip(text = label, selected = datePreset == value, onClick = { datePreset = value })
                 }
             }
 
-            // Danh mục
             Text("Danh mục", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Row(
                 modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                CategoryStore.all().forEach { c ->
+                categories.forEach { c ->
                     StatusFilterChip(text = categoryLabel(c), selected = category == c, onClick = { category = c })
                 }
             }
 
-            // Ưu tiên
             Text("Ưu tiên", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 listOf("LOW", "MEDIUM", "HIGH").forEach { p ->
@@ -690,15 +690,7 @@ private fun QuickCreateSheet(
                 FloatingActionButton(
                     onClick = {
                         if (title.isNotBlank()) {
-                            onCreate(
-                                com.example.todoapplication.data.model.CreateTaskInput(
-                                    title = title.trim(),
-                                    description = "",
-                                    priority = priority,
-                                    dueDate = resolveDue(),
-                                    category = category
-                                )
-                            )
+                            onCreate(TaskDraft(title = title.trim(), priority = priority, dueAt = resolveDue(), category = category))
                         }
                     },
                     modifier = Modifier.size(48.dp),
@@ -733,11 +725,7 @@ private fun GreetingHeroCard(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(24.dp))
-            .background(
-                Brush.linearGradient(
-                    listOf(primary, primary.copy(alpha = 0.72f))
-                )
-            )
+            .background(Brush.linearGradient(listOf(primary, primary.copy(alpha = 0.72f))))
             .padding(20.dp)
     ) {
         Column {
@@ -747,15 +735,9 @@ private fun GreetingHeroCard(
                 verticalAlignment = Alignment.Top
             ) {
                 Column(modifier = Modifier.weight(1f)) {
+                    Text("Xin chào, $userName! 👋", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 21.sp)
                     Text(
-                        "Xin chào, $userName! 👋",
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 21.sp
-                    )
-                    Text(
-                        if (pendingCount > 0) "$pendingCount việc đang chờ bạn"
-                        else "Bạn đã xử lý hết việc hôm nay! 🎉",
+                        if (pendingCount > 0) "$pendingCount việc đang chờ bạn" else "Bạn đã xử lý hết việc hôm nay! 🎉",
                         color = Color.White.copy(alpha = 0.85f),
                         fontSize = 13.sp,
                         modifier = Modifier.padding(top = 4.dp)
@@ -769,10 +751,7 @@ private fun GreetingHeroCard(
                         Box(
                             modifier = Modifier
                                 .size(26.dp)
-                                .background(
-                                    if (sortMode) Color.White else Color.White.copy(alpha = 0.2f),
-                                    CircleShape
-                                ),
+                                .background(if (sortMode) Color.White else Color.White.copy(alpha = 0.2f), CircleShape),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
@@ -805,34 +784,26 @@ private fun GreetingHeroCard(
 // ─── Section header + swipeable row ──────────────────────────────────────────
 
 @Composable
-private fun SectionHeader(title: String, count: Int) {
+private fun SectionHeader(title: String, count: Int, modifier: Modifier = Modifier) {
     Text(
         text = "$title ($count)",
         fontWeight = FontWeight.Bold,
         fontSize = 15.sp,
         color = MaterialTheme.colorScheme.onSurface,
-        modifier = Modifier.padding(start = 4.dp, top = 4.dp, bottom = 2.dp)
+        modifier = modifier.padding(start = 4.dp, top = 4.dp, bottom = 2.dp)
     )
 }
 
+/** Vuốt sang phải để hoàn thành (thẻ bật lại chỗ cũ; ViewModel chuyển nó sang nhóm "Đã hoàn thành"). */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun SwipeableTaskCard(
-    task: Task,
-    isAiRecommended: Boolean,
-    subtaskDone: Int,
-    subtaskTotal: Int,
-    onCardClick: () -> Unit,
-    onComplete: () -> Unit,
-    onDelete: () -> Unit,
-    onSetPriority: (String) -> Unit
-) {
-    val context = LocalContext.current
+private fun SwipeToCompleteBox(onComplete: () -> Unit, content: @Composable () -> Unit) {
+    val haptics = LocalHapticFeedback.current
     val dismissState = rememberSwipeToDismissBoxState(
         confirmValueChange = { value ->
             if (value == SwipeToDismissBoxValue.StartToEnd) {
+                haptics.performHapticFeedback(HapticFeedbackType.Confirm)
                 onComplete()
-                Toast.makeText(context, "Đã hoàn thành: ${task.title}", Toast.LENGTH_SHORT).show()
             }
             false
         }
@@ -858,25 +829,13 @@ private fun SwipeableTaskCard(
             }
         }
     ) {
-        TaskCard(
-            task = task,
-            onCardClick = onCardClick,
-            onCompleteClick = onComplete,
-            onDeleteClick = onDelete,
-            isAiRecommended = isAiRecommended,
-            subtaskDone = subtaskDone,
-            subtaskTotal = subtaskTotal,
-            onSetPriority = onSetPriority
-        )
+        content()
     }
 }
 
 @Composable
 private fun HeroStatChip(value: String, label: String, valueColor: Color) {
-    Surface(
-        shape = RoundedCornerShape(14.dp),
-        color = Color.White.copy(alpha = 0.18f)
-    ) {
+    Surface(shape = RoundedCornerShape(14.dp), color = Color.White.copy(alpha = 0.18f)) {
         Column(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
             horizontalAlignment = Alignment.CenterHorizontally
@@ -893,15 +852,14 @@ private fun HeroStatChip(value: String, label: String, valueColor: Color) {
 fun TaskCard(
     task: Task,
     onCardClick: () -> Unit,
-    onCompleteClick: () -> Unit,
+    onToggleComplete: () -> Unit,
     onDeleteClick: () -> Unit,
+    modifier: Modifier = Modifier,
     isAiRecommended: Boolean = false,
-    subtaskDone: Int = 0,
-    subtaskTotal: Int = 0,
     onSetPriority: (String) -> Unit = {},
-    dragHandleModifier: Modifier = Modifier
+    dragHandleModifier: Modifier? = null
 ) {
-    val isCompleted = task.status == "COMPLETED"
+    val isCompleted = task.isCompleted
     val isOverdue = task.isOverdue()
 
     val accentColor = when (task.priority) {
@@ -911,15 +869,11 @@ fun TaskCard(
     }
 
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .then(if (dragHandleModifier != Modifier) Modifier.shadow(8.dp, RoundedCornerShape(16.dp)) else Modifier)
-            .clickable(onClick = onCardClick),
+        modifier = modifier.fillMaxWidth().clickable(onClick = onCardClick),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
-        // AI recommended banner
         if (isAiRecommended) {
             Row(
                 modifier = Modifier
@@ -930,12 +884,7 @@ fun TaskCard(
             ) {
                 Text("🤖", fontSize = 11.sp)
                 Spacer(Modifier.width(4.dp))
-                Text(
-                    "AI khuyến nghị ưu tiên",
-                    color = MaterialTheme.colorScheme.primary,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
+                Text("AI khuyến nghị ưu tiên", color = MaterialTheme.colorScheme.primary, fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
             }
         }
         Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
@@ -944,47 +893,31 @@ fun TaskCard(
                 modifier = Modifier
                     .width(4.dp)
                     .fillMaxHeight()
-                    .background(
-                        accentColor,
-                        RoundedCornerShape(topStart = 16.dp, bottomStart = 16.dp)
-                    )
+                    .background(accentColor, RoundedCornerShape(topStart = 16.dp, bottomStart = 16.dp))
             )
             // Drag handle (only in sort mode)
-            if (dragHandleModifier != Modifier) {
+            if (dragHandleModifier != null) {
                 Box(
-                    modifier = dragHandleModifier
-                        .width(28.dp)
-                        .fillMaxHeight()
-                        .padding(start = 6.dp),
+                    modifier = dragHandleModifier.width(28.dp).fillMaxHeight().padding(start = 6.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(Icons.Default.Menu, contentDescription = "Kéo", tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f), modifier = Modifier.size(16.dp))
                 }
             }
 
-            // Complete checkbox (tròn) — tick để hoàn thành nhanh
-            Box(
-                modifier = Modifier
-                    .padding(start = 8.dp)
-                    .fillMaxHeight(),
-                contentAlignment = Alignment.Center
-            ) {
+            // Ô tích tròn: tích để hoàn thành, tích lại để mở lại
+            Box(modifier = Modifier.padding(start = 8.dp).fillMaxHeight(), contentAlignment = Alignment.Center) {
                 Box(
                     modifier = Modifier
                         .size(24.dp)
                         .clip(CircleShape)
-                        .background(
-                            if (isCompleted) StateCompleted else Color.Transparent
-                        )
-                        .then(
-                            if (isCompleted) Modifier
-                            else Modifier.border(2.dp, accentColor.copy(alpha = 0.6f), CircleShape)
-                        )
-                        .clickable(enabled = !isCompleted, onClick = onCompleteClick),
+                        .background(if (isCompleted) StateCompleted else Color.Transparent)
+                        .then(if (isCompleted) Modifier else Modifier.border(2.dp, accentColor.copy(alpha = 0.6f), CircleShape))
+                        .clickable(onClick = onToggleComplete),
                     contentAlignment = Alignment.Center
                 ) {
                     if (isCompleted) {
-                        Icon(Icons.Default.Check, contentDescription = "Hoàn thành", tint = Color.White, modifier = Modifier.size(16.dp))
+                        Icon(Icons.Default.Check, contentDescription = "Mở lại", tint = Color.White, modifier = Modifier.size(16.dp))
                     }
                 }
             }
@@ -994,94 +927,35 @@ fun TaskCard(
                     .weight(1f)
                     .padding(start = 10.dp, end = 8.dp, top = 13.dp, bottom = 12.dp)
             ) {
-                // Title row with overflow menu
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = task.title,
                         fontWeight = FontWeight.SemiBold,
                         fontSize = 15.sp,
-                        color = if (isCompleted)
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        else MaterialTheme.colorScheme.onSurface,
+                        color = if (isCompleted) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
                         textDecoration = if (isCompleted) TextDecoration.LineThrough else null,
                         modifier = Modifier.weight(1f),
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
-                    // Recurrence icon
-                    if (task.recurrence != "NONE") {
+                    if (task.hasPendingSync) {
                         Spacer(Modifier.width(4.dp))
                         Icon(
-                            Icons.Default.Refresh,
-                            contentDescription = "Lặp lại",
+                            Icons.Outlined.CloudUpload,
+                            contentDescription = "Chưa đồng bộ",
                             modifier = Modifier.size(14.dp),
-                            tint = MaterialTheme.colorScheme.tertiary
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                         )
                     }
-                    // Cờ ưu tiên (bấm để đổi)
-                    var flagMenu by remember { mutableStateOf(false) }
-                    Box {
-                        IconButton(onClick = { flagMenu = true }, modifier = Modifier.size(32.dp)) {
-                            Icon(
-                                Icons.Default.Flag,
-                                contentDescription = "Đổi ưu tiên",
-                                modifier = Modifier.size(16.dp),
-                                tint = accentColor
-                            )
-                        }
-                        DropdownMenu(
-                            expanded = flagMenu,
-                            onDismissRequest = { flagMenu = false },
-                            modifier = Modifier.background(MaterialTheme.colorScheme.surface)
-                        ) {
-                            listOf(
-                                "HIGH" to PriorityHighColor,
-                                "MEDIUM" to PriorityMediumColor,
-                                "LOW" to PriorityLowColor
-                            ).forEach { (p, color) ->
-                                DropdownMenuItem(
-                                    text = { Text(priorityLabel(p), color = MaterialTheme.colorScheme.onSurface) },
-                                    leadingIcon = { Icon(Icons.Default.Flag, contentDescription = null, tint = color, modifier = Modifier.size(16.dp)) },
-                                    onClick = { flagMenu = false; onSetPriority(p) }
-                                )
-                            }
-                        }
+                    if (task.isRecurring) {
+                        Spacer(Modifier.width(4.dp))
+                        Icon(Icons.Default.Refresh, contentDescription = "Lặp lại", modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.tertiary)
                     }
-                    // Overflow menu
-                    var menuExpanded by remember { mutableStateOf(false) }
-                    Box {
-                        IconButton(onClick = { menuExpanded = true }, modifier = Modifier.size(32.dp)) {
-                            Icon(
-                                Icons.Default.MoreVert,
-                                contentDescription = "Thêm",
-                                modifier = Modifier.size(18.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        DropdownMenu(
-                            expanded = menuExpanded,
-                            onDismissRequest = { menuExpanded = false },
-                            modifier = Modifier.background(MaterialTheme.colorScheme.surface)
-                        ) {
-                            DropdownMenuItem(
-                                text = { Text("Chỉnh sửa", color = MaterialTheme.colorScheme.onSurface) },
-                                leadingIcon = { Icon(imageVector = Icons.Default.Edit, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
-                                onClick = { menuExpanded = false; onCardClick() }
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Xóa", color = PriorityHighColor) },
-                                leadingIcon = { Icon(imageVector = Icons.Default.Delete, contentDescription = null, tint = PriorityHighColor) },
-                                onClick = { menuExpanded = false; onDeleteClick() }
-                            )
-                        }
-                    }
+                    PriorityFlagMenu(accentColor = accentColor, onSetPriority = onSetPriority)
+                    OverflowMenu(onEdit = onCardClick, onDelete = onDeleteClick)
                 }
 
-                // Description
-                if (!task.description.isNullOrEmpty()) {
+                if (task.description.isNotEmpty()) {
                     Text(
                         task.description,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -1092,18 +966,8 @@ fun TaskCard(
                     )
                 }
 
-                // Bottom row: category + due date + subtask chips
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    // Category chip
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = MaterialTheme.colorScheme.primaryContainer
-                    ) {
+                Row(modifier = Modifier.fillMaxWidth().padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Surface(shape = RoundedCornerShape(8.dp), color = MaterialTheme.colorScheme.primaryContainer) {
                         Text(
                             categoryLabel(task.category),
                             color = MaterialTheme.colorScheme.primary,
@@ -1112,18 +976,13 @@ fun TaskCard(
                             modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
                         )
                     }
-                    // Due date chip
-                    task.dueDate?.let { dateStr ->
+                    task.dueAt?.let { due ->
                         Spacer(Modifier.width(6.dp))
                         Surface(
                             shape = RoundedCornerShape(8.dp),
-                            color = if (isOverdue) StateOverdue.copy(alpha = 0.12f)
-                                    else MaterialTheme.colorScheme.surfaceVariant
+                            color = if (isOverdue) StateOverdue.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceVariant
                         ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
+                            Row(modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                                 Icon(
                                     Icons.Default.DateRange,
                                     contentDescription = null,
@@ -1132,24 +991,23 @@ fun TaskCard(
                                 )
                                 Spacer(Modifier.width(4.dp))
                                 Text(
-                                    formatUtcToLocal(dateStr),
+                                    formatDateTime(due),
                                     color = if (isOverdue) StateOverdue else MaterialTheme.colorScheme.onSurfaceVariant,
                                     fontSize = 11.sp
                                 )
                             }
                         }
                     }
-                    // Subtask checklist progress chip
-                    if (subtaskTotal > 0) {
+                    if (task.subtaskTotal > 0) {
+                        val allDone = task.subtaskDone == task.subtaskTotal
                         Spacer(Modifier.width(6.dp))
                         Surface(
                             shape = RoundedCornerShape(8.dp),
-                            color = if (subtaskDone == subtaskTotal) StateCompleted.copy(alpha = 0.13f)
-                                    else MaterialTheme.colorScheme.surfaceVariant
+                            color = if (allDone) StateCompleted.copy(alpha = 0.13f) else MaterialTheme.colorScheme.surfaceVariant
                         ) {
                             Text(
-                                "☑ $subtaskDone/$subtaskTotal",
-                                color = if (subtaskDone == subtaskTotal) StateCompleted else MaterialTheme.colorScheme.onSurfaceVariant,
+                                "☑ ${task.subtaskDone}/${task.subtaskTotal}",
+                                color = if (allDone) StateCompleted else MaterialTheme.colorScheme.onSurfaceVariant,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Medium,
                                 modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
@@ -1162,68 +1020,60 @@ fun TaskCard(
     }
 }
 
+@Composable
+private fun PriorityFlagMenu(accentColor: Color, onSetPriority: (String) -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        IconButton(onClick = { expanded = true }, modifier = Modifier.size(32.dp)) {
+            Icon(Icons.Default.Flag, contentDescription = "Đổi ưu tiên", modifier = Modifier.size(16.dp), tint = accentColor)
+        }
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            modifier = Modifier.background(MaterialTheme.colorScheme.surface)
+        ) {
+            listOf("HIGH" to PriorityHighColor, "MEDIUM" to PriorityMediumColor, "LOW" to PriorityLowColor).forEach { (p, color) ->
+                DropdownMenuItem(
+                    text = { Text(priorityLabel(p), color = MaterialTheme.colorScheme.onSurface) },
+                    leadingIcon = { Icon(Icons.Default.Flag, contentDescription = null, tint = color, modifier = Modifier.size(16.dp)) },
+                    onClick = { expanded = false; onSetPriority(p) }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun OverflowMenu(onEdit: () -> Unit, onDelete: () -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        IconButton(onClick = { expanded = true }, modifier = Modifier.size(32.dp)) {
+            Icon(Icons.Default.MoreVert, contentDescription = "Thêm", modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            modifier = Modifier.background(MaterialTheme.colorScheme.surface)
+        ) {
+            DropdownMenuItem(
+                text = { Text("Chỉnh sửa", color = MaterialTheme.colorScheme.onSurface) },
+                leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
+                onClick = { expanded = false; onEdit() }
+            )
+            DropdownMenuItem(
+                text = { Text("Xóa", color = PriorityHighColor) },
+                leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null, tint = PriorityHighColor) },
+                onClick = { expanded = false; onDelete() }
+            )
+        }
+    }
+}
+
 // ─── Wrapper / chips ─────────────────────────────────────────────────────────
 
 @Composable
 fun BottomNavigationBar(navController: NavController, activeTab: Int) =
     AppBottomBar(navController, activeTab)
-
-// Legacy pill composables (still used by other screens that haven't been migrated)
-@Composable
-fun OverduePill() {
-    Surface(
-        shape = RoundedCornerShape(8.dp),
-        color = StateOverdue.copy(alpha = 0.13f),
-        border = BorderStroke(1.dp, StateOverdue.copy(alpha = 0.4f))
-    ) {
-        Text(
-            "QUÁ HẠN",
-            color = StateOverdue,
-            fontSize = 10.sp,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-        )
-    }
-}
-
-@Composable
-fun CancelledPill() {
-    Surface(
-        shape = RoundedCornerShape(8.dp),
-        color = StateCancelled.copy(alpha = 0.13f),
-        border = BorderStroke(1.dp, StateCancelled.copy(alpha = 0.4f))
-    ) {
-        Text(
-            "ĐÃ HỦY",
-            color = StateCancelled,
-            fontSize = 10.sp,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-        )
-    }
-}
-
-@Composable
-fun PriorityPill(priority: String) {
-    val color = when (priority) {
-        "HIGH" -> PriorityHighColor
-        "MEDIUM" -> PriorityMediumColor
-        else -> PriorityLowColor
-    }
-    Surface(
-        shape = RoundedCornerShape(8.dp),
-        color = color.copy(alpha = 0.13f),
-        border = BorderStroke(1.dp, color.copy(alpha = 0.4f))
-    ) {
-        Text(
-            text = priorityLabel(priority),
-            color = color,
-            fontSize = 10.sp,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-        )
-    }
-}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -1231,12 +1081,7 @@ fun StatusFilterChip(text: String, selected: Boolean, onClick: () -> Unit) {
     val containerColor = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
     val contentColor = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
 
-    Surface(
-        onClick = onClick,
-        shape = RoundedCornerShape(20.dp),
-        color = containerColor,
-        contentColor = contentColor
-    ) {
+    Surface(onClick = onClick, shape = RoundedCornerShape(20.dp), color = containerColor, contentColor = contentColor) {
         Text(
             text = text,
             fontSize = 12.sp,

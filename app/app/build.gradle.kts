@@ -38,7 +38,17 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
+    // Schema JSON của Room làm asset cho androidTest → MigrationTestHelper dựng lại được DB phiên bản cũ
+    sourceSets {
+        getByName("androidTest").assets.srcDir("$projectDir/schemas")
+    }
+}
+
+// Room xuất schema JSON mỗi version -> commit vào git để viết/kiểm tra Migration
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
 }
 
 dependencies {
@@ -84,6 +94,8 @@ dependencies {
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(libs.androidx.junit)
+    androidTestImplementation(libs.androidx.room.testing)
+    androidTestImplementation(libs.kotlinx.coroutines.test)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     debugImplementation(libs.androidx.compose.ui.tooling)
 }

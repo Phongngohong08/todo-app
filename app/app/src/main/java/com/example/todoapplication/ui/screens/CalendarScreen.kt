@@ -14,30 +14,32 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
-import com.example.todoapplication.data.model.Task
+import com.example.todoapplication.ui.viewmodel.CalendarEntry
 import com.example.todoapplication.ui.navigation.Screen
 import com.example.todoapplication.ui.theme.*
 import com.example.todoapplication.ui.viewmodel.CalendarViewModel
 import java.util.*
 
-/** [TẦNG UI · MÀN HÌNH] Lịch tháng — hiển thị việc theo ngày (tasksByDay từ CalendarViewModel). */
+/** [TẦNG UI · MÀN HÌNH] Lịch tháng — hiển thị việc theo ngày (entriesByDay từ CalendarViewModel). */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CalendarScreen(
     navController: NavController,
     calendarViewModel: CalendarViewModel = viewModel(factory = CalendarViewModel.Factory)
 ) {
-    // state.tasksByDay: map "ngày" → task rơi vào ngày đó (ViewModel đã khai triển việc lặp).
+    // state.entriesByDay: map "ngày" → các mục rơi vào ngày đó (ViewModel quan sát Room, đã chiếu thêm việc lặp).
     val state by calendarViewModel.uiState.collectAsStateWithLifecycle()
     val primary = MaterialTheme.colorScheme.primary
 
@@ -48,7 +50,6 @@ fun CalendarScreen(
     var shownMonth by remember { mutableIntStateOf(today.get(Calendar.MONTH)) } // 0-based
     var selectedDay by remember { mutableStateOf(CalendarViewModel.keyOf(today.get(Calendar.YEAR), today.get(Calendar.MONTH), today.get(Calendar.DAY_OF_MONTH))) }
 
-    LaunchedEffect(Unit) { calendarViewModel.load() }   // tải & khai triển task một lần khi mở màn
 
     val monthNames = listOf(
         "Tháng 1", "Tháng 2", "Tháng 3", "Tháng 4", "Tháng 5", "Tháng 6",
@@ -110,7 +111,7 @@ fun CalendarScreen(
                             Box(modifier = Modifier.weight(1f).aspectRatio(1f), contentAlignment = Alignment.Center) {
                                 if (day > 0) {
                                     val key = CalendarViewModel.keyOf(shownYear, shownMonth, day)
-                                    val dayTasks = state.tasksByDay[key].orEmpty()
+                                    val dayTasks = state.entriesByDay[key].orEmpty()
                                     val isToday = key == CalendarViewModel.keyOf(today.get(Calendar.YEAR), today.get(Calendar.MONTH), today.get(Calendar.DAY_OF_MONTH))
                                     val isSelected = key == selectedDay
                                     Column(
@@ -155,7 +156,7 @@ fun CalendarScreen(
             Divider(color = MaterialTheme.colorScheme.outlineVariant, modifier = Modifier.padding(vertical = 8.dp))
 
             // Tasks for selected day
-            val selectedTasks = state.tasksByDay[selectedDay].orEmpty()
+            val selectedTasks = state.entriesByDay[selectedDay].orEmpty()
             Text(
                 "Công việc ngày ${selectedDay.takeLast(2)}/${selectedDay.substring(5, 7)}",
                 fontWeight = FontWeight.Bold,
@@ -179,7 +180,8 @@ fun CalendarScreen(
                     contentPadding = PaddingValues(horizontal = 20.dp, vertical = 6.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    items(selectedTasks, key = { it.id }) { task ->
+                    items(selectedTasks, key = { it.task.id }) { entry ->
+                        val task = entry.task
                         Surface(
                             shape = RoundedCornerShape(14.dp),
                             color = MaterialTheme.colorScheme.surface,
@@ -207,10 +209,10 @@ private fun priorityColor(priority: String): Color = when (priority) {
     else -> PriorityLowColor
 }
 
-private fun priorityDotColor(tasks: List<Task>): Color {
+private fun priorityDotColor(entries: List<CalendarEntry>): Color {
     return when {
-        tasks.any { it.priority == "HIGH" } -> PriorityHighColor
-        tasks.any { it.priority == "MEDIUM" } -> PriorityMediumColor
+        entries.any { it.task.priority == "HIGH" } -> PriorityHighColor
+        entries.any { it.task.priority == "MEDIUM" } -> PriorityMediumColor
         else -> PriorityLowColor
     }
 }

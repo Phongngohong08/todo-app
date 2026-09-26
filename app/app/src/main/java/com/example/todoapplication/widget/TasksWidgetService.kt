@@ -6,8 +6,8 @@ import android.widget.RemoteViews
 import android.widget.RemoteViewsService
 import com.example.todoapplication.R
 import com.example.todoapplication.data.local.AppDatabase
-import com.example.todoapplication.data.local.TaskCacheEntity
-import com.example.todoapplication.ui.utils.formatUtcToLocal
+import com.example.todoapplication.data.local.TaskEntity
+import com.example.todoapplication.ui.utils.formatDateTime
 import kotlinx.coroutines.runBlocking
 
 class TasksWidgetService : RemoteViewsService() {
@@ -17,19 +17,17 @@ class TasksWidgetService : RemoteViewsService() {
 
 /**
  * Cung cấp từng dòng cho ListView của widget — đọc danh sách việc chưa hoàn thành
- * từ Room cache (cập nhật mỗi lần app tải task).
+ * từ Room (nguồn dữ liệu chính của app — widget luôn khớp với màn hình, kể cả khi offline).
  */
 class TasksRemoteViewsFactory(private val context: Context) : RemoteViewsService.RemoteViewsFactory {
 
-    private var items: List<TaskCacheEntity> = emptyList()
+    private var items: List<TaskEntity> = emptyList()
 
     override fun onCreate() {}
 
     override fun onDataSetChanged() {
-        items = runBlocking {
-            AppDatabase.get(context).taskCacheDao().getAll()
-        }.filter { it.status != "COMPLETED" }
-            .sortedBy { it.dueDate ?: "9999" }
+        // onDataSetChanged chạy trên luồng nền của widget nên được phép chặn chờ truy vấn
+        items = runBlocking { AppDatabase.get(context).taskDao().getPending(limit = 50) }
     }
 
     override fun onDestroy() { items = emptyList() }
@@ -42,7 +40,7 @@ class TasksRemoteViewsFactory(private val context: Context) : RemoteViewsService
         rv.setTextViewText(R.id.item_title, task.title)
         rv.setTextViewText(
             R.id.item_due,
-            task.dueDate?.let { "Hạn: ${formatUtcToLocal(it)}" } ?: "Không có hạn"
+            task.dueAt?.let { "Hạn: ${formatDateTime(it)}" } ?: "Không có hạn"
         )
         val dotColor = when (task.priority) {
             "HIGH" -> 0xFFFF6B6B.toInt()

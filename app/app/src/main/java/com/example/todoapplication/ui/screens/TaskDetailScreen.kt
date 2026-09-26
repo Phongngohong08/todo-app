@@ -16,6 +16,7 @@ import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -28,19 +29,19 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
-import com.example.todoapplication.data.model.CreateTaskInput
-import com.example.todoapplication.data.model.UpdateTaskInput
 import com.example.todoapplication.data.repository.QuickAddDraft
 import com.example.todoapplication.domain.daysUntilSunday
 import com.example.todoapplication.domain.dueAtDayOffset
+import com.example.todoapplication.domain.model.TaskDraft
 import com.example.todoapplication.ui.theme.*
 import com.example.todoapplication.ui.utils.formatUtcToLocal
 import com.example.todoapplication.ui.utils.parseIso8601
+import com.example.todoapplication.ui.utils.parseIsoMillis
+import com.example.todoapplication.ui.utils.toIsoString
 import com.example.todoapplication.ui.utils.priorityLabel
 import com.example.todoapplication.ui.utils.recurrenceLabel
 import com.example.todoapplication.ui.utils.categoryLabel
 import com.example.todoapplication.ui.utils.RECURRENCE_OPTIONS
-import com.example.todoapplication.data.repository.CategoryStore
 import com.example.todoapplication.ui.viewmodel.TaskDetailEvent
 import com.example.todoapplication.ui.viewmodel.TaskDetailViewModel
 import java.text.SimpleDateFormat
@@ -55,20 +56,24 @@ fun TaskDetailScreen(
     taskDetailViewModel: TaskDetailViewModel = viewModel(factory = TaskDetailViewModel.Factory)
 ) {
     val context = LocalContext.current
-    val isNewTask = taskId == "new"   // quy ước: taskId "new" = TẠO MỚI, ngược lại = SỬA task có id đó
+    // taskId "new" = TẠO MỚI, ngược lại = SỬA. ViewModel đọc taskId từ SavedStateHandle (tham số route).
+    val isNewTask = taskDetailViewModel.isNew
     val isLoading by taskDetailViewModel.isBusy.collectAsStateWithLifecycle()
 
     // Mỗi ô trong form là một state cục bộ. Khi SỬA, chúng được điền lại từ sự kiện Loaded bên dưới.
-    var title by remember { mutableStateOf("") }
-    var description by remember { mutableStateOf("") }
-    var priority by remember { mutableStateOf("MEDIUM") }
-    var dueDate by remember { mutableStateOf("") }
-    var category by remember { mutableStateOf("OTHER") }
-    var recurrence by remember { mutableStateOf("NONE") }
-    var recurrenceDays by remember { mutableStateOf("") } // "MON,WED,FRI" khi WEEKLY
-    var reminderOffset by remember { mutableIntStateOf(0) } // phút nhắc trước hạn
-    var subtaskInput by remember { mutableStateOf("") }
-    val subtasks by taskDetailViewModel.subtasks.collectAsStateWithLifecycle()  // bước con (từ Room)
+    var title by rememberSaveable { mutableStateOf("") }
+    var description by rememberSaveable { mutableStateOf("") }
+    var priority by rememberSaveable { mutableStateOf("MEDIUM") }
+    var dueDate by rememberSaveable { mutableStateOf("") }
+    var category by rememberSaveable { mutableStateOf("OTHER") }
+    var recurrence by rememberSaveable { mutableStateOf("NONE") }
+    var recurrenceDays by rememberSaveable { mutableStateOf("") } // "MON,WED,FRI" khi WEEKLY
+    var reminderOffset by rememberSaveable { mutableIntStateOf(0) } // phút nhắc trước hạn
+    var subtaskInput by rememberSaveable { mutableStateOf("") }
+    // true khi form đã được điền (từ server hoặc bản nháp AI) — giữ qua xoay màn để không nạp lại
+    var formInitialized by rememberSaveable { mutableStateOf(false) }
+    val subtasks by taskDetailViewModel.subtasks.collectAsStateWithLifecycle()  // bước con (Room, hoặc bản nháp nếu là task mới)
+    val categories by taskDetailViewModel.categories.collectAsStateWithLifecycle()
     val calendar = remember { Calendar.getInstance() }
 
     // Lắng nghe sự kiện từ ViewModel: nạp dữ liệu (đổ vào form), lưu xong (Toast + quay lại), hoặc lỗi.
@@ -81,12 +86,13 @@ fun TaskDetailScreen(
                     title = task.title
                     description = task.description ?: ""
                     priority = task.priority
-                    dueDate = task.dueDate ?: ""
+                    dueDate = task.dueAt?.let(::toIsoString) ?: ""
                     category = task.category
                     recurrence = task.recurrence
                     recurrenceDays = task.recurrenceDays
                     reminderOffset = task.reminderOffsetMinutes
                     if (dueDate.isNotEmpty()) parseIso8601(dueDate)?.let { calendar.time = it }
+                    formInitialized = true
                 }
                 TaskDetailEvent.Saved -> {
                     Toast.makeText(context, "Đã lưu công việc thành công!", Toast.LENGTH_SHORT).show()
@@ -100,10 +106,12 @@ fun TaskDetailScreen(
     // Khóa = taskId: quyết định nạp gì khi vào màn.
     LaunchedEffect(taskId) {
         if (!isNewTask) {
-            // SỬA: tải task + bước con từ kho dữ liệu.
-            taskDetailViewModel.loadTask(taskId)
-            taskDetailViewModel.loadSubtasks(taskId)
-        } else {
+            // SỬA: tải task từ Room (tức thì, kể cả offline). Sau khi xoay màn, form đã được khôi phục
+            // (rememberSaveable) -> KHÔNG tải lại task kẻo ghi đè phần người dùng đang sửa.
+            // Bước con là Flow từ Room nên tự hiện, không cần tải riêng.
+            if (!formInitialized) taskDetailViewModel.loadTask()
+        } else if (!formInitialized) {
+            formInitialized = true
             // TẠO MỚI: nếu có "bản nháp" do AI Quick Add để lại thì điền sẵn (consume = lấy ra rồi xóa).
             QuickAddDraft.consume()?.let { draft ->
                 title = draft.title
@@ -177,19 +185,19 @@ fun TaskDetailScreen(
                                 Toast.makeText(context, "Vui lòng đặt hạn chót cho công việc lặp lại", Toast.LENGTH_SHORT).show()
                                 return@clickable
                             }
-                            val dateString = if (dueDate.isEmpty()) null else dueDate
-                            // Chỉ lưu thứ lặp khi đang lặp theo tuần
-                            val days = if (recurrence == "WEEKLY") recurrenceDays else ""
-                            if (isNewTask) {
-                                taskDetailViewModel.create(
-                                    CreateTaskInput(title, description, priority, dateString, category, recurrence, days, reminderOffset)
+                            taskDetailViewModel.save(
+                                TaskDraft(
+                                    title = title,
+                                    description = description,
+                                    priority = priority,
+                                    dueAt = parseIsoMillis(dueDate),
+                                    category = category,
+                                    recurrence = recurrence,
+                                    // Chỉ lưu thứ lặp khi đang lặp theo tuần
+                                    recurrenceDays = if (recurrence == "WEEKLY") recurrenceDays else "",
+                                    reminderOffsetMinutes = reminderOffset
                                 )
-                            } else {
-                                taskDetailViewModel.update(
-                                    taskId,
-                                    UpdateTaskInput(title, description, priority, dateString, category, recurrence, days, reminderOffset)
-                                )
-                            }
+                            )
                         },
                     contentAlignment = Alignment.Center
                 ) {
@@ -293,7 +301,7 @@ fun TaskDetailScreen(
                             0 to "Hôm nay", 1 to "Ngày mai", 3 to "3 ngày sau",
                             daysUntilSunday() to "Cuối tuần", -1 to "Không"
                         ).forEach { (offset, label) ->
-                            val newDue = if (offset < 0) "" else dueAtDayOffset(offset)
+                            val newDue = if (offset < 0) "" else toIsoString(dueAtDayOffset(offset))
                             val isSel = dueDate == newDue
                             StatusFilterChip(
                                 text = label,
@@ -386,7 +394,7 @@ fun TaskDetailScreen(
                         modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        CategoryStore.all().forEach { c ->
+                        categories.forEach { c ->
                             StatusFilterChip(
                                 text = categoryLabel(c),
                                 selected = category == c,
@@ -415,8 +423,7 @@ fun TaskDetailScreen(
                                 .clip(RoundedCornerShape(12.dp))
                                 .background(MaterialTheme.colorScheme.primary)
                                 .clickable {
-                                    val added = CategoryStore.add(newCategory)
-                                    if (added.isNotEmpty()) category = added
+                                    taskDetailViewModel.addCategory(newCategory) { added -> category = added }
                                     newCategory = ""
                                 }
                                 .padding(horizontal = 16.dp, vertical = 14.dp),
@@ -526,13 +533,7 @@ fun TaskDetailScreen(
 
                 // ── Section 6: Các bước con (Checklist) ──────────────────
                 DetailSection(emoji = "✅", title = "Các bước con") {
-                    if (isNewTask) {
-                        Text(
-                            "Hãy lưu công việc trước, sau đó mở lại để thêm các bước con.",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontSize = 12.sp
-                        )
-                    } else {
+                    run {
                         val doneCount = subtasks.count { it.isDone }
                         if (subtasks.isNotEmpty()) {
                             val fraction = doneCount.toFloat() / subtasks.size.toFloat()
@@ -600,7 +601,7 @@ fun TaskDetailScreen(
                                     .clip(RoundedCornerShape(12.dp))
                                     .background(MaterialTheme.colorScheme.primary)
                                     .clickable {
-                                        taskDetailViewModel.addSubtask(taskId, subtaskInput)
+                                        taskDetailViewModel.addSubtask(subtaskInput)
                                         subtaskInput = ""
                                     }
                                     .padding(horizontal = 16.dp, vertical = 14.dp),

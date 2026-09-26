@@ -28,7 +28,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
-import com.example.todoapplication.data.repository.CategoryStore
+import com.example.todoapplication.data.repository.CategoryRepository
 import com.example.todoapplication.data.repository.ThemeController
 import com.example.todoapplication.data.repository.ThemeMode
 import com.example.todoapplication.ui.utils.categoryLabel
@@ -51,6 +51,7 @@ fun SettingsScreen(
     val workDuration = state.workDuration
     val isLoading = state.isLoading
     val isSaving = state.isSaving
+    val categories by settingsViewModel.categories.collectAsStateWithLifecycle()
 
     val primary = MaterialTheme.colorScheme.primary
     val tertiary = MaterialTheme.colorScheme.tertiary
@@ -197,8 +198,8 @@ fun SettingsScreen(
                             fontSize = 12.sp,
                             modifier = Modifier.padding(bottom = 10.dp)
                         )
-                        CategoryStore.all().forEach { c ->
-                            val isDefault = CategoryStore.defaults.any { it.equals(c, ignoreCase = true) }
+                        categories.forEach { c ->
+                            val isDefault = CategoryRepository.DEFAULTS.contains(c)
                             Row(
                                 modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
                                 verticalAlignment = Alignment.CenterVertically
@@ -207,7 +208,7 @@ fun SettingsScreen(
                                 if (isDefault) {
                                     Text("Mặc định", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
                                 } else {
-                                    IconButton(onClick = { CategoryStore.remove(c) }, modifier = Modifier.size(28.dp)) {
+                                    IconButton(onClick = { settingsViewModel.removeCategory(c) }, modifier = Modifier.size(28.dp)) {
                                         Icon(Icons.Default.Close, contentDescription = "Xoá", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
                                     }
                                 }
@@ -239,7 +240,7 @@ fun SettingsScreen(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(12.dp))
                                     .background(primary)
-                                    .clickable { CategoryStore.add(newCat); newCat = "" }
+                                    .clickable { settingsViewModel.addCategory(newCat); newCat = "" }
                                     .padding(horizontal = 16.dp, vertical = 14.dp),
                                 contentAlignment = Alignment.Center
                             ) {

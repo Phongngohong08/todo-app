@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.example.todoapplication.data.repository.ApiException
 import com.example.todoapplication.data.repository.AuthRepository
 import com.example.todoapplication.di.ServiceLocator
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -48,7 +49,15 @@ class LoginViewModel(private val authRepository: AuthRepository) : ViewModel() {
             // 5. fold: tách 2 nhánh của Result — thành công có data (it), thất bại có exception.
             result.fold(
                 onSuccess = { _events.emit(AuthEvent.Success("Chào mừng quay trở lại, ${it.user.name}!")) },
-                onFailure = { _events.emit(AuthEvent.Error("Tài khoản hoặc mật khẩu không chính xác")) }
+                onFailure = { error ->
+                    val msg = when ((error as? ApiException)?.code) {
+                        401, 400 -> "Tài khoản hoặc mật khẩu không chính xác"
+                        429 -> "Bạn đăng nhập sai quá nhiều lần. Vui lòng thử lại sau ít phút."
+                        null -> "Không kết nối được máy chủ. Kiểm tra mạng rồi thử lại."
+                        else -> "Đăng nhập thất bại. Vui lòng thử lại sau."
+                    }
+                    _events.emit(AuthEvent.Error(msg))
+                }
             )
         }
     }
@@ -79,7 +88,16 @@ class RegisterViewModel(private val authRepository: AuthRepository) : ViewModel(
             _isLoading.value = false
             result.fold(
                 onSuccess = { _events.emit(AuthEvent.Success("Đăng ký thành công! Hãy đăng nhập.")) },
-                onFailure = { _events.emit(AuthEvent.Error("Đăng ký thất bại. Email có thể đã tồn tại.")) }
+                onFailure = { error ->
+                    // Backend: 409 = email đã dùng, 400 = dữ liệu không hợp lệ, 429 = đăng ký quá nhiều lần
+                    val msg = when ((error as? ApiException)?.code) {
+                        409 -> "Email này đã được sử dụng."
+                        400 -> "Thông tin chưa hợp lệ. Kiểm tra email và mật khẩu (tối thiểu 6 ký tự)."
+                        429 -> "Bạn đăng ký quá nhiều lần. Vui lòng thử lại sau ít phút."
+                        else -> "Đăng ký thất bại. Kiểm tra kết nối rồi thử lại."
+                    }
+                    _events.emit(AuthEvent.Error(msg))
+                }
             )
         }
     }

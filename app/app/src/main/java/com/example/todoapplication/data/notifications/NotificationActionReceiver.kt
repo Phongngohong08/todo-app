@@ -11,10 +11,10 @@ import kotlinx.coroutines.launch
 
 /**
  * Nhận sự kiện khi người dùng bấm nút trên thông báo nhắc việc:
- * - "Hoàn thành" → gọi API complete rồi tắt thông báo.
+ * - "Hoàn thành" → ghi vào Room (chạy được cả khi offline), SyncEngine gửi lên server sau.
  * - "Hoãn 1 giờ" → đặt lại nhắc nhở sau 60 phút.
  *
- * Dùng `goAsync()` để giữ receiver sống trong lúc gọi mạng (coroutine ngắn).
+ * Dùng `goAsync()` để giữ receiver sống trong lúc ghi database (coroutine ngắn).
  */
 class NotificationActionReceiver : BroadcastReceiver() {
 
@@ -29,10 +29,8 @@ class NotificationActionReceiver : BroadcastReceiver() {
                 val pending = goAsync()
                 CoroutineScope(Dispatchers.IO).launch {
                     try {
-                        ServiceLocator.apiService.completeTask(taskId)
-                        ReminderScheduler.cancel(appContext, taskId)
-                    } catch (_: Exception) {
-                        // Mất mạng: bỏ qua, người dùng có thể hoàn thành lại trong app
+                        // Repository tự hủy nhắc việc, tạo lần lặp kế tiếp (nếu có) và xin đồng bộ
+                        ServiceLocator.taskRepository.setCompleted(taskId, completed = true)
                     } finally {
                         NotificationManagerCompat.from(appContext).cancel(notifId)
                         pending.finish()

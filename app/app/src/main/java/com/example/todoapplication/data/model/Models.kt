@@ -27,31 +27,6 @@ data class RefreshTokenInput(
     @SerializedName("refresh_token") val refreshToken: String
 )
 
-data class Task(
-    val id: String,
-    @SerializedName("user_id") val userId: String,
-    val title: String,
-    val description: String?,
-    val priority: String, // "LOW", "MEDIUM", "HIGH"
-    @SerializedName("due_date") val dueDate: String?,
-    val status: String, // "TODO", "COMPLETED"
-    val category: String = "OTHER", // "PERSONAL", "WORK", "OTHER" hoặc danh mục tự do
-    val recurrence: String = "NONE", // "NONE", "DAILY", "WEEKLY", "MONTHLY"
-    @SerializedName("recurrence_days") val recurrenceDays: String = "", // "MON,WED,FRI" khi WEEKLY
-    @SerializedName("reminder_offset_minutes") val reminderOffsetMinutes: Int = 0, // phút nhắc trước hạn
-    @SerializedName("created_at") val createdAt: String,
-    @SerializedName("updated_at") val updatedAt: String
-)
-
-data class TaskLog(
-    val id: String,
-    @SerializedName("task_id") val taskId: String,
-    @SerializedName("user_id") val userId: String,
-    val action: String,
-    val details: String?,
-    @SerializedName("created_at") val createdAt: String
-)
-
 data class PlanSlot(
     val start: String, // e.g., "08:00"
     val end: String,   // e.g., "09:00"
@@ -83,18 +58,6 @@ data class UserPreferences(
     @SerializedName("updated_at") val updatedAt: String? = null
 )
 
-data class DailyCount(
-    val date: String,
-    val completed: Int
-)
-
-data class StatsSummary(
-    @SerializedName("completed_tasks") val completedTasks: Int,
-    @SerializedName("pending_tasks") val pendingTasks: Int,
-    @SerializedName("by_category") val byCategory: Map<String, Int> = emptyMap(),
-    @SerializedName("daily_completed") val dailyCompleted: List<DailyCount> = emptyList()
-)
-
 // Request inputs
 data class RegisterInput(
     val email: String,
@@ -105,28 +68,6 @@ data class RegisterInput(
 data class LoginInput(
     val email: String,
     val password: String
-)
-
-data class CreateTaskInput(
-    val title: String,
-    val description: String,
-    val priority: String,
-    @SerializedName("due_date") val dueDate: String?,
-    val category: String = "OTHER",
-    val recurrence: String = "NONE",
-    @SerializedName("recurrence_days") val recurrenceDays: String = "",
-    @SerializedName("reminder_offset_minutes") val reminderOffsetMinutes: Int = 0
-)
-
-data class UpdateTaskInput(
-    val title: String,
-    val description: String,
-    val priority: String,
-    @SerializedName("due_date") val dueDate: String?,
-    val category: String = "OTHER",
-    val recurrence: String = "NONE",
-    @SerializedName("recurrence_days") val recurrenceDays: String = "",
-    @SerializedName("reminder_offset_minutes") val reminderOffsetMinutes: Int = 0
 )
 
 data class ParseTaskInput(
@@ -163,4 +104,63 @@ data class MemoryItem(
     val content: String,
     val source: String,
     @SerializedName("created_at") val createdAt: String
+)
+
+// ── Công việc & đồng bộ offline ──
+
+data class SubtaskDto(
+    val id: String,
+    val title: String,
+    val done: Boolean,
+    val position: Int
+)
+
+/** Task như server trả về. Thời gian là chuỗi RFC3339; mapper đổi sang epoch millis cho Room. */
+data class TaskDto(
+    val id: String,
+    @SerializedName("user_id") val userId: String?,
+    val title: String,
+    val description: String?,
+    val priority: String,
+    @SerializedName("due_date") val dueDate: String?,
+    val status: String,
+    val category: String?,
+    val recurrence: String?,
+    @SerializedName("recurrence_days") val recurrenceDays: String?,
+    @SerializedName("reminder_offset_minutes") val reminderOffsetMinutes: Int,
+    @SerializedName("completed_at") val completedAt: String?,
+    @SerializedName("sort_order") val sortOrder: Double?,
+    val subtasks: List<SubtaskDto>?,
+    @SerializedName("spawned_from") val spawnedFrom: String?,
+    @SerializedName("created_at") val createdAt: String,
+    @SerializedName("updated_at") val updatedAt: String
+)
+
+/** Toàn bộ trạng thái task gửi lên bằng PUT /tasks/{id} (server tạo mới nếu chưa có — idempotent). */
+data class TaskInputDto(
+    val id: String,
+    val title: String,
+    val description: String,
+    val priority: String,
+    @SerializedName("due_date") val dueDate: String?,
+    val category: String,
+    val recurrence: String,
+    @SerializedName("recurrence_days") val recurrenceDays: String,
+    @SerializedName("reminder_offset_minutes") val reminderOffsetMinutes: Int,
+    val status: String,
+    @SerializedName("completed_at") val completedAt: String?,
+    @SerializedName("sort_order") val sortOrder: Double,
+    val subtasks: List<SubtaskDto>,
+    @SerializedName("spawned_from") val spawnedFrom: String?
+)
+
+/** Kết quả GET /tasks/sync?since=... */
+data class TaskChangesDto(
+    val tasks: List<TaskDto>?,
+    @SerializedName("deleted_ids") val deletedIds: List<String>?,
+    @SerializedName("server_time") val serverTime: String
+)
+
+data class CategoriesDto(
+    val categories: List<String>
 )

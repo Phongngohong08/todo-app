@@ -32,10 +32,10 @@ type capturingCoach struct {
 	history []*domain.ChatMessage
 }
 
-func (c *capturingCoach) GetCoachResponse(ctx context.Context, message string, tasks []*domain.Task, memories []*domain.MemoryItem, history []*domain.ChatMessage) (string, error) {
+func (c *capturingCoach) GetCoachResponse(ctx context.Context, message string, localTime string, tasks []*domain.Task, memories []*domain.MemoryItem, history []*domain.ChatMessage) (*domain.CoachReply, error) {
 	c.message = message
 	c.history = history
-	return "reply", nil
+	return &domain.CoachReply{Reply: "reply"}, nil
 }
 
 func TestChat_CurrentMessageNotDuplicatedInHistory(t *testing.T) {
@@ -46,7 +46,7 @@ func TestChat_CurrentMessageNotDuplicatedInHistory(t *testing.T) {
 	ai := &capturingCoach{}
 	uc := NewCoachUseCase(chat, emptyTaskRepo{}, nil, nil, ai)
 
-	if _, err := uc.Chat(context.Background(), "u1", "tin mới"); err != nil {
+	if _, err := uc.Chat(context.Background(), "u1", "tin mới", ""); err != nil {
 		t.Fatalf("chat: %v", err)
 	}
 
@@ -63,5 +63,31 @@ func TestChat_CurrentMessageNotDuplicatedInHistory(t *testing.T) {
 	}
 	if len(chat.msgs) != 4 {
 		t.Fatalf("expected user + assistant messages to be saved, got %d total", len(chat.msgs))
+	}
+}
+
+// LLM có thể bịa id hoặc trả hành động thiếu dữ liệu — chỉ giữ đề xuất áp dụng được lên việc của chính người dùng.
+func TestSanitizeActions_DropsUnknownTasksAndInvalidActions(t *testing.T) {
+	active := []*domain.Task{{ID: "t1"}, {ID: "t2"}}
+	got := sanitizeActions([]domain.CoachAction{
+		{Type: domain.CoachActionReschedule, Label: "Dời", TaskIDs: []string{"t1", "ghost"}, DueDate: "2026-07-13T09:00:00+07:00"},
+		{Type: domain.CoachActionReschedule, Label: "Dời việc lạ", TaskIDs: []string{"ghost"}, DueDate: "2026-07-13T09:00:00+07:00"},
+		{Type: domain.CoachActionSetPriority, Label: "Ưu tiên", TaskIDs: []string{"t2"}, Priority: "URGENT"},
+		{Type: "DELETE_ALL", Label: "Xóa hết", TaskIDs: []string{"t1"}},
+		{Type: domain.CoachActionAddSubtasks, Label: "Chia nhỏ", TaskIDs: []string{"t2"}, Subtasks: []string{" Bước 1 ", ""}},
+		{Type: domain.CoachActionCreateTask, Label: "Tạo", Title: "Đi bộ 15 phút"},
+	}, active)
+
+	if len(got) != domain.MaxCoachActions {
+		t.Fatalf("expected %d actions, got %d: %+v", domain.MaxCoachActions, len(got), got)
+	}
+	if got[0].Type != domain.CoachActionReschedule || len(got[0].TaskIDs) != 1 || got[0].TaskIDs[0] != "t1" {
+		t.Fatalf("unknown task id should be stripped, got %+v", got[0])
+	}
+	if got[1].Type != domain.CoachActionAddSubtasks || len(got[1].Subtasks) != 1 || got[1].Subtasks[0] != "Bước 1" {
+		t.Fatalf("subtasks should be trimmed and blanks dropped, got %+v", got[1])
+	}
+	if got[2].Type != domain.CoachActionCreateTask || got[2].Priority != "MEDIUM" {
+		t.Fatalf("create task should default priority, got %+v", got[2])
 	}
 }

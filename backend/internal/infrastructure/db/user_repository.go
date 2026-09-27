@@ -114,16 +114,33 @@ func (r *PostgresUserRepository) IncrementTokenVersion(ctx context.Context, user
 	return err
 }
 
+func (r *PostgresUserRepository) RevokeRefreshToken(ctx context.Context, jti, userID string, expiresAt time.Time) error {
+	query := `INSERT INTO revoked_refresh_tokens (jti, user_id, expires_at) VALUES ($1, $2, $3) ON CONFLICT (jti) DO NOTHING`
+	_, err := r.db.ExecContext(ctx, query, jti, userID, expiresAt)
+	return err
+}
+
+func (r *PostgresUserRepository) IsRefreshTokenRevoked(ctx context.Context, jti string) (bool, error) {
+	var exists bool
+	err := r.db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM revoked_refresh_tokens WHERE jti = $1)`, jti).Scan(&exists)
+	return exists, err
+}
+
+func (r *PostgresUserRepository) PurgeExpiredRevocations(ctx context.Context, now time.Time) error {
+	_, err := r.db.ExecContext(ctx, `DELETE FROM revoked_refresh_tokens WHERE expires_at < $1`, now)
+	return err
+}
+
 func (r *PostgresUserRepository) GetPreferences(ctx context.Context, userID string) (*domain.UserPreferences, error) {
 	query := `
-		SELECT user_id, morning_start_time, evening_end_time, work_duration_preference, updated_at
+		SELECT user_id, morning_start_time, evening_end_time, work_duration_preference, daily_goal, days_off, updated_at
 		FROM user_preferences
 		WHERE user_id = $1
 	`
 	row := r.db.QueryRowContext(ctx, query, userID)
 
 	var prefs domain.UserPreferences
-	err := row.Scan(&prefs.UserID, &prefs.MorningStartTime, &prefs.EveningEndTime, &prefs.WorkDurationPreference, &prefs.UpdatedAt)
+	err := row.Scan(&prefs.UserID, &prefs.MorningStartTime, &prefs.EveningEndTime, &prefs.WorkDurationPreference, &prefs.DailyGoal, &prefs.DaysOff, &prefs.UpdatedAt)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
@@ -137,9 +154,10 @@ func (r *PostgresUserRepository) GetPreferences(ctx context.Context, userID stri
 func (r *PostgresUserRepository) UpdatePreferences(ctx context.Context, prefs *domain.UserPreferences) error {
 	query := `
 		UPDATE user_preferences
-		SET morning_start_time = $1, evening_end_time = $2, work_duration_preference = $3, updated_at = $4
+		SET morning_start_time = $1, evening_end_time = $2, work_duration_preference = $3, updated_at = $4,
+			daily_goal = $6, days_off = $7
 		WHERE user_id = $5
 	`
-	_, err := r.db.ExecContext(ctx, query, prefs.MorningStartTime, prefs.EveningEndTime, prefs.WorkDurationPreference, prefs.UpdatedAt, prefs.UserID)
+	_, err := r.db.ExecContext(ctx, query, prefs.MorningStartTime, prefs.EveningEndTime, prefs.WorkDurationPreference, prefs.UpdatedAt, prefs.UserID, prefs.DailyGoal, prefs.DaysOff)
 	return err
 }

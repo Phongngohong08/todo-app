@@ -52,7 +52,19 @@ type TaskInput struct {
 	SortOrder   *float64         `json:"sort_order"`
 	Subtasks    []domain.Subtask `json:"subtasks" binding:"omitempty,max=100,dive"`
 	SpawnedFrom *string          `json:"spawned_from" binding:"omitempty,uuid"`
+
+	// Trường thêm ở migration 000008. Đều là con trỏ: client cũ không gửi (nil) → giữ nguyên giá trị hiện có.
+	// Với my_day / recurrence_until, chuỗi rỗng "" nghĩa là XÓA (JSON null không phân biệt được với "không gửi").
+	DueAllDay          *bool   `json:"due_all_day"`
+	MyDay              *string `json:"my_day" binding:"omitempty,max=10"`
+	EstimatedMinutes   *int    `json:"estimated_minutes" binding:"omitempty,min=0,max=1440"`
+	RecurrenceInterval *int    `json:"recurrence_interval" binding:"omitempty,min=1,max=365"`
+	RecurrenceMode     *string `json:"recurrence_mode" binding:"omitempty,oneof=SCHEDULE COMPLETION"`
+	RecurrenceUntil    *string `json:"recurrence_until" binding:"omitempty,max=40"`
 }
+
+// myDayLayout: định dạng ngày của "Ngày của tôi" (ngày theo lịch của người dùng, không có giờ).
+const myDayLayout = "2006-01-02"
 
 // Giữ tên cũ cho các lời gọi hiện có.
 type (
@@ -125,12 +137,14 @@ func (u *TaskUseCase) Save(ctx context.Context, id, userID string, input TaskInp
 	}
 
 	task := &domain.Task{
-		ID:        id,
-		UserID:    userID,
-		Status:    domain.StatusTodo,
-		SortOrder: -float64(now.UnixMilli()), // mới nhất lên đầu
-		Subtasks:  []domain.Subtask{},
-		CreatedAt: now,
+		ID:                 id,
+		UserID:             userID,
+		Status:             domain.StatusTodo,
+		SortOrder:          -float64(now.UnixMilli()), // mới nhất lên đầu
+		Subtasks:           []domain.Subtask{},
+		RecurrenceInterval: 1,
+		RecurrenceMode:     domain.RecurrenceModeSchedule,
+		CreatedAt:          now,
 	}
 	prevStatus := domain.StatusTodo
 	if existing != nil {
@@ -140,7 +154,16 @@ func (u *TaskUseCase) Save(ctx context.Context, id, userID string, input TaskInp
 		task.SortOrder = existing.SortOrder
 		task.Subtasks = existing.Subtasks
 		task.SpawnedFrom = existing.SpawnedFrom
+		task.DueAllDay = existing.DueAllDay
+		task.MyDay = existing.MyDay
+		task.EstimatedMinutes = existing.EstimatedMinutes
+		task.RecurrenceInterval = existing.RecurrenceInterval
+		task.RecurrenceMode = existing.RecurrenceMode
+		task.RecurrenceUntil = existing.RecurrenceUntil
 		prevStatus = existing.Status
+	}
+	if err := applyExtendedFields(task, input); err != nil {
+		return nil, err
 	}
 
 	task.Title = strings.TrimSpace(input.Title)
@@ -190,6 +213,52 @@ func (u *TaskUseCase) Save(ctx context.Context, id, userID string, input TaskInp
 		u.retractNextOccurrence(ctx, task, now)
 	}
 	return task, nil
+}
+
+// applyExtendedFields ghi các trường mới (migration 000008) mà client có gửi; trường nil giữ nguyên.
+func applyExtendedFields(task *domain.Task, input TaskInput) error {
+	if input.DueAllDay != nil {
+		task.DueAllDay = *input.DueAllDay
+	}
+	if input.MyDay != nil {
+		day := strings.TrimSpace(*input.MyDay)
+		if day == "" {
+			task.MyDay = nil
+		} else {
+			if _, err := time.Parse(myDayLayout, day); err != nil {
+				return domain.NewValidationError("my_day phải có dạng yyyy-MM-dd")
+			}
+			task.MyDay = &day
+		}
+	}
+	if input.EstimatedMinutes != nil {
+		task.EstimatedMinutes = *input.EstimatedMinutes
+	}
+	if input.RecurrenceInterval != nil {
+		task.RecurrenceInterval = normalizeInterval(*input.RecurrenceInterval)
+	}
+	if input.RecurrenceMode != nil {
+		task.RecurrenceMode = domain.RecurrenceMode(*input.RecurrenceMode)
+	}
+	if input.RecurrenceUntil != nil {
+		raw := strings.TrimSpace(*input.RecurrenceUntil)
+		if raw == "" {
+			task.RecurrenceUntil = nil
+		} else {
+			until, err := time.Parse(time.RFC3339, raw)
+			if err != nil {
+				return domain.NewValidationError("recurrence_until phải là thời điểm RFC3339")
+			}
+			task.RecurrenceUntil = &until
+		}
+	}
+	if task.RecurrenceInterval < 1 {
+		task.RecurrenceInterval = 1
+	}
+	if task.RecurrenceMode == "" {
+		task.RecurrenceMode = domain.RecurrenceModeSchedule
+	}
+	return nil
 }
 
 // completionTime dùng thời điểm hoàn thành client gửi (có thể từ lúc offline), trừ khi nó ở tương lai.
@@ -303,7 +372,14 @@ func (u *TaskUseCase) spawnNextOccurrence(ctx context.Context, parent *domain.Ta
 		return
 	}
 
-	nextDue := nextDueAfter(*parent.DueDate, parent.Recurrence, parent.RecurrenceDays, now, u.loc)
+	completedAt := now
+	if parent.CompletedAt != nil {
+		completedAt = *parent.CompletedAt
+	}
+	nextDue, ok := nextDueForCompletion(parent, completedAt, now, u.loc)
+	if !ok {
+		return // đã qua ngày kết thúc lặp
+	}
 	parentID := parent.ID
 	child := &domain.Task{
 		ID:                    childID,
@@ -312,10 +388,15 @@ func (u *TaskUseCase) spawnNextOccurrence(ctx context.Context, parent *domain.Ta
 		Description:           parent.Description,
 		Priority:              parent.Priority,
 		DueDate:               &nextDue,
+		DueAllDay:             parent.DueAllDay,
 		Status:                domain.StatusTodo,
 		Category:              parent.Category,
 		Recurrence:            parent.Recurrence,
 		RecurrenceDays:        parent.RecurrenceDays,
+		RecurrenceInterval:    parent.RecurrenceInterval,
+		RecurrenceMode:        parent.RecurrenceMode,
+		RecurrenceUntil:       parent.RecurrenceUntil,
+		EstimatedMinutes:      parent.EstimatedMinutes,
 		ReminderOffsetMinutes: parent.ReminderOffsetMinutes,
 		SortOrder:             parent.SortOrder,
 		Subtasks:              nextOccurrenceSubtasks(parent.Subtasks),
@@ -361,7 +442,25 @@ func (u *TaskUseCase) log(ctx context.Context, task *domain.Task, action domain.
 
 func inputFromTask(t *domain.Task) TaskInput {
 	sortOrder := t.SortOrder
+	dueAllDay := t.DueAllDay
+	estimated := t.EstimatedMinutes
+	interval := t.RecurrenceInterval
+	mode := string(t.RecurrenceMode)
+	myDay := ""
+	if t.MyDay != nil {
+		myDay = *t.MyDay
+	}
+	until := ""
+	if t.RecurrenceUntil != nil {
+		until = t.RecurrenceUntil.Format(time.RFC3339)
+	}
 	return TaskInput{
+		DueAllDay:             &dueAllDay,
+		MyDay:                 &myDay,
+		EstimatedMinutes:      &estimated,
+		RecurrenceInterval:    &interval,
+		RecurrenceMode:        &mode,
+		RecurrenceUntil:       &until,
 		Title:                 t.Title,
 		Description:           t.Description,
 		Priority:              string(t.Priority),

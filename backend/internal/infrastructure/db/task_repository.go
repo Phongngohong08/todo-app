@@ -20,7 +20,8 @@ func NewPostgresTaskRepository(db *sql.DB) *PostgresTaskRepository {
 
 const taskColumns = `id, user_id, title, description, priority, due_date, status, category, recurrence,
 	recurrence_days, reminder_offset_minutes, completed_at, sort_order, subtasks, spawned_from,
-	created_at, updated_at, deleted_at`
+	created_at, updated_at, deleted_at, due_all_day, my_day, estimated_minutes,
+	recurrence_interval, recurrence_mode, recurrence_until`
 
 type rowScanner interface {
 	Scan(dest ...any) error
@@ -32,12 +33,14 @@ func scanTask(row rowScanner) (*domain.Task, error) {
 		description sql.NullString
 		subtasks    []byte
 		spawnedFrom sql.NullString
+		myDay       sql.NullString
 	)
 	err := row.Scan(
 		&task.ID, &task.UserID, &task.Title, &description, &task.Priority, &task.DueDate,
 		&task.Status, &task.Category, &task.Recurrence, &task.RecurrenceDays, &task.ReminderOffsetMinutes,
 		&task.CompletedAt, &task.SortOrder, &subtasks, &spawnedFrom,
-		&task.CreatedAt, &task.UpdatedAt, &task.DeletedAt,
+		&task.CreatedAt, &task.UpdatedAt, &task.DeletedAt, &task.DueAllDay, &myDay, &task.EstimatedMinutes,
+		&task.RecurrenceInterval, &task.RecurrenceMode, &task.RecurrenceUntil,
 	)
 	if err != nil {
 		return nil, err
@@ -45,6 +48,9 @@ func scanTask(row rowScanner) (*domain.Task, error) {
 	task.Description = description.String
 	if spawnedFrom.Valid {
 		task.SpawnedFrom = &spawnedFrom.String
+	}
+	if myDay.Valid && myDay.String != "" {
+		task.MyDay = &myDay.String
 	}
 	task.Subtasks = []domain.Subtask{}
 	if len(subtasks) > 0 {
@@ -81,21 +87,34 @@ func (r *PostgresTaskRepository) Upsert(ctx context.Context, task *domain.Task) 
 	// ON CONFLICT chỉ ghi đè khi cùng chủ sở hữu — chặn ở tầng DB phòng khi caller quên kiểm tra.
 	query := `
 		INSERT INTO tasks (` + taskColumns + `)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18,
+			$19, $20, $21, $22, $23, $24)
 		ON CONFLICT (id) DO UPDATE SET
 			title = EXCLUDED.title, description = EXCLUDED.description, priority = EXCLUDED.priority,
 			due_date = EXCLUDED.due_date, status = EXCLUDED.status, category = EXCLUDED.category,
 			recurrence = EXCLUDED.recurrence, recurrence_days = EXCLUDED.recurrence_days,
 			reminder_offset_minutes = EXCLUDED.reminder_offset_minutes, completed_at = EXCLUDED.completed_at,
 			sort_order = EXCLUDED.sort_order, subtasks = EXCLUDED.subtasks, spawned_from = EXCLUDED.spawned_from,
-			updated_at = EXCLUDED.updated_at, deleted_at = EXCLUDED.deleted_at
+			updated_at = EXCLUDED.updated_at, deleted_at = EXCLUDED.deleted_at,
+			due_all_day = EXCLUDED.due_all_day, my_day = EXCLUDED.my_day,
+			estimated_minutes = EXCLUDED.estimated_minutes, recurrence_interval = EXCLUDED.recurrence_interval,
+			recurrence_mode = EXCLUDED.recurrence_mode, recurrence_until = EXCLUDED.recurrence_until
 		WHERE tasks.user_id = EXCLUDED.user_id
 	`
+	interval := task.RecurrenceInterval
+	if interval < 1 {
+		interval = 1
+	}
+	mode := task.RecurrenceMode
+	if mode == "" {
+		mode = domain.RecurrenceModeSchedule
+	}
 	res, err := r.db.ExecContext(ctx, query,
 		task.ID, task.UserID, task.Title, task.Description, task.Priority, task.DueDate,
 		task.Status, task.Category, task.Recurrence, task.RecurrenceDays, task.ReminderOffsetMinutes,
 		task.CompletedAt, task.SortOrder, subtasksJSON, task.SpawnedFrom,
 		task.CreatedAt, task.UpdatedAt, task.DeletedAt,
+		task.DueAllDay, task.MyDay, task.EstimatedMinutes, interval, mode, task.RecurrenceUntil,
 	)
 	if err != nil {
 		return err
@@ -158,6 +177,17 @@ func (r *PostgresTaskRepository) ListChangedSince(ctx context.Context, userID st
 		query := `SELECT ` + taskColumns + ` FROM tasks WHERE user_id = $1 AND updated_at > $2`
 		rows, err = r.db.QueryContext(ctx, query, userID, *since)
 	}
+	if err != nil {
+		return nil, err
+	}
+	return scanTasks(rows)
+}
+
+func (r *PostgresTaskRepository) ListMyDay(ctx context.Context, userID string, day string) ([]*domain.Task, error) {
+	query := `SELECT ` + taskColumns + ` FROM tasks
+		WHERE user_id = $1 AND deleted_at IS NULL AND status = 'TODO' AND my_day = $2
+		ORDER BY sort_order ASC, created_at DESC`
+	rows, err := r.db.QueryContext(ctx, query, userID, day)
 	if err != nil {
 		return nil, err
 	}

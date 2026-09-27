@@ -63,6 +63,16 @@ func (m *MockTaskRepository) ListChangedSince(ctx context.Context, userID string
 	return result, nil
 }
 
+func (m *MockTaskRepository) ListMyDay(ctx context.Context, userID string, day string) ([]*domain.Task, error) {
+	var result []*domain.Task
+	for _, t := range m.tasks {
+		if t.UserID == userID && !t.IsDeleted() && t.Status == domain.StatusTodo && t.MyDay != nil && *t.MyDay == day {
+			result = append(result, clone(t))
+		}
+	}
+	return result, nil
+}
+
 func (m *MockTaskRepository) SoftDelete(ctx context.Context, id string, at time.Time) error {
 	if t, ok := m.tasks[id]; ok && t.DeletedAt == nil {
 		t.DeletedAt = &at
@@ -350,5 +360,90 @@ func TestSave_ResurrectsDeletedTask(t *testing.T) {
 	}
 	if repo.tasks[taskA].IsDeleted() {
 		t.Fatal("saving a deleted task should restore it")
+	}
+}
+
+// Client cũ (chưa biết các trường mới) sửa task không được xóa mất "cả ngày", "Ngày của tôi", lặp nâng cao...
+func TestSave_ExtendedFieldsSurviveOldClientsAndCanBeCleared(t *testing.T) {
+	uc, _, _ := newTestUseCase(time.Date(2026, 7, 8, 10, 0, 0, 0, vn))
+	ctx := context.Background()
+	allDay, myDay, est, interval, mode, until := true, "2026-07-08", 45, 2, "COMPLETION", "2026-12-31T23:59:00+07:00"
+	if _, err := uc.Save(ctx, taskA, "u", TaskInput{
+		Title: "Tưới cây", Priority: "LOW", Recurrence: "DAILY",
+		DueAllDay: &allDay, MyDay: &myDay, EstimatedMinutes: &est,
+		RecurrenceInterval: &interval, RecurrenceMode: &mode, RecurrenceUntil: &until,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	kept, err := uc.Save(ctx, taskA, "u", TaskInput{Title: "Tưới cây ban công", Priority: "LOW", Recurrence: "DAILY"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !kept.DueAllDay || kept.MyDay == nil || *kept.MyDay != myDay || kept.EstimatedMinutes != 45 ||
+		kept.RecurrenceInterval != 2 || kept.RecurrenceMode != domain.RecurrenceModeCompletion || kept.RecurrenceUntil == nil {
+		t.Fatalf("extended fields must be preserved, got %+v", kept)
+	}
+
+	empty := ""
+	cleared, err := uc.Save(ctx, taskA, "u", TaskInput{Title: "Tưới cây", Priority: "LOW", MyDay: &empty, RecurrenceUntil: &empty})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cleared.MyDay != nil || cleared.RecurrenceUntil != nil {
+		t.Fatalf(`"" must clear my_day and recurrence_until, got %v / %v`, cleared.MyDay, cleared.RecurrenceUntil)
+	}
+
+	bad := "08/07/2026"
+	if _, err := uc.Save(ctx, taskA, "u", TaskInput{Title: "x", Priority: "LOW", MyDay: &bad}); err == nil {
+		t.Fatal("malformed my_day must be rejected")
+	}
+}
+
+// Lần lặp mới giữ các thiết lập lặp + "cả ngày", nhưng KHÔNG thừa hưởng "Ngày của tôi" của lần trước.
+func TestComplete_SpawnCopiesRecurrenceSettingsButNotMyDay(t *testing.T) {
+	now := time.Date(2026, 7, 8, 21, 0, 0, 0, vn)
+	uc, repo, _ := newTestUseCase(now)
+	ctx := context.Background()
+	due := time.Date(2026, 7, 1, 23, 59, 0, 0, vn)
+	allDay, myDay, interval, mode := true, "2026-07-08", 3, "COMPLETION"
+	uc.Save(ctx, taskA, "u", TaskInput{
+		Title: "Tưới cây", Priority: "LOW", DueDate: &due, Recurrence: "DAILY",
+		DueAllDay: &allDay, MyDay: &myDay, RecurrenceInterval: &interval, RecurrenceMode: &mode,
+	})
+
+	if _, err := uc.Complete(ctx, taskA, "u"); err != nil {
+		t.Fatal(err)
+	}
+	child := repo.tasks[domain.NextOccurrenceID(taskA)]
+	if child == nil {
+		t.Fatal("next occurrence was not created")
+	}
+	want := time.Date(2026, 7, 11, 23, 59, 0, 0, vn) // ngày hoàn thành 8/7 + 3 ngày
+	if !child.DueDate.Equal(want) {
+		t.Fatalf("next due = %v, want %v", child.DueDate.In(vn), want)
+	}
+	if !child.DueAllDay || child.RecurrenceInterval != 3 || child.RecurrenceMode != domain.RecurrenceModeCompletion {
+		t.Fatalf("recurrence settings must be copied, got %+v", child)
+	}
+	if child.MyDay != nil {
+		t.Fatal("the new occurrence must not inherit My Day")
+	}
+}
+
+// Hết ngày kết thúc lặp → hoàn thành lần cuối không sinh thêm lần nào.
+func TestComplete_NoSpawnAfterRecurrenceUntil(t *testing.T) {
+	now := time.Date(2026, 7, 8, 9, 0, 0, 0, vn)
+	uc, repo, _ := newTestUseCase(now)
+	ctx := context.Background()
+	due := time.Date(2026, 7, 8, 8, 0, 0, 0, vn)
+	until := "2026-07-08T23:59:00+07:00"
+	uc.Save(ctx, taskA, "u", TaskInput{Title: "Khóa học", Priority: "LOW", DueDate: &due, Recurrence: "DAILY", RecurrenceUntil: &until})
+
+	if _, err := uc.Complete(ctx, taskA, "u"); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := repo.tasks[domain.NextOccurrenceID(taskA)]; ok {
+		t.Fatal("no occurrence should be spawned after recurrence_until")
 	}
 }

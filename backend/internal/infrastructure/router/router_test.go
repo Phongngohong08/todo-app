@@ -20,8 +20,9 @@ import (
 const testSecret = "0123456789abcdef0123456789abcdef"
 
 type memUserRepo struct {
-	users map[string]*domain.User
-	prefs map[string]*domain.UserPreferences
+	users   map[string]*domain.User
+	prefs   map[string]*domain.UserPreferences
+	revoked map[string]bool
 }
 
 func (m *memUserRepo) Create(ctx context.Context, u *domain.User) error {
@@ -53,6 +54,17 @@ func (m *memUserRepo) UpdatePreferences(ctx context.Context, p *domain.UserPrefe
 	m.prefs[p.UserID] = p
 	return nil
 }
+func (m *memUserRepo) RevokeRefreshToken(ctx context.Context, jti, userID string, expiresAt time.Time) error {
+	if m.revoked == nil {
+		m.revoked = map[string]bool{}
+	}
+	m.revoked[jti] = true
+	return nil
+}
+func (m *memUserRepo) IsRefreshTokenRevoked(ctx context.Context, jti string) (bool, error) {
+	return m.revoked[jti], nil
+}
+func (m *memUserRepo) PurgeExpiredRevocations(ctx context.Context, now time.Time) error { return nil }
 
 type testServer struct {
 	engine *gin.Engine
@@ -241,5 +253,18 @@ func TestLogout_RevokesRefreshToken(t *testing.T) {
 	}
 	if w := s.do(http.MethodPost, "/api/v1/auth/refresh", map[string]string{"refresh_token": res.RefreshToken}, nil); w.Code != http.StatusUnauthorized {
 		t.Fatalf("refresh after logout: got %d, want 401", w.Code)
+	}
+}
+
+func TestNormalizeWeekdayList(t *testing.T) {
+	got, ok := normalizeWeekdayList(" sun, sat ,SAT")
+	if !ok || got != "SAT,SUN" {
+		t.Fatalf("got %q, %v; want SAT,SUN", got, ok)
+	}
+	if _, ok := normalizeWeekdayList("SAT,HOLIDAY"); ok {
+		t.Fatal("unknown weekday code must be rejected")
+	}
+	if got, ok := normalizeWeekdayList(""); !ok || got != "" {
+		t.Fatalf("empty list should clear days off, got %q, %v", got, ok)
 	}
 }

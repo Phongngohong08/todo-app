@@ -40,6 +40,19 @@ const (
 	RecurrenceMonthly Recurrence = "MONTHLY"
 )
 
+// RecurrenceMode quyết định lần lặp kế tiếp tính từ đâu.
+type RecurrenceMode string
+
+const (
+	// RecurrenceModeSchedule: theo lịch cố định, tính từ hạn chót trước (họp mỗi thứ 2).
+	RecurrenceModeSchedule RecurrenceMode = "SCHEDULE"
+	// RecurrenceModeCompletion: tính từ ngày hoàn thành (tưới cây 3 ngày sau lần tưới trước).
+	RecurrenceModeCompletion RecurrenceMode = "COMPLETION"
+)
+
+// MaxRecurrenceInterval giới hạn "mỗi N ngày/tuần/tháng" — đủ rộng cho nhu cầu thật, chặn giá trị vô lý.
+const MaxRecurrenceInterval = 365
+
 // Subtask là một bước trong checklist. Nằm TRONG task (task là aggregate root): thêm/sửa/xóa bước con
 // đều là cập nhật task, nên chỉ cần đồng bộ một loại bản ghi.
 type Subtask struct {
@@ -56,11 +69,17 @@ type Task struct {
 	Description           string     `json:"description"`
 	Priority              Priority   `json:"priority"`
 	DueDate               *time.Time `json:"due_date"`
+	DueAllDay             bool       `json:"due_all_day"` // hạn chỉ có ngày (app lưu ở 23:59 giờ địa phương)
 	Status                TaskStatus `json:"status"`
 	Category              Category   `json:"category"`
 	Recurrence            Recurrence `json:"recurrence"`
 	RecurrenceDays        string     `json:"recurrence_days"`         // "MON,WED,FRI" khi recurrence = WEEKLY
+	RecurrenceInterval    int        `json:"recurrence_interval"`     // mỗi N ngày/tuần/tháng (>= 1)
+	RecurrenceMode        RecurrenceMode `json:"recurrence_mode"`     // SCHEDULE | COMPLETION
+	RecurrenceUntil       *time.Time `json:"recurrence_until"`        // không lặp sau mốc này (nil = mãi mãi)
 	ReminderOffsetMinutes int        `json:"reminder_offset_minutes"` // số phút nhắc trước hạn (0 = đúng giờ)
+	MyDay                 *string    `json:"my_day"`                  // "yyyy-MM-dd": ngày người dùng chọn làm việc này
+	EstimatedMinutes      int        `json:"estimated_minutes"`       // thời lượng ước tính (0 = chưa có)
 	CompletedAt           *time.Time `json:"completed_at"`
 	SortOrder             float64    `json:"sort_order"` // nhỏ hơn đứng trước
 	Subtasks              []Subtask  `json:"subtasks"`
@@ -136,6 +155,8 @@ type TaskRepository interface {
 	List(ctx context.Context, userID string, filter TaskFilter) ([]*Task, error)
 	// ListChangedSince trả về mọi task (kể cả đã xóa mềm) có updated_at > since; since nil = mọi task chưa xóa.
 	ListChangedSince(ctx context.Context, userID string, since *time.Time) ([]*Task, error)
+	// ListMyDay trả về task chưa xóa, chưa xong, được chọn vào "Ngày của tôi" của ngày day ("yyyy-MM-dd").
+	ListMyDay(ctx context.Context, userID string, day string) ([]*Task, error)
 	SoftDelete(ctx context.Context, id string, at time.Time) error
 
 	CreateLog(ctx context.Context, log *TaskLog) error

@@ -209,7 +209,8 @@ func (c *GeminiClient) GenerateDailyPlan(ctx context.Context, tasks []*domain.Ta
 4. Current time of day (if provided).
 
 Scheduling Rules:
-- Schedule each task into a time block of roughly the user's default work block size (split larger work sensibly).
+- If a task has "estimated_minutes" > 0, use exactly that duration for its block (split into several blocks with short breaks only if it exceeds 120 minutes). Otherwise use roughly the user's default work block size.
+- A task with "due_all_day": true is due by the end of that day (its due_date time is not meaningful); a task with a specific due time should finish before that time when possible.
 - Order tasks by priority (HIGH first) and by due date (earlier due dates first).
 - Prefer to keep slots within the user's morning start time and evening end time.
 - If a current local time is provided (e.g., "10:15"), you MUST ONLY schedule tasks starting from or after this time. Do not suggest slots in the past.
@@ -290,9 +291,9 @@ Return ONLY a JSON array of slots with this exact structure:
 // Kết quả trả về (chuỗi lời khuyên):
 //
 //	"Mình hiểu cảm giác đó. Mình để ý bạn hay hoãn việc học — thử bắt đầu chỉ 15 phút với môn dễ nhất nhé..."
-func (c *GeminiClient) GetCoachResponse(ctx context.Context, message string, tasks []*domain.Task, memories []*domain.MemoryItem, history []*domain.ChatMessage) (string, error) {
+func (c *GeminiClient) GetCoachResponse(ctx context.Context, message string, localTime string, tasks []*domain.Task, memories []*domain.MemoryItem, history []*domain.ChatMessage) (*domain.CoachReply, error) {
 	if c == nil || c.client == nil {
-		return "", errNotInitialized
+		return nil, errNotInitialized
 	}
 
 	systemPrompt := `You are an empathetic, insightful AI Coach for a To-Do application. Your goal is to guide, motivate, and counsel the user regarding their task completions and habits.
@@ -306,11 +307,11 @@ Be direct but encouraging. Refer to their previous history if they have patterns
 	tasksJSON, _ := json.Marshal(tasks)
 	memoriesJSON, _ := json.Marshal(memories)
 	contextPrompt := fmt.Sprintf(
-		"--- USER CONTEXT ---\nActive Tasks: %s\nUser Habits & Memories: %s\n--------------------",
-		tasksJSON, memoriesJSON,
+		"--- USER CONTEXT ---\nCurrent local time: %s\nActive Tasks: %s\nUser Habits & Memories: %s\n--------------------",
+		localTime, tasksJSON, memoriesJSON,
 	)
 
-	fullSystemPrompt := systemPrompt + "\n\n" + contextPrompt
+	fullSystemPrompt := systemPrompt + "\n\n" + coachActionsPrompt + "\n\n" + contextPrompt
 
 	var contents []*genai.Content
 
@@ -348,15 +349,49 @@ Be direct but encouraging. Refer to their previous history if they have patterns
 				},
 			},
 		},
-		Temperature: genai.Ptr[float32](0.7),
+		ResponseMIMEType: "application/json",
+		Temperature:      genai.Ptr[float32](0.7),
 	}
 
 	resp, err := c.client.Models.GenerateContent(ctx, c.model, contents, config)
 	if err != nil {
-		return "", classifyErr(err)
+		return nil, classifyErr(err)
 	}
 
-	return resp.Text(), nil
+	return parseCoachReply(resp.Text()), nil
+}
+
+// coachActionsPrompt dạy Coach trả JSON gồm lời khuyên + hành động đề xuất (app hiện nút để người dùng xác nhận).
+const coachActionsPrompt = `RESPONSE FORMAT — return ONLY a JSON object:
+{"reply": "<your answer as plain text, same language as the user>", "actions": [ ... ]}
+
+"actions" lists at most 3 concrete changes you PROPOSE (the app shows a confirm button; nothing happens unless the user taps it).
+Only propose actions when they directly help with what the user asked or clearly unblock them; otherwise return "actions": [].
+Use ONLY task ids from Active Tasks. Resolve relative dates ("thứ 2 tuần sau", "tối nay") from the current local time and
+write due_date as RFC3339 with the same UTC offset. Action shapes:
+- {"type":"RESCHEDULE","label":"Dời 2 việc quá hạn sang sáng mai","task_ids":["..."],"due_date":"...","all_day":false}
+- {"type":"ADD_SUBTASKS","label":"Chia 'Viết luận văn' thành 4 bước","task_ids":["<one id>"],"subtasks":["...","..."]}
+- {"type":"CREATE_TASK","label":"Tạo việc 'Đi bộ 15 phút'","title":"Đi bộ 15 phút","due_date":"...","priority":"LOW"}
+- {"type":"SET_PRIORITY","label":"Đặt 'Nộp báo cáo' ưu tiên cao","task_ids":["..."],"priority":"HIGH"}
+- {"type":"ADD_TO_MY_DAY","label":"Đưa 3 việc vào Ngày của tôi","task_ids":["..."]}
+"label" is a short button caption in the user's language describing exactly what will change.`
+
+// parseCoachReply đọc JSON của Coach; nếu model lỡ trả văn bản thường thì dùng nguyên văn làm lời khuyên.
+func parseCoachReply(raw string) *domain.CoachReply {
+	var reply domain.CoachReply
+	if err := json.Unmarshal([]byte(raw), &reply); err != nil {
+		if err := json.Unmarshal([]byte(stripCodeBlocks(raw)), &reply); err != nil {
+			return &domain.CoachReply{Reply: strings.TrimSpace(raw), Actions: []domain.CoachAction{}}
+		}
+	}
+	if strings.TrimSpace(reply.Reply) == "" {
+		reply.Reply = strings.TrimSpace(raw)
+		reply.Actions = nil
+	}
+	if reply.Actions == nil {
+		reply.Actions = []domain.CoachAction{}
+	}
+	return &reply
 }
 
 // ExtractMemories nhờ LLM đọc lịch sử hoạt động + chat để rút ra các "thói quen/quan sát" dạng câu ngắn.

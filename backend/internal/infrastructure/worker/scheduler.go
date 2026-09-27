@@ -65,7 +65,14 @@ func (s *Scheduler) runDueJobs(ctx context.Context, now time.Time) {
 		s.RunMemoryExtraction(ctx)
 	}
 
-	// 2. Daily planning job runs daily at 04:00
+	// 2. Dọn danh sách refresh token đã thu hồi mà giờ đã tự hết hạn (03:00)
+	if local.Hour() == 3 && s.markRun("revocations", local) {
+		if err := s.userRepo.PurgeExpiredRevocations(ctx, now); err != nil {
+			log.Printf("Error purging expired token revocations: %v", err)
+		}
+	}
+
+	// 3. Daily planning job runs daily at 04:00
 	if local.Hour() == 4 && s.markRun("planning", local) {
 		log.Println("Triggering nightly daily planning job...")
 		s.RunDailyPlanning(ctx)

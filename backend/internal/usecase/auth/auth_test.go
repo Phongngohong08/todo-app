@@ -14,10 +14,13 @@ import (
 const testSecret = "0123456789abcdef0123456789abcdef"
 
 type mockUserRepo struct {
-	byID map[string]*domain.User
+	byID    map[string]*domain.User
+	revoked map[string]bool
 }
 
-func newMockUserRepo() *mockUserRepo { return &mockUserRepo{byID: map[string]*domain.User{}} }
+func newMockUserRepo() *mockUserRepo {
+	return &mockUserRepo{byID: map[string]*domain.User{}, revoked: map[string]bool{}}
+}
 
 func (m *mockUserRepo) Create(ctx context.Context, u *domain.User) error {
 	m.byID[u.ID] = u
@@ -88,7 +91,7 @@ func TestLogin_WrongPassword(t *testing.T) {
 	}
 }
 
-func TestRefresh_ThenLogoutRevokesRefreshToken(t *testing.T) {
+func TestRefresh_ThenLogoutAllDevicesRevokesEveryRefreshToken(t *testing.T) {
 	uc, _, res := setup(t)
 	ctx := context.Background()
 
@@ -97,7 +100,7 @@ func TestRefresh_ThenLogoutRevokesRefreshToken(t *testing.T) {
 		t.Fatalf("refresh before logout should work: %v", err)
 	}
 
-	if err := uc.Logout(ctx, refreshed.RefreshToken); err != nil {
+	if err := uc.Logout(ctx, refreshed.RefreshToken, true); err != nil {
 		t.Fatalf("logout: %v", err)
 	}
 
@@ -119,7 +122,7 @@ func TestRefresh_ThenLogoutRevokesRefreshToken(t *testing.T) {
 
 func TestLogout_InvalidTokenIsNoop(t *testing.T) {
 	uc, _, _ := setup(t)
-	if err := uc.Logout(context.Background(), "not-a-jwt"); err != nil {
+	if err := uc.Logout(context.Background(), "not-a-jwt", false); err != nil {
 		t.Fatalf("logout with garbage token should be a no-op, got %v", err)
 	}
 }
@@ -153,5 +156,58 @@ func TestRefresh_LegacyTokenWithoutVersionStillValid(t *testing.T) {
 	}
 	if _, err := uc.Refresh(context.Background(), tok); err != nil {
 		t.Fatalf("legacy refresh token should remain valid until first logout: %v", err)
+	}
+}
+
+func (m *mockUserRepo) RevokeRefreshToken(ctx context.Context, jti, userID string, expiresAt time.Time) error {
+	m.revoked[jti] = true
+	return nil
+}
+func (m *mockUserRepo) IsRefreshTokenRevoked(ctx context.Context, jti string) (bool, error) {
+	return m.revoked[jti], nil
+}
+func (m *mockUserRepo) PurgeExpiredRevocations(ctx context.Context, now time.Time) error { return nil }
+
+// Đăng xuất trên máy A không được đá máy B ra.
+func TestLogout_SingleDeviceKeepsOtherDevicesSignedIn(t *testing.T) {
+	uc, _, deviceA := setup(t)
+	ctx := context.Background()
+	deviceB, err := uc.Login(ctx, LoginInput{Email: "a@b.com", Password: "secret123"})
+	if err != nil {
+		t.Fatalf("login on device B: %v", err)
+	}
+
+	if err := uc.Logout(ctx, deviceA.RefreshToken, false); err != nil {
+		t.Fatalf("logout device A: %v", err)
+	}
+
+	if _, err := uc.Refresh(ctx, deviceA.RefreshToken); !errors.Is(err, domain.ErrInvalidToken) {
+		t.Fatalf("device A refresh token should be revoked, got %v", err)
+	}
+	if _, err := uc.Refresh(ctx, deviceB.RefreshToken); err != nil {
+		t.Fatalf("device B should stay signed in, got %v", err)
+	}
+}
+
+// Refresh token phát trước khi có jti không thu hồi riêng được → đăng xuất một máy rơi về thu hồi tất cả.
+func TestLogout_LegacyTokenWithoutJTIFallsBackToAllDevices(t *testing.T) {
+	uc, repo, _ := setup(t)
+	ctx := context.Background()
+	var userID string
+	for id := range repo.byID {
+		userID = id
+	}
+	legacy := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"sub": userID, "typ": tokenTypeRefresh, "ver": 0, "exp": time.Now().Add(time.Hour).Unix(),
+	})
+	token, err := legacy.SignedString([]byte(testSecret))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := uc.Logout(ctx, token, false); err != nil {
+		t.Fatalf("logout: %v", err)
+	}
+	if repo.byID[userID].TokenVersion != 1 {
+		t.Fatalf("legacy logout should bump token_version, got %d", repo.byID[userID].TokenVersion)
 	}
 }

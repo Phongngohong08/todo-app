@@ -2,6 +2,7 @@ package plan
 
 import (
 	"context"
+	"sort"
 	"time"
 	"todo-backend/internal/domain"
 
@@ -34,6 +35,66 @@ func NewPlanUseCase(
 		memoryRepo: memoryRepo,
 		aiClient:   aiClient,
 	}
+}
+
+// MaxPlanSlots giới hạn số khung giờ người dùng lưu tay (một ngày không cần nhiều hơn).
+const MaxPlanSlots = 48
+
+// SaveEdited lưu lịch người dùng đã chỉnh tay (đổi giờ, bỏ khung). Khung giờ phải hợp lệ và không chồng nhau;
+// được sắp lại theo giờ bắt đầu.
+func (u *PlanUseCase) SaveEdited(ctx context.Context, userID string, date time.Time, slots []domain.PlanSlot) (*domain.DailyPlan, error) {
+	if len(slots) > MaxPlanSlots {
+		return nil, domain.NewValidationError("Lịch trình có quá nhiều khung giờ")
+	}
+	clean, err := normalizeSlots(slots)
+	if err != nil {
+		return nil, err
+	}
+	existing, err := u.planRepo.GetByDate(ctx, userID, date)
+	if err != nil {
+		return nil, err
+	}
+	plan := &domain.DailyPlan{
+		ID:        uuid.New().String(),
+		UserID:    userID,
+		PlanDate:  date,
+		PlanData:  clean,
+		CreatedAt: time.Now(),
+	}
+	if existing != nil {
+		plan.ID = existing.ID
+	}
+	if err := u.planRepo.Save(ctx, plan); err != nil {
+		return nil, err
+	}
+	return plan, nil
+}
+
+// normalizeSlots kiểm tra "HH:mm", start < end, không chồng nhau; trả về bản đã sắp theo giờ bắt đầu.
+func normalizeSlots(slots []domain.PlanSlot) ([]domain.PlanSlot, error) {
+	out := make([]domain.PlanSlot, 0, len(slots))
+	for _, s := range slots {
+		start, errS := time.Parse("15:04", s.StartTime)
+		end, errE := time.Parse("15:04", s.EndTime)
+		if errS != nil || errE != nil {
+			return nil, domain.NewValidationError("Giờ trong lịch trình phải có dạng HH:mm")
+		}
+		if !end.After(start) {
+			return nil, domain.NewValidationError("Giờ kết thúc phải sau giờ bắt đầu")
+		}
+		if len(s.Title) > 255 {
+			return nil, domain.NewValidationError("Tên khung giờ quá dài")
+		}
+		s.StartTime, s.EndTime = start.Format("15:04"), end.Format("15:04")
+		out = append(out, s)
+	}
+	sort.SliceStable(out, func(i, j int) bool { return out[i].StartTime < out[j].StartTime })
+	for i := 1; i < len(out); i++ {
+		if out[i].StartTime < out[i-1].EndTime {
+			return nil, domain.NewValidationError("Các khung giờ bị chồng lên nhau")
+		}
+	}
+	return out, nil
 }
 
 // GetPlan chỉ đọc lại lịch ĐÃ lưu của một ngày (không gọi AI).
@@ -93,6 +154,16 @@ func (u *PlanUseCase) Generate(ctx context.Context, userID string, date time.Tim
 		if t.Status == domain.StatusTodo {
 			activeTasks = append(activeTasks, t)
 		}
+	}
+
+	// Người dùng đã chọn "Ngày của tôi" cho ngày này → chỉ xếp lịch những việc đó (cam kết của họ),
+	// thay vì dồn mọi việc đang mở vào một ngày.
+	myDay, err := u.taskRepo.ListMyDay(ctx, userID, date.Format("2006-01-02"))
+	if err != nil {
+		return nil, err
+	}
+	if len(myDay) > 0 {
+		activeTasks = myDay
 	}
 
 	// Không có việc cần xếp → trả lịch rỗng, KHÔNG gọi AI (tiết kiệm lượt) và KHÔNG lưu, để khi người dùng

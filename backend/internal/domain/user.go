@@ -20,6 +20,8 @@ type UserPreferences struct {
 	MorningStartTime        string    `json:"morning_start_time"`         // e.g., "08:00"
 	EveningEndTime          string    `json:"evening_end_time"`           // e.g., "18:00"
 	WorkDurationPreference  int       `json:"work_duration_preference"`  // in minutes, e.g., 60
+	DailyGoal               int       `json:"daily_goal"`                // số việc muốn hoàn thành mỗi ngày (chuỗi ngày đạt mục tiêu)
+	DaysOff                 string    `json:"days_off"`                  // "SAT,SUN": ngày nghỉ không làm đứt chuỗi
 	UpdatedAt               time.Time `json:"updated_at"`
 }
 
@@ -32,6 +34,12 @@ type UserRepository interface {
 	ListActiveUserIDs(ctx context.Context, since time.Time) ([]string, error)
 	// IncrementTokenVersion vô hiệu hóa mọi refresh token đã phát cho user.
 	IncrementTokenVersion(ctx context.Context, userID string) error
+	// RevokeRefreshToken thu hồi đúng một refresh token (đăng xuất một thiết bị). Gọi lại vẫn an toàn.
+	RevokeRefreshToken(ctx context.Context, jti, userID string, expiresAt time.Time) error
+	// IsRefreshTokenRevoked cho biết refresh token có jti này đã bị thu hồi chưa.
+	IsRefreshTokenRevoked(ctx context.Context, jti string) (bool, error)
+	// PurgeExpiredRevocations xóa bản ghi thu hồi của token đã tự hết hạn (không còn cần chặn).
+	PurgeExpiredRevocations(ctx context.Context, now time.Time) error
 
 	GetPreferences(ctx context.Context, userID string) (*UserPreferences, error)
 	UpdatePreferences(ctx context.Context, prefs *UserPreferences) error

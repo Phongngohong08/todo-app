@@ -120,49 +120,67 @@ func (u *AuthUseCase) Login(ctx context.Context, input LoginInput) (*AuthRespons
 
 // Refresh đổi một refresh token hợp lệ lấy cặp access/refresh token mới (sliding expiration).
 func (u *AuthUseCase) Refresh(ctx context.Context, refreshToken string) (*AuthResponse, error) {
-	user, err := u.userFromRefreshToken(ctx, refreshToken)
+	user, _, err := u.userFromRefreshToken(ctx, refreshToken)
 	if err != nil {
 		return nil, err
 	}
 	return u.buildAuthResponse(user)
 }
 
-// Logout thu hồi mọi refresh token của chủ sở hữu token (đăng xuất khỏi tất cả thiết bị).
+// Logout thu hồi refresh token.
+//   - allDevices = false: chỉ thu hồi token này (đăng xuất thiết bị đang dùng) — theo jti.
+//     Token phát trước khi có jti không thu hồi riêng được → rơi về thu hồi tất cả cho chắc.
+//   - allDevices = true:  tăng token_version → mọi refresh token đã phát đều vô hiệu.
+//
 // Token không hợp lệ/đã hết hạn thì coi như đã đăng xuất (idempotent). Access token đang còn hạn
 // vẫn dùng được tới khi hết ACCESS_TOKEN_TTL — vì vậy TTL đó nên ngắn.
-func (u *AuthUseCase) Logout(ctx context.Context, refreshToken string) error {
-	user, err := u.userFromRefreshToken(ctx, refreshToken)
+func (u *AuthUseCase) Logout(ctx context.Context, refreshToken string, allDevices bool) error {
+	user, claims, err := u.userFromRefreshToken(ctx, refreshToken)
 	if errors.Is(err, domain.ErrInvalidToken) {
 		return nil
 	}
 	if err != nil {
 		return err
 	}
-	return u.userRepo.IncrementTokenVersion(ctx, user.ID)
+	if allDevices || claims.jti == "" {
+		return u.userRepo.IncrementTokenVersion(ctx, user.ID)
+	}
+	return u.userRepo.RevokeRefreshToken(ctx, claims.jti, user.ID, claims.expiresAt)
 }
 
-// userFromRefreshToken xác thực refresh token (chữ ký, hạn, loại, version) và trả về user sở hữu.
-func (u *AuthUseCase) userFromRefreshToken(ctx context.Context, refreshToken string) (*domain.User, error) {
+// userFromRefreshToken xác thực refresh token (chữ ký, hạn, loại, version, danh sách thu hồi)
+// và trả về user sở hữu.
+func (u *AuthUseCase) userFromRefreshToken(ctx context.Context, refreshToken string) (*domain.User, *tokenClaims, error) {
 	claims, err := u.parseToken(refreshToken)
 	if err != nil {
-		return nil, domain.ErrInvalidToken
+		return nil, nil, domain.ErrInvalidToken
 	}
 	if claims.tokenType != tokenTypeRefresh {
-		return nil, domain.ErrInvalidToken
+		return nil, nil, domain.ErrInvalidToken
 	}
 
 	user, err := u.userRepo.GetByID(ctx, claims.userID)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if user == nil {
-		return nil, domain.ErrInvalidToken
+		return nil, nil, domain.ErrInvalidToken
 	}
-	// Token phát trước lần đăng xuất gần nhất → đã bị thu hồi.
+	// Token phát trước lần "đăng xuất mọi thiết bị" gần nhất → đã bị thu hồi.
 	if claims.version != user.TokenVersion {
-		return nil, domain.ErrInvalidToken
+		return nil, nil, domain.ErrInvalidToken
 	}
-	return user, nil
+	// Thiết bị này đã đăng xuất riêng.
+	if claims.jti != "" {
+		revoked, err := u.userRepo.IsRefreshTokenRevoked(ctx, claims.jti)
+		if err != nil {
+			return nil, nil, err
+		}
+		if revoked {
+			return nil, nil, domain.ErrInvalidToken
+		}
+	}
+	return user, claims, nil
 }
 
 // buildAuthResponse sinh cặp access + refresh token cho user.
@@ -184,7 +202,8 @@ func (u *AuthUseCase) buildAuthResponse(user *domain.User) (*AuthResponse, error
 	}, nil
 }
 
-// generateToken tạo một JWT HS256 với claim sub (userID), typ (loại token), exp và — với refresh token — ver.
+// generateToken tạo một JWT HS256 với claim sub (userID), typ (loại token), exp và — với refresh token —
+// ver (thu hồi mọi thiết bị) + jti (thu hồi riêng thiết bị này).
 func (u *AuthUseCase) generateToken(userID, tokenType string, ttl time.Duration, version *int) (string, error) {
 	claims := jwt.MapClaims{
 		"sub": userID,
@@ -194,6 +213,9 @@ func (u *AuthUseCase) generateToken(userID, tokenType string, ttl time.Duration,
 	if version != nil {
 		claims["ver"] = *version
 	}
+	if tokenType == tokenTypeRefresh {
+		claims["jti"] = uuid.New().String()
+	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString([]byte(u.jwtSecret))
 }
@@ -202,6 +224,8 @@ type tokenClaims struct {
 	userID    string
 	tokenType string
 	version   int
+	jti       string    // chỉ có ở refresh token phát sau migration 000008
+	expiresAt time.Time
 }
 
 // parseToken xác thực chữ ký + hạn dùng, trả về các claim cần dùng.
@@ -235,7 +259,12 @@ func (u *AuthUseCase) parseToken(tokenString string) (*tokenClaims, error) {
 	if v, ok := claims["ver"].(float64); ok {
 		version = int(v)
 	}
-	return &tokenClaims{userID: userID, tokenType: tokenType, version: version}, nil
+	jti, _ := claims["jti"].(string)
+	var expiresAt time.Time
+	if exp, err := claims.GetExpirationTime(); err == nil && exp != nil {
+		expiresAt = exp.Time
+	}
+	return &tokenClaims{userID: userID, tokenType: tokenType, version: version, jti: jti, expiresAt: expiresAt}, nil
 }
 
 // VerifyToken dùng cho middleware: chỉ chấp nhận access token.

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -166,6 +167,7 @@ func (rm *RouteManager) SetupRouter() (*gin.Engine, error) {
 			{
 				plansGroup.GET("/daily", rm.handleGetDailyPlan)
 				plansGroup.POST("/daily/generate", rm.handleGenerateDailyPlan)
+				plansGroup.PUT("/daily", rm.handleSaveDailyPlan) // lưu lịch người dùng chỉnh tay (không gọi AI)
 			}
 
 			// AI Coach Chat
@@ -256,13 +258,19 @@ func (rm *RouteManager) handleRefresh(c *gin.Context) {
 
 // handleLogout thu hồi refresh token (mọi phiên của tài khoản). Nhận refresh token trong body thay vì
 // dùng access token, để vẫn đăng xuất được khi access token đã hết hạn.
+// LogoutInput: all_devices = false (mặc định) chỉ đăng xuất thiết bị gửi request.
+type LogoutInput struct {
+	RefreshToken string `json:"refresh_token" binding:"required,max=4096"`
+	AllDevices   bool   `json:"all_devices"`
+}
+
 func (rm *RouteManager) handleLogout(c *gin.Context) {
-	var input RefreshInput
+	var input LogoutInput
 	if !bindJSON(c, &input) {
 		return
 	}
 
-	if err := rm.authUC.Logout(c.Request.Context(), input.RefreshToken); err != nil {
+	if err := rm.authUC.Logout(c.Request.Context(), input.RefreshToken, input.AllDevices); err != nil {
 		respondError(c, err)
 		return
 	}
@@ -286,10 +294,36 @@ func (rm *RouteManager) handleGetPreferences(c *gin.Context) {
 	c.JSON(http.StatusOK, prefs)
 }
 
+// normalizeWeekdayList chuẩn hóa "sat, Sun" → "SAT,SUN" (bỏ trùng, giữ thứ tự T2→CN); false nếu có mã lạ.
+func normalizeWeekdayList(raw string) (string, bool) {
+	order := []string{"MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"}
+	chosen := make(map[string]bool)
+	for _, p := range strings.Split(raw, ",") {
+		code := strings.ToUpper(strings.TrimSpace(p))
+		if code == "" {
+			continue
+		}
+		if !slices.Contains(order, code) {
+			return "", false
+		}
+		chosen[code] = true
+	}
+	var out []string
+	for _, code := range order {
+		if chosen[code] {
+			out = append(out, code)
+		}
+	}
+	return strings.Join(out, ","), true
+}
+
 type UpdatePreferencesInput struct {
 	MorningStartTime       string `json:"morning_start_time" binding:"required"`
 	EveningEndTime         string `json:"evening_end_time" binding:"required"`
 	WorkDurationPreference int    `json:"work_duration_preference" binding:"required,min=15,max=480"`
+	// Thêm ở migration 000008 — nil (client cũ) thì giữ nguyên giá trị đang có.
+	DailyGoal *int    `json:"daily_goal" binding:"omitempty,min=1,max=50"`
+	DaysOff   *string `json:"days_off" binding:"omitempty,max=40"`
 }
 
 func (rm *RouteManager) handleUpdatePreferences(c *gin.Context) {
@@ -310,11 +344,34 @@ func (rm *RouteManager) handleUpdatePreferences(c *gin.Context) {
 		return
 	}
 
+	current, err := rm.userRepo.GetPreferences(c.Request.Context(), userID)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	dailyGoal, daysOff := 3, ""
+	if current != nil {
+		dailyGoal, daysOff = current.DailyGoal, current.DaysOff
+	}
+	if input.DailyGoal != nil {
+		dailyGoal = *input.DailyGoal
+	}
+	if input.DaysOff != nil {
+		normalized, ok := normalizeWeekdayList(*input.DaysOff)
+		if !ok {
+			respondError(c, domain.NewValidationError("Ngày nghỉ phải là danh sách như SAT,SUN"))
+			return
+		}
+		daysOff = normalized
+	}
+
 	prefs := &domain.UserPreferences{
 		UserID:                 userID,
 		MorningStartTime:       morning.Format("15:04"),
 		EveningEndTime:         evening.Format("15:04"),
 		WorkDurationPreference: input.WorkDurationPreference,
+		DailyGoal:              dailyGoal,
+		DaysOff:                daysOff,
 		UpdatedAt:              time.Now(),
 	}
 
@@ -531,6 +588,29 @@ func (rm *RouteManager) handleGetDailyPlan(c *gin.Context) {
 	c.JSON(http.StatusOK, plan)
 }
 
+// SavePlanInput: toàn bộ khung giờ sau khi người dùng chỉnh (đổi giờ, bỏ bớt).
+type SavePlanInput struct {
+	PlanData []domain.PlanSlot `json:"plan_data" binding:"max=48"`
+}
+
+func (rm *RouteManager) handleSaveDailyPlan(c *gin.Context) {
+	userID := c.GetString("userID")
+	date, ok := rm.planDateParam(c)
+	if !ok {
+		return
+	}
+	var input SavePlanInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	plan, err := rm.planUC.SaveEdited(c.Request.Context(), userID, date, input.PlanData)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, plan)
+}
+
 func (rm *RouteManager) handleGenerateDailyPlan(c *gin.Context) {
 	userID := c.GetString("userID")
 	// App gửi date theo lịch của máy; thiếu thì lấy "hôm nay" theo APP_TIMEZONE (không dùng giờ UTC của server).
@@ -586,13 +666,14 @@ func (rm *RouteManager) handleAIChat(c *gin.Context) {
 		return
 	}
 
-	reply, err := rm.coachUC.Chat(c.Request.Context(), userID, input.Message)
+	// reply + actions (đề xuất để app hiện nút xác nhận). App cũ chỉ đọc "reply" nên vẫn tương thích.
+	reply, err := rm.coachUC.Chat(c.Request.Context(), userID, input.Message, input.LocalTime)
 	if err != nil {
 		respondError(c, err)
 		return
 	}
 
-	c.JSON(http.StatusOK, coach.ChatResponse{Reply: reply})
+	c.JSON(http.StatusOK, reply)
 }
 
 const (

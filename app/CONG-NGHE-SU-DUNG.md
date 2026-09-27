@@ -28,6 +28,8 @@ Tài liệu liệt kê đầy đủ các công nghệ, thư viện và **kỹ th
 | **Compose Animation** | `Modifier.animateItem()` (thẻ trượt mượt giữa các nhóm), `animateColorAsState` |
 | **Compose Canvas** | Vẽ tùy biến: biểu đồ cột năng suất tuần, bản đồ nhiệt năm |
 | **Haptic feedback** | `LocalHapticFeedback` — rung nhẹ khi kéo-thả, khi vuốt hoàn thành |
+| **SplashScreen API** (`core-splashscreen` 1.0.1) | Màn khởi động theo thương hiệu, icon AnimatedVectorDrawable (Android 12+), hiệu ứng thoát tùy biến |
+| **Adaptive icon** (vector) | Lớp nền + lớp trước + lớp **monochrome** (themed icon Android 13+); không cần ảnh bitmap theo mật độ màn hình vì minSdk 29 |
 | **Lifecycle Runtime Compose** | `collectAsStateWithLifecycle()`, `LifecycleEventEffect(ON_START)` |
 
 ### Kỹ thuật UI áp dụng

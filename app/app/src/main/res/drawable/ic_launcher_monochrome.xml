@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Lớp đơn sắc cho "Themed icons" (Android 13+): hệ thống chỉ dùng độ trong suốt rồi tô theo màu hình nền,
+  nên vẽ biểu tượng dạng nét (thẻ rỗng + dấu tích + tia sáng) để vẫn nhận ra khi chỉ có một màu.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FF000000"
+        android:strokeWidth="4.5"
+        android:pathData="M42,37H58A11,11 0,0 1,69 48V64A11,11 0,0 1,58 75H42A11,11 0,0 1,31 64V48A11,11 0,0 1,42 37Z" />
+
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FF000000"
+        android:strokeWidth="6"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M40.5,56.5L47.5,63.5L60,48.5" />
+
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M71,26.5C71.6,31.4 73.6,33.4 78.5,34C73.6,34.6 71.6,36.6 71,41.5C70.4,36.6 68.4,34.6 63.5,34C68.4,33.4 70.4,31.4 71,26.5Z" />
+</vector>

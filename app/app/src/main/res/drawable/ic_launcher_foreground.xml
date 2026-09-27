@@ -1,30 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Biểu tượng TaskFlow AI: "thẻ công việc" trắng có dấu tích (gradient tím → xanh ngọc) và tia sáng ✦ tượng trưng AI.
+  Mọi nét nằm trong vùng an toàn bán kính 33dp quanh tâm (54,54) nên không bị cắt ở bất kỳ hình mask nào
+  (tròn, bo góc, giọt nước...). Dùng chung cho icon, màn khởi động và logo trong app.
+-->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <path android:pathData="M31,63.928c0,0 6.4,-11 12.1,-13.1c7.2,-2.6 26,-1.4 26,-1.4l38.1,38.1L107,108.928l-32,-1L31,63.928z">
-        <aapt:attr name="android:fillColor">
+
+    <!-- Bóng đổ nhẹ dưới thẻ -->
+    <path
+        android:fillColor="#33201A5E"
+        android:pathData="M43,39.5H59A11,11 0,0 1,70 50.5V65.5A11,11 0,0 1,59 76.5H43A11,11 0,0 1,32 65.5V50.5A11,11 0,0 1,43 39.5Z" />
+
+    <!-- Thẻ công việc -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M42,37H58A11,11 0,0 1,69 48V64A11,11 0,0 1,58 75H42A11,11 0,0 1,31 64V48A11,11 0,0 1,42 37Z" />
+
+    <!-- Dấu tích -->
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M40.5,56.5L47.5,63.5L60,48.5"
+        android:strokeWidth="6.5"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round">
+        <aapt:attr name="android:strokeColor">
             <gradient
-                android:endX="85.84757"
-                android:endY="92.4963"
-                android:startX="42.9492"
-                android:startY="49.59793"
-                android:type="linear">
-                <item
-                    android:color="#44000000"
-                    android:offset="0.0" />
-                <item
-                    android:color="#00000000"
-                    android:offset="1.0" />
+                android:type="linear"
+                android:startX="40"
+                android:startY="64"
+                android:endX="60"
+                android:endY="48">
+                <item android:offset="0" android:color="#FF6C5CE7" />
+                <item android:offset="1" android:color="#FF2FB89B" />
             </gradient>
         </aapt:attr>
     </path>
+
+    <!-- Tia sáng AI lớn -->
     <path
-        android:fillColor="#FFFFFF"
-        android:fillType="nonZero"
-        android:pathData="M65.3,45.828l3.8,-6.6c0.2,-0.4 0.1,-0.9 -0.3,-1.1c-0.4,-0.2 -0.9,-0.1 -1.1,0.3l-3.9,6.7c-6.3,-2.8 -13.4,-2.8 -19.7,0l-3.9,-6.7c-0.2,-0.4 -0.7,-0.5 -1.1,-0.3C38.8,38.328 38.7,38.828 38.9,39.228l3.8,6.6C36.2,49.428 31.7,56.028 31,63.928h46C76.3,56.028 71.8,49.428 65.3,45.828zM43.4,57.328c-0.8,0 -1.5,-0.5 -1.8,-1.2c-0.3,-0.7 -0.1,-1.5 0.4,-2.1c0.5,-0.5 1.4,-0.7 2.1,-0.4c0.7,0.3 1.2,1 1.2,1.8C45.3,56.528 44.5,57.328 43.4,57.328L43.4,57.328zM64.6,57.328c-0.8,0 -1.5,-0.5 -1.8,-1.2s-0.1,-1.5 0.4,-2.1c0.5,-0.5 1.4,-0.7 2.1,-0.4c0.7,0.3 1.2,1 1.2,1.8C66.5,56.528 65.6,57.328 64.6,57.328L64.6,57.328z"
-        android:strokeWidth="1"
-        android:strokeColor="#00000000" />
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M71,26.5C71.6,31.4 73.6,33.4 78.5,34C73.6,34.6 71.6,36.6 71,41.5C70.4,36.6 68.4,34.6 63.5,34C68.4,33.4 70.4,31.4 71,26.5Z" />
+
+    <!-- Tia sáng nhỏ -->
+    <path
+        android:fillColor="#FFB8F5E6"
+        android:pathData="M62.5,24.3C62.75,26.3 63.5,27.05 65.5,27.3C63.5,27.55 62.75,28.3 62.5,30.3C62.25,28.3 61.5,27.55 59.5,27.3C61.5,27.05 62.25,26.3 62.5,24.3Z" />
 </vector>

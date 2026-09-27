@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Icon màn khởi động có animation (Android 12+, SplashScreen API): thẻ hiện ra, dấu tích tự "vẽ"
+  (trimPathEnd 0 → 1), rồi tia sáng AI bật ra (scale + xoay, overshoot). Tổng ~800ms, khớp
+  windowSplashScreenAnimationDuration trong themes.xml.
+-->
+<animated-vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt">
+
+    <aapt:attr name="android:drawable">
+        <vector
+            android:width="108dp"
+            android:height="108dp"
+            android:viewportWidth="108"
+            android:viewportHeight="108">
+
+            <group
+                android:name="card"
+                android:pivotX="50"
+                android:pivotY="56"
+                android:scaleX="0.85"
+                android:scaleY="0.85">
+                <path
+                    android:fillColor="#33201A5E"
+                    android:pathData="M43,39.5H59A11,11 0,0 1,70 50.5V65.5A11,11 0,0 1,59 76.5H43A11,11 0,0 1,32 65.5V50.5A11,11 0,0 1,43 39.5Z" />
+                <path
+                    android:fillColor="#FFFFFFFF"
+                    android:pathData="M42,37H58A11,11 0,0 1,69 48V64A11,11 0,0 1,58 75H42A11,11 0,0 1,31 64V48A11,11 0,0 1,42 37Z" />
+                <path
+                    android:name="check"
+                    android:fillColor="#00000000"
+                    android:pathData="M40.5,56.5L47.5,63.5L60,48.5"
+                    android:strokeWidth="6.5"
+                    android:strokeLineCap="round"
+                    android:strokeLineJoin="round"
+                    android:trimPathEnd="0">
+                    <aapt:attr name="android:strokeColor">
+                        <gradient
+                            android:type="linear"
+                            android:startX="40"
+                            android:startY="64"
+                            android:endX="60"
+                            android:endY="48">
+                            <item android:offset="0" android:color="#FF6C5CE7" />
+                            <item android:offset="1" android:color="#FF2FB89B" />
+                        </gradient>
+                    </aapt:attr>
+                </path>
+            </group>
+
+            <group
+                android:name="sparkle"
+                android:pivotX="71"
+                android:pivotY="34"
+                android:scaleX="0"
+                android:scaleY="0">
+                <path
+                    android:fillColor="#FFFFFFFF"
+                    android:pathData="M71,26.5C71.6,31.4 73.6,33.4 78.5,34C73.6,34.6 71.6,36.6 71,41.5C70.4,36.6 68.4,34.6 63.5,34C68.4,33.4 70.4,31.4 71,26.5Z" />
+                <path
+                    android:fillColor="#FFB8F5E6"
+                    android:pathData="M62.5,24.3C62.75,26.3 63.5,27.05 65.5,27.3C63.5,27.55 62.75,28.3 62.5,30.3C62.25,28.3 61.5,27.55 59.5,27.3C61.5,27.05 62.25,26.3 62.5,24.3Z" />
+            </group>
+        </vector>
+    </aapt:attr>
+
+    <target android:name="card">
+        <aapt:attr name="android:animation">
+            <set>
+                <objectAnimator
+                    android:duration="300"
+                    android:interpolator="@android:interpolator/fast_out_slow_in"
+                    android:propertyName="scaleX"
+                    android:valueFrom="0.85"
+                    android:valueTo="1" />
+                <objectAnimator
+                    android:duration="300"
+                    android:interpolator="@android:interpolator/fast_out_slow_in"
+                    android:propertyName="scaleY"
+                    android:valueFrom="0.85"
+                    android:valueTo="1" />
+            </set>
+        </aapt:attr>
+    </target>
+
+    <target android:name="check">
+        <aapt:attr name="android:animation">
+            <objectAnimator
+                android:duration="380"
+                android:interpolator="@android:interpolator/fast_out_slow_in"
+                android:propertyName="trimPathEnd"
+                android:startOffset="180"
+                android:valueFrom="0"
+                android:valueTo="1" />
+        </aapt:attr>
+    </target>
+
+    <target android:name="sparkle">
+        <aapt:attr name="android:animation">
+            <set>
+                <objectAnimator
+                    android:duration="320"
+                    android:interpolator="@android:anim/overshoot_interpolator"
+                    android:propertyName="scaleX"
+                    android:startOffset="480"
+                    android:valueFrom="0"
+                    android:valueTo="1" />
+                <objectAnimator
+                    android:duration="320"
+                    android:interpolator="@android:anim/overshoot_interpolator"
+                    android:propertyName="scaleY"
+                    android:startOffset="480"
+                    android:valueFrom="0"
+                    android:valueTo="1" />
+                <objectAnimator
+                    android:duration="320"
+                    android:interpolator="@android:interpolator/fast_out_slow_in"
+                    android:propertyName="rotation"
+                    android:startOffset="480"
+                    android:valueFrom="-60"
+                    android:valueTo="0" />
+            </set>
+        </aapt:attr>
+    </target>
+</animated-vector>

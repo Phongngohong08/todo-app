@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Chế độ tối: tím đậm thay vì tím sáng để không "chói" khi mở app buổi tối -->
+    <color name="splash_background">#FF2A2358</color>
+    <color name="window_background">#FF131320</color>
+</resources>

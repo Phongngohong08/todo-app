@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Icon màn khởi động (Android 10–11: tĩnh). Android 12+ dùng bản có animation ở drawable-v31/. -->
+<inset xmlns:android="http://schemas.android.com/apk/res/android"
+    android:drawable="@drawable/ic_launcher_foreground" />

@@ -67,7 +67,7 @@ Ba dạng dữ liệu tách biệt theo tầng, chuyển đổi trong [`Mappers.
 | Mất mạng giữa chừng / gửi lại | Mọi request đồng bộ **idempotent** (PUT ghi toàn bộ trạng thái, DELETE lần hai vẫn thành công) → gửi lại bao nhiêu lần cũng an toàn |
 | Người dùng sửa tiếp khi request đang bay | Mỗi lần sửa tăng `localVersion`; chỉ xóa cờ dirty nếu version không đổi → bản sửa sau được gửi ở vòng kế tiếp, không bao giờ mất |
 | Chỉ tải phần thay đổi | Con trỏ `server_time`: `GET /tasks/sync?since=...` trả task đã sửa + id đã xóa kể từ lần trước |
-| Xóa rồi bấm Hoàn tác | Xóa để lại "bia mộ" (`isDeleted`) vài phút; Hoàn tác = ghi lại → server khôi phục (ghi sau cùng thắng) |
+| Xóa rồi bấm Hoàn tác / Thùng rác | Xóa để lại "bia mộ" (`isDeleted`) **30 ngày** — việc bị xóa ở máy khác (`deleted_ids`) cũng thành bia mộ — nên hiện trong **Thùng rác** và khôi phục được; khôi phục = ghi lại → server "hồi sinh" task (ghi sau cùng thắng). Xóa vĩnh viễn chỉ áp dụng cho bia mộ đã gửi việc xóa lên server |
 | Hai máy cùng sửa | Bản trên máy còn dirty được giữ khi kéo về, rồi gửi lên — "ghi sau cùng thắng" ở mức task |
 | Hai lần đồng bộ chạy cùng lúc | `Mutex` trong `SyncEngine` (WorkManager, kéo-để-làm-mới và đăng xuất dùng chung) |
 | Nhiều thao tác liên tiếp | `SyncScheduler.requestSync()` = unique work + REPLACE + trễ 1 giây → gộp thành một lần đồng bộ |
@@ -82,22 +82,26 @@ Ba dạng dữ liệu tách biệt theo tầng, chuyển đổi trong [`Mappers.
 
 ```
 app/src/main/java/com/example/todoapplication/
-  MainActivity.kt                # NavHost; xin quyền thông báo; forced-logout; đồng bộ khi ON_START
-  TodoApplication.kt             # Khởi tạo DI; bật đồng bộ nền; đồng bộ lại khi có mạng
+  MainActivity.kt                # NavHost 4 tab; deep link (thông báo, widget, shortcut, chia sẻ); forced-logout; đồng bộ khi ON_START
+  TodoApplication.kt             # Khởi tạo DI; kênh thông báo; hẹn tóm tắt sáng/tổng kết tuần; đồng bộ nền
   domain/                        # Logic thuần Kotlin (không phụ thuộc Android)
-    model/Task.kt                # Task, Subtask, TaskDraft, StatsSummary
-    TaskListLogic.kt             # Quá hạn, nhóm Hôm nay/Tương lai/Đã xong, sắp xếp, gợi ý AI
-    RecurrenceRules.kt           # Quy tắc lặp + id tất định (giống backend)
+    model/Task.kt                # Task (cả ngày, Ngày của tôi, thời lượng, lặp nâng cao), Subtask, TaskDraft
+    TaskListLogic.kt             # Nhóm Quá hạn/Hôm nay/Sắp tới/Chưa có hạn, bộ lọc thông minh, "Nên làm trước" + lý do, gợi ý Ngày của tôi
+    QuickAddParser.kt            # Phân tích câu tạo nhanh tiếng Việt trên máy (ngày, giờ, !ưu tiên, #danh mục, lặp)
+    RecurrenceRules.kt           # Quy tắc lặp (mỗi N, theo lịch/ngày hoàn thành, ngày kết thúc) + id tất định — giống backend
+    GoalsAndReview.kt            # Mục tiêu ngày + chuỗi (ngày nghỉ), Tổng kết tuần
+    PlanLogic.kt                 # Chỉnh lịch trình AI (dồn khung), phát hiện lịch đã cũ
+    SnoozeOptions.kt             # Các mốc "Hoãn…"
     SortOrder.kt                 # Fractional indexing cho kéo-thả
     StatsCalculator.kt           # Biểu đồ tuần / bản đồ nhiệt theo ngày lịch
   data/
     api/                         # ApiService (Retrofit) + NetworkClient (token, tự refresh)
     model/Models.kt              # DTO JSON (TaskDto, TaskInputDto, TaskChangesDto, ...)
-    local/                       # Room — database version 5
+    local/                       # Room — database version 6
       Entities.kt                # tasks, subtasks (FK CASCADE), categories, chat_messages, sync_state
       Daos.kt                    # Truy vấn (Flow) — kể cả thống kê, lịch, widget
       AppDatabase.kt             # RoomDatabase singleton
-      Migrations.kt              # MIGRATION_4_5 (giữ dữ liệu cũ)
+      Migrations.kt              # MIGRATION_4_5, MIGRATION_5_6 (giữ dữ liệu cũ)
       Mappers.kt                 # DTO ↔ Entity ↔ Domain
     sync/                        # SyncEngine, SyncWorker, SyncScheduler, SyncController, ConnectivityObserver
     repository/
@@ -106,15 +110,17 @@ app/src/main/java/com/example/todoapplication/
       Repositories.kt            # Auth, Preferences, Plan, Ai, Category, Chat, Stats
       SessionManager.kt          # Token + thông tin user (mã hóa)
       UserDataCleaner.kt         # Xóa dữ liệu cục bộ khi đăng xuất
+      LocalPrefs.kt              # Cài đặt cục bộ (mục tiêu đệm, thông báo) dạng StateFlow
+      CoachActionApplier.kt      # Áp dụng hành động AI Coach đề xuất (sau khi người dùng xác nhận)
       ...                        # SessionEvents, QuickAddDraft, ThemeController, NetworkCallExt
-    notifications/               # ReminderScheduler, ReminderWorker, NotificationActionReceiver
-  widget/                        # App widget đọc thẳng Room
+    notifications/               # Nhắc việc (+ Hoãn…), DigestWorker (tóm tắt sáng, tổng kết tuần), FocusSession (Pomodoro)
+  widget/                        # App widget đọc thẳng Room; WidgetActionActivity (tích xong / mở việc)
   di/ServiceLocator.kt           # Manual DI — đồ thị phụ thuộc ghi trong file
   ui/
-    viewmodel/                   # 9 ViewModel
-    screens/                     # 10 màn hình Compose
+    viewmodel/                   # ViewModel của từng màn (Today, TaskList, TaskDetail, Review/History/Trash, ...)
+    screens/                     # Màn hình Compose + TaskComponents (thẻ việc, thanh tạo nhanh dùng chung) + SnoozeActivity
     components/, theme/, navigation/, utils/
-app/schemas/                     # Schema Room đã export (4.json, 5.json) — dùng cho MigrationTest
+app/schemas/                     # Schema Room đã export (4.json, 5.json, 6.json) — dùng cho MigrationTest
 ```
 
 ---
@@ -124,13 +130,16 @@ app/schemas/                     # Schema Room đã export (4.json, 5.json) — 
 | Màn hình | Chức năng |
 | :--- | :--- |
 | `LoginScreen` / `RegisterScreen` | Đăng nhập / đăng ký; báo lỗi rõ ràng (email đã dùng, sai mật khẩu, thao tác quá nhanh) |
-| `TaskListScreen` | Tìm kiếm (debounce), **lọc danh mục**, nhóm **Hôm nay / Tương lai / Đã hoàn thành hôm nay**, tích/vuốt để hoàn thành (**Hoàn tác** qua Snackbar, tích lại để mở lại), xóa có Hoàn tác, cờ ưu tiên, sắp xếp, **kéo-thả lưu thứ tự**, **kéo-để-làm-mới**, banner offline/đang đồng bộ, biểu tượng ☁ trên thẻ chưa đồng bộ |
-| `TaskDetailScreen` | Thêm/sửa task; **thêm bước con ngay cả khi đang tạo mới**; danh mục (chọn/thêm), lặp theo thứ, lời nhắc |
+| `TodayScreen` | Tab mặc định: **Ngày của tôi** (danh sách tự chọn mỗi ngày), gợi ý thêm việc (quá hạn / đến hạn / hôm qua chưa xong / ưu tiên cao), vòng **mục tiêu ngày + chuỗi 🔥**, **lịch trình AI** tích xong trên lịch, đổi giờ (dồn khung sau), báo lịch đã cũ, thanh đếm ngược tập trung |
+| `TaskListScreen` | Tab "Việc làm": nhóm **Quá hạn (Dời tất cả) / Hôm nay / Sắp tới / Chưa có hạn / Đã xong hôm nay**, **bộ lọc thông minh** + danh mục + tìm kiếm (debounce), "⚡ Nên làm trước · lý do", tích/vuốt để hoàn thành (**Hoàn tác**), kéo-thả lưu thứ tự, kéo-để-làm-mới, banner offline, ☁ trên thẻ chưa đồng bộ |
+| `QuickCreateSheet` | Thanh tạo nhanh: **bộ phân tích câu tiếng Việt chạy trên máy** (`QuickAddParser`) tô màu ngày/giờ/ưu tiên/#danh mục/lặp ngay khi gõ, không cần mạng; nút AI cho câu phức tạp |
+| `TaskDetailScreen` | Thêm/sửa task: hạn **ngày + giờ tùy chọn** (không giờ = cả ngày), **thời lượng ước tính**, Ngày của tôi, lặp **mỗi N / theo lịch hoặc ngày hoàn thành / ngày kết thúc**, **Bỏ qua lần này**, lời nhắc, bước con (kể cả khi đang tạo mới) |
+| `FocusScreen` | Hẹn giờ tập trung 25'/5' cho một việc; lưu mốc kết thúc nên đóng app vẫn đúng, hết giờ có thông báo |
 | `CalendarScreen` | Lịch tháng; lần lặp **dự kiến** hiển thị mờ, khác với task thật |
-| `DailyPlanScreen` | Lịch trình do AI tạo (gửi kèm ngày/múi giờ của máy) |
-| `AICoachScreen` | Chat với AI Coach — **lịch sử lưu trên server**, mở lại app vẫn còn |
-| `StatsScreen` | Thống kê/biểu đồ/bản đồ nhiệt **tính từ Room**, cập nhật tức thì và xem được khi offline; Trí nhớ AI |
-| `SettingsScreen` | Giao diện Sáng/Tối; giờ giấc cho lập lịch AI; **danh mục đồng bộ theo tài khoản** |
+| `AICoachScreen` | Chat với AI Coach — lịch sử lưu trên server; **thẻ hành động đề xuất** (dời hạn, chia bước con, tạo việc, đổi ưu tiên, thêm vào Ngày của tôi) chỉ áp dụng khi bấm "Áp dụng" (`CoachActionApplier`) |
+| `StatsScreen` | Tab "Tôi": mục tiêu + chuỗi ngày, lối tắt, thống kê/biểu đồ/bản đồ nhiệt **tính từ Room** (xem được khi offline), Trí nhớ AI |
+| `WeeklyReviewScreen` · `HistoryScreen` · `TrashScreen` | Tổng kết 7 ngày so với tuần trước (+ nhờ AI lập kế hoạch tuần tới) · việc đã xong theo ngày · thùng rác 30 ngày |
+| `SettingsScreen` | Giao diện Sáng/Tối; giờ giấc cho lập lịch AI; **mục tiêu ngày + ngày nghỉ**; danh mục; **thông báo** (tóm tắt sáng, tổng kết tuần, giờ nhắc việc cả ngày); **đăng xuất máy này / mọi thiết bị** |
 | `TemplatesScreen` | Thư viện mẫu nhiệm vụ |
 
 ---
@@ -139,9 +148,13 @@ app/schemas/                     # Schema Room đã export (4.json, 5.json) — 
 
 - **Checklist (bước con)** — bảng `subtasks` có khóa ngoại `ON DELETE CASCADE`; thẻ task hiện tiến độ `☑ 2/5` đếm bằng subquery ngay trong SQL. Bước con nằm trong task khi đồng bộ (task là *aggregate root*).
 - **Kéo-thả có lưu** — "fractional indexing": thả task giữa A và B chỉ gán `sortOrder` ở giữa → chỉ một dòng thay đổi và cần đồng bộ. Trong lúc kéo, thứ tự chỉ đổi trong bộ nhớ (mượt 60fps), thả tay mới ghi database; có rung phản hồi (haptic).
-- **Thông báo có nút** "Hoàn thành" / "Hoãn 1 giờ" — "Hoàn thành" ghi vào Room nên chạy được khi offline; lượt hoãn có job WorkManager riêng nên không bị hủy khi đồng bộ lại nhắc việc.
-- **Widget màn hình chính** — `RemoteViewsService` đọc thẳng Room, tự làm mới sau mỗi thay đổi.
+- **Thông báo có nút** "Hoàn thành" / "Hoãn 1 giờ" / **"Hoãn…"** (hộp chọn `SnoozeActivity`: 15 phút, tối nay, sáng mai…) — "Hoàn thành" ghi vào Room nên chạy được khi offline; lượt hoãn có job WorkManager riêng nên không bị hủy khi đồng bộ lại nhắc việc; việc đã xong ở máy khác thì không nhắc nữa.
+- **Tóm tắt buổi sáng & tổng kết tuần** — `DigestWorker` đọc Room (không cần mạng), tự hẹn lần kế tiếp.
+- **Quyền thông báo xin đúng lúc** — chỉ hỏi (kèm giải thích) khi người dùng đặt hạn/nhắc việc, bật tóm tắt hoặc bắt đầu tập trung, không hỏi ngay khi mở app.
+- **App shortcut & chia sẻ** — nhấn giữ icon: Thêm việc / Hôm nay / Tập trung; "Chia sẻ → Thêm vào TaskFlow" từ app khác mở thanh tạo nhanh đã điền sẵn.
+- **Widget màn hình chính** — `RemoteViewsService` đọc thẳng Room ("Ngày của tôi" lên đầu), tự làm mới sau mỗi thay đổi; **ô tích hoàn thành ngay trên widget** và nút **+** (qua `WidgetActionActivity` trong suốt — Android 12+ cấm broadcast tự mở Activity).
 - **AI Quick Add / AI Coach / Lịch trình AI** — báo rõ khi hết lượt AI (HTTP 429) hoặc AI chưa bật (503).
+- **Icon & màn khởi động** — adaptive icon vẽ bằng vector (nền gradient thương hiệu + "thẻ công việc" có dấu tích và tia sáng AI) kèm lớp **monochrome** cho themed icon Android 13+; màn khởi động dùng **SplashScreen API** (`core-splashscreen`) với icon **AnimatedVectorDrawable** trên Android 12+ (dấu tích tự vẽ bằng `trimPathEnd`, tia sáng bật ra) và hiệu ứng thoát mượt (`setOnExitAnimationListener`). Logo trong app (`AppLogo`) và icon thông báo dùng chung hình.
 - **Hiệu năng danh sách** — nhóm/sắp xếp/gợi ý tính trong ViewModel trên `Dispatchers.Default`; thời gian là `Long` (không parse chuỗi ISO khi vẽ); `LazyColumn` dùng `key` + `contentType`; `DateTimeFormatter` dùng lại (thread-safe).
 
 ---
@@ -150,7 +163,7 @@ app/schemas/                     # Schema Room đã export (4.json, 5.json) — 
 
 - Đăng nhập lưu `token` và `refresh_token` trong [`SessionManager`](app/src/main/java/com/example/todoapplication/data/repository/SessionManager.kt) (EncryptedSharedPreferences).
 - [`NetworkClient`](app/src/main/java/com/example/todoapplication/data/api/NetworkClient.kt) gắn `Authorization: Bearer <access>` và cài **OkHttp `Authenticator`**: gặp `401` → gọi `/auth/refresh` (client phụ, tránh đệ quy) → phát lại request. Refresh thất bại → `SessionEvents.forcedLogout` → `MainActivity` đưa về Login.
-- Đăng xuất gọi `POST /auth/logout` để server **thu hồi refresh token** (mọi thiết bị), rồi xóa toàn bộ dữ liệu cục bộ.
+- Đăng xuất gọi `POST /auth/logout` để server **thu hồi refresh token** — mặc định chỉ của máy này, hoặc mọi thiết bị (`all_devices`) — rồi xóa toàn bộ dữ liệu cục bộ của tài khoản.
 
 ---
 
@@ -183,9 +196,10 @@ Chạy với backend trên máy tính: đổi thành `http://10.0.2.2:8080/api/v
 
 | Bộ test | Nội dung |
 | :--- | :--- |
-| `domain/*Test` | Nhóm/sắp xếp việc, quy tắc lặp (cùng trường hợp với test Go), id tất định, thứ tự kéo-thả, thống kê theo ngày lịch |
-| `TaskListViewModelTest` | Luồng state từ Room, debounce tìm kiếm, hoàn thành/xóa + Hoàn tác, kéo-thả, đăng xuất khi còn thay đổi chưa đồng bộ |
-| `MigrationTest` (androidTest) | Dựng DB v4 từ schema JSON, chạy `MIGRATION_4_5`, kiểm tra schema khớp v5 và dữ liệu được giữ |
+| `domain/*Test` | Nhóm việc (quá hạn / hôm nay / sắp tới / chưa có hạn), việc cả ngày, lý do gợi ý, gợi ý Ngày của tôi, **bộ phân tích câu tiếng Việt**, quy tắc lặp (mỗi N, theo ngày hoàn thành, ngày kết thúc, bỏ qua — cùng vector với test Go), chuỗi ngày + ngày nghỉ, tổng kết tuần, chỉnh lịch trình, lựa chọn hoãn |
+| `CoachActionApplierTest` | Áp dụng hành động AI Coach: hạn cả ngày, Ngày của tôi, tạo việc, bỏ qua đề xuất sai |
+| `TaskListViewModelTest` · `SettingsViewModelTest` | Luồng state từ Room, bộ lọc thông minh, debounce, hoàn thành/xóa + Hoàn tác, dời việc quá hạn + Hoàn tác, tạo nhanh vào Ngày của tôi, kéo-thả · đăng xuất máy này/mọi thiết bị khi còn thay đổi chưa đồng bộ |
+| `MigrationTest` (androidTest) | Dựng DB v4/v5 từ schema JSON, chạy `MIGRATION_4_5` / `MIGRATION_5_6`, kiểm tra schema khớp và dữ liệu được giữ (cột mới có giá trị mặc định) |
 | `SyncEngineTest` (androidTest) | Room thật + server giả: tạo khi offline, mất mạng, thay đổi từ máy khác, hoàn tác xóa sau đồng bộ, việc lặp offline, sửa khi đang gửi |
 
 > ⚙️ AGP 9 dùng "built-in Kotlin" nên cần flag `android.disallowKotlinSourceSets=false` trong `gradle.properties` để KSP (Room) thêm được source set sinh mã.
@@ -198,5 +212,5 @@ Chạy với backend trên máy tính: đổi thành `http://10.0.2.2:8080/api/v
 | :--- | :--- |
 | `INTERNET` | Gọi REST API |
 | `ACCESS_NETWORK_STATE` | Theo dõi trạng thái mạng: banner offline, đồng bộ lại khi có mạng |
-| `POST_NOTIFICATIONS` | Hiển thị nhắc nhở công việc (Android 13+) |
+| `POST_NOTIFICATIONS` | Nhắc việc, tóm tắt buổi sáng, tổng kết tuần, hết giờ tập trung (Android 13+) — **xin đúng lúc**, không xin khi mở app |
 | `VIBRATE` | Rung khi có thông báo nhắc việc |

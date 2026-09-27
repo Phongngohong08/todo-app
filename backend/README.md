@@ -8,13 +8,15 @@
 
 1. **Quản lý Công việc (CRUD)**: Tạo mới, xem, cập nhật, xóa và hoàn thành công việc. Trạng thái được rút gọn còn `TODO`/`COMPLETED`.
 2. **Phân loại theo Danh mục & Tìm kiếm (Category & Search)**: Mỗi task thuộc một **danh mục** (mặc định `PERSONAL`/`WORK`/`OTHER`, nhưng cho phép **danh mục tự do** do người dùng tự đặt); lọc danh sách theo `?category=` và tìm kiếm `?q=` theo tiêu đề/mô tả.
-3. **Task Lặp lại (Recurring)**: Task có thể lặp `DAILY`/`WEEKLY`/`MONTHLY`; lặp tuần có thể chọn **các thứ cụ thể** (`recurrence_days`, vd `"MON,WED,FRI"`). Khi hoàn thành một task lặp (có hạn chót), hệ thống tự sinh lần kế tiếp (id tất định, hạn luôn ở tương lai, tính theo `APP_TIMEZONE`); mở lại việc đã xong sẽ thu hồi lần kế tiếp chưa làm. Mỗi task còn có **`reminder_offset_minutes`** để nhắc trước hạn (do client lập lịch local notification).
+3. **Task Lặp lại (Recurring)**: Task có thể lặp `DAILY`/`WEEKLY`/`MONTHLY`; lặp tuần có thể chọn **các thứ cụ thể** (`recurrence_days`, vd `"MON,WED,FRI"`). Lặp **mỗi N** ngày/tuần/tháng (`recurrence_interval`), tính **theo lịch cố định** hoặc **từ ngày hoàn thành** (`recurrence_mode` = `SCHEDULE`/`COMPLETION`), và có **ngày kết thúc** (`recurrence_until`). Khi hoàn thành một task lặp (có hạn chót), hệ thống tự sinh lần kế tiếp (id tất định, hạn luôn ở tương lai, tính theo `APP_TIMEZONE`); mở lại việc đã xong sẽ thu hồi lần kế tiếp chưa làm. Mỗi task còn có **`reminder_offset_minutes`** để nhắc trước hạn (do client lập lịch local notification).
 4. **AI Quick Add (Tạo task bằng ngôn ngữ tự nhiên)**: Gửi một câu mô tả tự nhiên, Gemini tách thành task có cấu trúc (tiêu đề, độ ưu tiên, hạn chót, **danh mục**) để người dùng xác nhận trước khi lưu.
 5. **Theo dõi Hoạt động (Activity Logging)**: Tự động lưu vết hành vi (tạo task `CREATED`, hoàn thành task `COMPLETED`) làm dữ liệu phân tích thói quen cho AI.
-6. **Lập Kế hoạch AI Hàng ngày (Daily AI Planning)**: Tự động chạy ngầm vào lúc `04:00 AM` hàng ngày để tạo lịch trình tối ưu dựa trên danh sách việc chưa hoàn thành, **độ ưu tiên + hạn chót**, cài đặt giờ giấc cá nhân và phân tích thói quen lưu trong bộ nhớ dài hạn.
-7. **Trợ lý AI Coach**: Một chatbot tư vấn và tạo động lực cho người dùng. AI Coach sẽ tự động lấy các thông tin về thói quen cũ (ví dụ: thường xuyên hoãn việc viết báo cáo) từ cơ sở dữ liệu Vector để đưa ra lời khuyên thiết thực.
+6. **Lập Kế hoạch AI Hàng ngày (Daily AI Planning)**: Tự động chạy ngầm vào lúc `04:00 AM` hàng ngày để tạo lịch trình tối ưu dựa trên danh sách việc chưa hoàn thành, **độ ưu tiên + hạn chót**, cài đặt giờ giấc cá nhân và phân tích thói quen lưu trong bộ nhớ dài hạn. Nếu người dùng đã chọn **"Ngày của tôi"** (`my_day`) cho ngày đó thì AI chỉ xếp các việc đã chọn; khung giờ dùng **thời lượng ước tính** (`estimated_minutes`) của từng việc. Người dùng có thể đổi giờ/bỏ khung rồi lưu lại (`PUT /plans/daily`).
+7. **Trợ lý AI Coach**: Một chatbot tư vấn và tạo động lực cho người dùng. AI Coach sẽ tự động lấy các thông tin về thói quen cũ (ví dụ: thường xuyên hoãn việc viết báo cáo) từ cơ sở dữ liệu Vector để đưa ra lời khuyên thiết thực. Câu trả lời kèm tối đa 3 **hành động đề xuất** (`actions`: dời hạn, chia bước con, tạo việc, đổi ưu tiên, thêm vào Ngày của tôi) — server chỉ đề xuất và lọc bỏ id không thuộc người dùng; app áp dụng khi người dùng bấm xác nhận.
 8. **Trích xuất Bộ nhớ Dài hạn (Long-Term Memory Extraction)**: Một tiến trình chạy ngầm vào lúc `01:00 AM` hàng đêm để phân tích lịch sử hoạt động và các tin nhắn chat trong ngày của người dùng, tự động trích xuất các thói quen/hành vi hữu ích (có khử trùng lặp theo ngữ nghĩa), tạo vector nhúng (embeddings) và lưu trữ vào Qdrant.
 9. **Thống kê (Statistics)**: Cung cấp báo cáo gọn: số việc **đã hoàn thành**, số việc **đang chờ**, phân bố việc đang chờ **theo danh mục**, và số việc hoàn thành mỗi ngày trong **7 ngày gần nhất**.
+10. **Mục tiêu hằng ngày**: `daily_goal` (số việc/ngày) và `days_off` (ngày nghỉ, vd `"SAT,SUN"`) trong `/preferences` — app dùng để tính chuỗi ngày đạt mục tiêu.
+11. **Hạn "cả ngày"**: `due_all_day = true` nghĩa là hạn chỉ có ngày (app lưu hạn ở 23:59 giờ địa phương để phép so sánh "quá hạn" vẫn đúng).
 
 > **Phía ứng dụng Android** còn có **Nhắc nhở local (Reminders)** qua WorkManager: tự gửi thông báo khi task đến hạn `due_date` — tính năng client-side, không phụ thuộc backend/FCM.
 
@@ -80,11 +82,11 @@ Hệ thống dùng mô hình **access token + refresh token** (JWT HS256, không
 | `POST` | `/api/v1/auth/register` | Đăng ký tài khoản mới |
 | `POST` | `/api/v1/auth/login` | Đăng nhập, trả về `token`, `refresh_token`, `expires_in` và thông tin `user` |
 | `POST` | `/api/v1/auth/refresh` | Gửi `{ "refresh_token": "..." }`, nhận về cặp `token` + `refresh_token` mới (sliding expiration) |
-| `POST` | `/api/v1/auth/logout` | Gửi `{ "refresh_token": "..." }`: thu hồi **mọi** refresh token của tài khoản (đăng xuất khỏi tất cả thiết bị). Luôn trả `204` |
+| `POST` | `/api/v1/auth/logout` | Gửi `{ "refresh_token": "...", "all_devices": false }`: mặc định chỉ thu hồi refresh token **của thiết bị này** (theo `jti`); `all_devices: true` thu hồi **mọi** refresh token của tài khoản. Luôn trả `204` |
 
 Khi gặp `401` ở bất kỳ endpoint được bảo vệ nào, client nên tự động gọi `/auth/refresh` để lấy access token mới rồi phát lại request; nếu refresh token cũng hết hạn/không hợp lệ thì buộc người dùng đăng nhập lại. (Ứng dụng Android đã hiện thực luồng này tự động qua OkHttp `Authenticator`.)
 
-> **Thu hồi:** mỗi refresh token mang claim `ver` = `users.token_version` lúc phát hành. `/auth/logout` tăng `token_version`, nên mọi refresh token cũ bị từ chối. Access token đã phát vẫn dùng được tới khi hết `ACCESS_TOKEN_TTL` (mặc định 15 phút), vì vậy giữ TTL này ngắn.
+> **Thu hồi:** mỗi refresh token mang claim `ver` = `users.token_version` lúc phát hành và một `jti` riêng. Đăng xuất một thiết bị ghi `jti` vào bảng `revoked_refresh_tokens` (job 03:00 dọn các dòng đã hết hạn); đăng xuất mọi thiết bị tăng `token_version`, nên mọi refresh token cũ bị từ chối. Token phát trước khi có `jti` không thu hồi riêng được nên rơi về thu hồi tất cả. Access token đã phát vẫn dùng được tới khi hết `ACCESS_TOKEN_TTL` (mặc định 15 phút), vì vậy giữ TTL này ngắn.
 
 ### Giới hạn tần suất (HTTP 429 + header `Retry-After`)
 
@@ -113,7 +115,7 @@ Tất cả endpoint dưới đây (trừ nhóm `/auth`) yêu cầu header `Autho
 | `GET` | `/api/v1/tasks` | Liệt kê task. Query: `status` (`TODO`/`COMPLETED`), `due_date_before`, **`q`** (tìm trong tiêu đề/mô tả), **`category`** (lọc theo danh mục) |
 | `GET` | `/api/v1/tasks/sync?since=<server_time>` | **Đồng bộ offline**: trả `{ tasks, deleted_ids, server_time }` — task thay đổi (và bị xóa) sau mốc `since`; bỏ `since` = tải toàn bộ. Client lưu `server_time` làm `since` cho lần sau |
 | `GET` | `/api/v1/tasks/{id}` | Chi tiết một task |
-| `PUT` | `/api/v1/tasks/{id}` | Ghi **toàn bộ** trạng thái task, **tạo mới nếu id chưa có** (idempotent — id do app sinh khi offline). Body như POST, thêm `status` (`TODO`/`COMPLETED` — chuyển về `TODO` = mở lại), `completed_at`, `sort_order`, `subtasks` (`[{id,title,done,position}]`), `spawned_from`. Trường bỏ trống giữ nguyên giá trị cũ |
+| `PUT` | `/api/v1/tasks/{id}` | Ghi **toàn bộ** trạng thái task, **tạo mới nếu id chưa có** (idempotent — id do app sinh khi offline). Body như POST, thêm `status` (`TODO`/`COMPLETED` — chuyển về `TODO` = mở lại), `completed_at`, `sort_order`, `subtasks` (`[{id,title,done,position}]`), `spawned_from`. Trường mới (migration 000008): `due_all_day`, `my_day` (`"yyyy-MM-dd"`), `estimated_minutes`, `recurrence_interval`, `recurrence_mode`, `recurrence_until` (RFC3339) — với `my_day` / `recurrence_until`, chuỗi rỗng `""` nghĩa là **xóa**. Trường bỏ trống giữ nguyên giá trị cũ |
 | `DELETE` | `/api/v1/tasks/{id}` | Xóa **mềm** (để thiết bị khác biết khi đồng bộ); xóa lại lần nữa vẫn trả thành công |
 | `POST` | `/api/v1/tasks/{id}/complete` | Đánh dấu hoàn thành. Task lặp (có `due_date`) sinh lần kế tiếp với **id tất định** `UUIDv3(namespace, id cha)` và hạn luôn ở tương lai — app tính giống hệt nên lần lặp tạo lúc offline không bị nhân đôi |
 
@@ -122,12 +124,12 @@ Tất cả endpoint dưới đây (trừ nhóm `/auth`) yêu cầu header `Autho
 | Phương thức | Endpoint | Mô tả |
 | :--- | :--- | :--- |
 | `POST` | `/api/v1/ai/parse-task` | **Quick Add**: gửi `{ "text": "...", "local_time": "<RFC3339>" }`, nhận về task có cấu trúc (`title`, `description`, `priority`, `due_date`, `category`). **Không** tự lưu task |
-| `POST` | `/api/v1/ai/chat` | Trò chuyện với AI Coach |
+| `POST` | `/api/v1/ai/chat` | Trò chuyện với AI Coach. Body `{ "message": "...", "local_time": "<RFC3339>" }` (local_time để AI quy "thứ 2 tuần sau" ra ngày). Trả `{ "reply": "...", "actions": [...] }` |
 | `GET` | `/api/v1/ai/chat/history?limit=50` | Lịch sử chat (cũ → mới) để app hiển thị lại cuộc trò chuyện |
 | `GET` · `DELETE` | `/api/v1/ai/memories` · `/memories/{id}` | Xem / xóa trí nhớ dài hạn |
 | `POST` | `/api/v1/ai/memories/trigger-extraction` | Phân tích thủ công (nhìn lại 30 ngày), trả `{ analyzed, extracted }` |
 
-> Các endpoint khác: `GET/PUT /categories` (danh mục tự tạo, `{ "categories": [...] }`, PUT thay toàn bộ), `GET/PUT /preferences` (giờ dạng `HH:mm`, kết thúc sau bắt đầu, `work_duration_preference` 15–480 phút), `GET /plans/daily?date=YYYY-MM-DD&tz=<IANA>&local_time=HH:mm`, `POST /plans/daily/generate` (cùng query), `GET /stats/summary?tz=<IANA>` (gom biểu đồ 7 ngày theo múi giờ người dùng; thiếu `tz` thì dùng `APP_TIMEZONE`), `GET /healthz`.
+> Các endpoint khác: `GET/PUT /categories` (danh mục tự tạo, `{ "categories": [...] }`, PUT thay toàn bộ), `GET/PUT /preferences` (giờ dạng `HH:mm`, kết thúc sau bắt đầu, `work_duration_preference` 15–480 phút, `daily_goal` 1–50, `days_off` — hai trường sau bỏ trống thì giữ nguyên), `GET /plans/daily?date=YYYY-MM-DD&tz=<IANA>&local_time=HH:mm`, `POST /plans/daily/generate` (cùng query), `PUT /plans/daily?date=...` (body `{ "plan_data": [...] }` — lưu lịch đã chỉnh tay; khung giờ `HH:mm`, không chồng nhau), `GET /stats/summary?tz=<IANA>` (gom biểu đồ 7 ngày theo múi giờ người dùng; thiếu `tz` thì dùng `APP_TIMEZONE`), `GET /healthz`.
 
 > **Lưu ý client-side:** App Android theo kiến trúc offline-first — thống kê, biểu đồ và điểm ưu tiên AI được tính trên máy từ database cục bộ (đồng bộ qua `/tasks/sync`), nên xem được khi offline. `GET /stats/summary` vẫn có cho client khác.
 
@@ -230,4 +232,7 @@ docker compose -f docker-compose.prod.yml ps
 
 # Dừng hệ thống
 docker compose -f docker-compose.prod.yml down
+
+# Dừng và xóa
+docker compose -f docker-compose.prod.yml down -v
 ```

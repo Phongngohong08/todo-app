@@ -12,7 +12,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -37,6 +38,8 @@ import com.example.todoapplication.ui.viewmodel.SUGGESTED_PROMPTS
 @Composable
 fun AICoachScreen(
     navController: NavController,
+    /** Câu điền sẵn vào ô nhập (vd từ Tổng kết tuần) — người dùng xem lại rồi mới gửi. */
+    initialPrompt: String? = null,
     aiCoachViewModel: AICoachViewModel = viewModel(factory = AICoachViewModel.Factory)
 ) {
     // Quan sát state của ViewModel → messages (danh sách bong bóng) + isThinking (đang chờ AI).
@@ -44,7 +47,9 @@ fun AICoachScreen(
     val messages = state.messages
     val isThinking = state.isThinking
 
-    var messageText by remember { mutableStateOf("") }   // nội dung ô nhập (state cục bộ)
+    var messageText by remember { mutableStateOf(initialPrompt.orEmpty()) }   // nội dung ô nhập (state cục bộ)
+    val snackbar = remember { SnackbarHostState() }
+    LaunchedEffect(Unit) { aiCoachViewModel.messages.collect { snackbar.showSnackbar(it) } }
     val listState = rememberLazyListState()               // "điều khiển" danh sách cuộn (để tự cuộn xuống cuối)
 
     val primary = MaterialTheme.colorScheme.primary
@@ -56,11 +61,12 @@ fun AICoachScreen(
     }
 
     // Mỗi khi có tin mới (messages.size đổi), tự cuộn xuống bong bóng cuối cùng. Khóa = messages.size.
-    LaunchedEffect(messages.size) {
-        if (messages.isNotEmpty()) listState.animateScrollToItem(messages.size - 1)
+    LaunchedEffect(messages.size, state.actions.size) {
+        if (messages.isNotEmpty()) listState.animateScrollToItem(messages.size - 1 + if (state.actions.isNotEmpty()) 1 else 0)
     }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbar) },
         topBar = {
             // Custom header with AI avatar
             Surface(
@@ -74,6 +80,9 @@ fun AICoachScreen(
                         .padding(horizontal = 16.dp, vertical = 12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    IconButton(onClick = { navController.popBackStack() }) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Quay lại", tint = MaterialTheme.colorScheme.onSurface)
+                    }
                     // AI avatar
                     Box(
                         modifier = Modifier
@@ -194,7 +203,7 @@ fun AICoachScreen(
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
-                                Icons.Default.Send,
+                                Icons.AutoMirrored.Filled.Send,
                                 contentDescription = "Gửi",
                                 tint = if (canSend) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(20.dp)
@@ -202,8 +211,6 @@ fun AICoachScreen(
                         }
                     }
                 }
-
-                BottomNavigationBar(navController, activeTab = 3)
             }
         },
         containerColor = MaterialTheme.colorScheme.background
@@ -218,6 +225,13 @@ fun AICoachScreen(
         ) {
             items(messages) { msg ->
                 ModernChatBubble(msg)
+            }
+
+            // Đề xuất hành động kèm câu trả lời mới nhất — chỉ thay đổi khi người dùng bấm "Áp dụng"
+            if (state.actions.isNotEmpty() && !isThinking) {
+                item(key = "actions") {
+                    CoachActionsCard(state.actions, state.applied, onApply = aiCoachViewModel::applyAction)
+                }
             }
 
             if (isThinking) {
@@ -314,6 +328,36 @@ fun ModernChatBubble(message: ChatUIModel) {
                     lineHeight = 20.sp,
                     modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CoachActionsCard(
+    actions: List<com.example.todoapplication.data.model.CoachAction>,
+    applied: Set<String>,
+    onApply: (com.example.todoapplication.data.model.CoachAction) -> Unit
+) {
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f),
+        modifier = Modifier.fillMaxWidth().padding(start = 40.dp)
+    ) {
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Đề xuất của AI", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+            actions.forEach { action ->
+                val done = action.label in applied
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(action.label, modifier = Modifier.weight(1f), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface)
+                    if (done) {
+                        Text("✓ Đã áp dụng", fontSize = 12.sp, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
+                    } else {
+                        FilledTonalButton(onClick = { onApply(action) }, contentPadding = PaddingValues(horizontal = 12.dp)) {
+                            Text("Áp dụng", fontSize = 12.sp)
+                        }
+                    }
+                }
             }
         }
     }

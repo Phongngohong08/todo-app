@@ -8,14 +8,26 @@
     android:paddingTop="4dp"
     android:paddingBottom="4dp">
 
+    <!-- Ô tích: bấm để hoàn thành ngay trên widget -->
+    <TextView
+        android:id="@+id/item_check"
+        android:layout_width="32dp"
+        android:layout_height="32dp"
+        android:gravity="center"
+        android:text="○"
+        android:contentDescription="Hoàn thành"
+        android:textColor="#FF6B7280"
+        android:textSize="20sp" />
+
     <TextView
         android:id="@+id/item_dot"
-        android:layout_width="8dp"
-        android:layout_height="8dp"
-        android:layout_marginEnd="10dp"
+        android:layout_width="4dp"
+        android:layout_height="28dp"
+        android:layout_marginEnd="8dp"
         android:background="#FF6B6B" />
 
     <LinearLayout
+        android:id="@+id/item_body"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"

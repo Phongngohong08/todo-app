@@ -7,6 +7,7 @@ import com.example.todoapplication.data.local.AppDatabase
 import com.example.todoapplication.data.repository.AiRepository
 import com.example.todoapplication.data.repository.AuthRepository
 import com.example.todoapplication.data.repository.CategoryRepository
+import com.example.todoapplication.data.repository.LocalPrefs
 import com.example.todoapplication.data.repository.ChatRepository
 import com.example.todoapplication.data.repository.PlanRepository
 import com.example.todoapplication.data.repository.PreferencesRepository
@@ -39,6 +40,9 @@ object ServiceLocator {
         appContext = context.applicationContext
     }
 
+    /** Context ứng dụng (cho việc hẹn giờ WorkManager từ ViewModel). */
+    val context: Context get() = appContext
+
     // ── Hạ tầng ──────────────────────────────────────────────────────────────
     val sessionManager: SessionManager by lazy { SessionManager(appContext) }
     val apiService: ApiService by lazy { NetworkClient.getApiService(sessionManager) }
@@ -61,7 +65,8 @@ object ServiceLocator {
     val chatRepository: ChatRepository by lazy { ChatRepository(apiService, database) }
     val statsRepository: StatsRepository by lazy { StatsRepository(database) }
     val authRepository: AuthRepository by lazy { AuthRepository(apiService, sessionManager, syncController) }
-    val preferencesRepository: PreferencesRepository by lazy { PreferencesRepository(apiService) }
+    val localPrefs: LocalPrefs by lazy { LocalPrefs(appContext) }
+    val preferencesRepository: PreferencesRepository by lazy { PreferencesRepository(apiService, localPrefs) }
     val planRepository: PlanRepository by lazy { PlanRepository(apiService) }
     val aiRepository: AiRepository by lazy { AiRepository(apiService) }
 }

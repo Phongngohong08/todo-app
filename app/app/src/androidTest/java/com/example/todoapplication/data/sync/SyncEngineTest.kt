@@ -11,6 +11,7 @@ import com.example.todoapplication.domain.model.Recurrence
 import com.example.todoapplication.domain.model.Subtask
 import com.example.todoapplication.domain.model.TaskDraft
 import com.example.todoapplication.domain.model.TaskStatus
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -83,6 +84,13 @@ class SyncEngineTest {
         server.deleteFromOtherDevice("x-1")
         engine.sync()
         assertNull(repo.getTask("x-1"))
+
+        // Không mất hẳn: nằm trong Thùng rác của máy này và khôi phục được (server "hồi sinh" task khi nhận PUT)
+        assertEquals(listOf("x-1"), repo.observeTrash().first().map { it.id })
+        assertTrue(repo.restore("x-1"))
+        engine.sync()
+        assertEquals("Từ điện thoại khác", repo.getTask("x-1")?.title)
+        assertTrue(!server.isDeleted("x-1"))
     }
 
     @Test

@@ -8,13 +8,16 @@ import com.example.todoapplication.data.local.ChatMessageEntity
 import com.example.todoapplication.data.local.toEntity
 import com.example.todoapplication.data.model.AuthResponse
 import com.example.todoapplication.data.model.ChatInput
+import com.example.todoapplication.data.model.ChatResponse
 import com.example.todoapplication.data.model.DailyPlan
 import com.example.todoapplication.data.model.LoginInput
 import com.example.todoapplication.data.model.MemoryExtractionResult
 import com.example.todoapplication.data.model.MemoryItem
 import com.example.todoapplication.data.model.ParseTaskInput
 import com.example.todoapplication.data.model.ParsedTask
-import com.example.todoapplication.data.model.RefreshTokenInput
+import com.example.todoapplication.data.model.LogoutInput
+import com.example.todoapplication.data.model.PlanSlot
+import com.example.todoapplication.data.model.SavePlanInput
 import com.example.todoapplication.data.model.RegisterInput
 import com.example.todoapplication.data.model.User
 import com.example.todoapplication.data.model.UserPreferences
@@ -62,25 +65,36 @@ class AuthRepository(
     /**
      * Đăng xuất: xóa phiên + dữ liệu cục bộ NGAY (UI không phải chờ mạng), rồi báo server thu hồi
      * refresh token ở nền. Mất mạng thì bỏ qua — refresh token vẫn tự hết hạn theo TTL.
-     * Caller nên đồng bộ trước (xem TaskListViewModel.requestLogout) để không mất thay đổi chưa gửi.
+     * Caller nên đồng bộ trước (xem MeViewModel.requestLogout) để không mất thay đổi chưa gửi.
+     *
+     * [allDevices] = false (mặc định): chỉ thu hồi phiên của máy này — các máy khác vẫn đăng nhập.
      */
-    fun logout() {
+    fun logout(allDevices: Boolean = false) {
         val refreshToken = sessionManager.getRefreshToken()
         sync.stop()
         sessionManager.logout()
         if (!refreshToken.isNullOrEmpty()) {
             backgroundScope.launch {
-                runCatching { api.logout(RefreshTokenInput(refreshToken)) }
+                runCatching { api.logout(LogoutInput(refreshToken, allDevices)) }
             }
         }
     }
 }
 
-/** Cấu hình cá nhân cho lập lịch AI. */
-class PreferencesRepository(private val api: ApiService) {
-    suspend fun get(): Result<UserPreferences> = safeApiCall { api.getPreferences() }
+/**
+ * Cấu hình cá nhân (lập lịch AI + mục tiêu ngày). Server là bản gốc; mục tiêu/ngày nghỉ được chép vào
+ * [LocalPrefs] để chuỗi ngày và thông báo tính được cả khi offline.
+ */
+class PreferencesRepository(private val api: ApiService, private val local: LocalPrefs) {
+    suspend fun get(): Result<UserPreferences> = safeApiCall { api.getPreferences() }.onSuccess(::cacheGoal)
+
     suspend fun update(prefs: UserPreferences): Result<UserPreferences> =
-        safeApiCall { api.updatePreferences(prefs) }
+        safeApiCall { api.updatePreferences(prefs) }.onSuccess(::cacheGoal)
+
+    private fun cacheGoal(prefs: UserPreferences) {
+        prefs.dailyGoal?.let { local.setDailyGoal(it) }
+        prefs.daysOff?.let { local.setDaysOff(it) }
+    }
 }
 
 /** Lịch trình hằng ngày do AI tạo. */
@@ -90,6 +104,10 @@ class PlanRepository(private val api: ApiService) {
 
     suspend fun generateDaily(date: String?, localTime: String?): Result<DailyPlan> =
         safeApiCall { api.generateDailyPlan(date, localTime, deviceTimeZoneId()) }
+
+    /** Lưu lịch người dùng chỉnh tay (đổi giờ / bỏ khung) — không gọi AI. */
+    suspend fun saveEdited(date: String, slots: List<PlanSlot>): Result<DailyPlan> =
+        safeApiCall { api.saveDailyPlan(date, deviceTimeZoneId(), SavePlanInput(slots)) }
 }
 
 /** Quick Add (parse) và trí nhớ dài hạn của AI. */
@@ -172,8 +190,11 @@ class ChatRepository(
             chatDao.replaceAll(messages.map { it.toEntity() })
         }
 
-    /** Gửi tin: hiện tin của người dùng ngay (lạc quan), chờ AI trả lời rồi đồng bộ lại với server. */
-    suspend fun send(text: String): Result<String> {
+    /**
+     * Gửi tin: hiện tin của người dùng ngay (lạc quan), chờ AI trả lời rồi đồng bộ lại với server.
+     * Kết quả kèm các hành động AI đề xuất (không lưu — chỉ áp dụng khi người dùng xác nhận).
+     */
+    suspend fun send(text: String, localTime: String): Result<ChatResponse> {
         val pending = ChatMessageEntity(
             id = UUID.randomUUID().toString(),
             role = "user",
@@ -183,10 +204,10 @@ class ChatRepository(
         )
         chatDao.upsert(pending)
 
-        val result = safeApiCall { api.chat(ChatInput(text)) }.map { it.reply }
-        result.onSuccess { reply ->
+        val result = safeApiCall { api.chat(ChatInput(text, localTime)) }
+        result.onSuccess { response ->
             chatDao.upsert(pending.copy(isPending = false))
-            chatDao.upsert(ChatMessageEntity(UUID.randomUUID().toString(), "assistant", reply, clock()))
+            chatDao.upsert(ChatMessageEntity(UUID.randomUUID().toString(), "assistant", response.reply, clock()))
             refresh() // lấy id thật từ server; thất bại cũng không sao — bản đệm đã đúng nội dung
         }.onFailure {
             chatDao.upsert(pending.copy(isPending = false))

@@ -11,7 +11,9 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -31,7 +33,12 @@ import androidx.navigation.NavController
 import com.example.todoapplication.data.repository.CategoryRepository
 import com.example.todoapplication.data.repository.ThemeController
 import com.example.todoapplication.data.repository.ThemeMode
+import com.example.todoapplication.ui.components.rememberNotificationPermissionRequest
+import com.example.todoapplication.ui.navigation.Screen
+import com.example.todoapplication.ui.theme.PriorityHighColor
+import com.example.todoapplication.ui.utils.WEEKDAY_SHORT
 import com.example.todoapplication.ui.utils.categoryLabel
+import com.example.todoapplication.ui.viewmodel.SettingsEvent
 import com.example.todoapplication.ui.viewmodel.SettingsViewModel
 
 /** [TẦNG UI · MÀN HÌNH] Cài đặt — chỉnh giờ làm việc/thời lượng (cho AI) và chọn theme Sáng/Tối. */
@@ -57,11 +64,47 @@ fun SettingsScreen(
     val tertiary = MaterialTheme.colorScheme.tertiary
 
     // Mở màn: (1) tải cấu hình hiện tại từ server, (2) lắng nghe thông báo lưu thành công/thất bại.
+    val digestEnabled by settingsViewModel.digestEnabled.collectAsStateWithLifecycle()
+    val digestTime by settingsViewModel.digestTime.collectAsStateWithLifecycle()
+    val weeklyReview by settingsViewModel.weeklyReviewEnabled.collectAsStateWithLifecycle()
+    val allDayReminder by settingsViewModel.allDayReminderTime.collectAsStateWithLifecycle()
+    val askNotificationPermission = rememberNotificationPermissionRequest()
+    var confirmLogout by remember { mutableStateOf<SettingsEvent.ConfirmLogout?>(null) }
+
     LaunchedEffect(Unit) { settingsViewModel.load() }
     LaunchedEffect(Unit) {
-        settingsViewModel.events.collect { msg ->
-            Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+        settingsViewModel.events.collect { event ->
+            when (event) {
+                is SettingsEvent.Message -> Toast.makeText(context, event.text, Toast.LENGTH_SHORT).show()
+                is SettingsEvent.ConfirmLogout -> confirmLogout = event
+                SettingsEvent.LoggedOut -> navController.navigate(Screen.Login.route) {
+                    popUpTo(navController.graph.id) { inclusive = true }
+                }
+            }
         }
+    }
+
+    confirmLogout?.let { pending ->
+        AlertDialog(
+            onDismissRequest = { confirmLogout = null },
+            title = { Text("Đăng xuất khi chưa đồng bộ?", color = MaterialTheme.colorScheme.onSurface) },
+            text = {
+                Text(
+                    "Còn ${pending.pendingChanges} thay đổi chưa gửi được lên máy chủ (đang offline). Đăng xuất bây giờ sẽ làm mất các thay đổi này.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmLogout = null
+                    settingsViewModel.logoutNow(pending.allDevices)
+                }) { Text("Vẫn đăng xuất", color = PriorityHighColor) }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmLogout = null }) { Text("Ở lại", color = MaterialTheme.colorScheme.primary) }
+            },
+            containerColor = MaterialTheme.colorScheme.surface
+        )
     }
 
     Scaffold(
@@ -190,6 +233,44 @@ fun SettingsScreen(
                         )
                     }
 
+                    // Mục tiêu hằng ngày + ngày nghỉ (kiểu Todoist Karma)
+                    SettingsSection(title = "🎯 Mục tiêu hằng ngày") {
+                        Text(
+                            "Chuỗi ngày 🔥 chỉ tăng khi bạn hoàn thành đủ số việc này. Ngày nghỉ không làm đứt chuỗi.",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = 12.sp,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("Mỗi ngày hoàn thành", color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
+                            IconButton(onClick = { settingsViewModel.setDailyGoal(state.dailyGoal - 1) }) {
+                                Icon(Icons.Default.Remove, contentDescription = "Giảm")
+                            }
+                            Text("${state.dailyGoal}", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = MaterialTheme.colorScheme.onSurface)
+                            IconButton(onClick = { settingsViewModel.setDailyGoal(state.dailyGoal + 1) }) {
+                                Icon(Icons.Default.Add, contentDescription = "Tăng")
+                            }
+                            Text("việc", color = MaterialTheme.colorScheme.onSurface)
+                        }
+                        Text("Ngày nghỉ", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp, bottom = 6.dp))
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            WEEKDAY_SHORT.forEach { (code, label) ->
+                                val sel = code in state.daysOff
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .aspectRatio(1f)
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(if (sel) primary else MaterialTheme.colorScheme.surfaceVariant)
+                                        .clickable { settingsViewModel.toggleDayOff(code) },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(label, fontSize = 11.sp, fontWeight = if (sel) FontWeight.Bold else FontWeight.Normal, color = if (sel) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                        }
+                    }
+
                     // Category management section
                     SettingsSection(title = "🏷️ Danh mục") {
                         Text(
@@ -278,6 +359,53 @@ fun SettingsScreen(
                         }
                     }
 
+                    // Thông báo (theo thiết bị, áp dụng ngay — không cần bấm Lưu)
+                    SettingsSection(title = "🔔 Thông báo") {
+                        SwitchRow(
+                            title = "Tóm tắt buổi sáng",
+                            subtitle = "Số việc đến hạn, quá hạn và trong Ngày của tôi",
+                            checked = digestEnabled,
+                            onChange = {
+                                settingsViewModel.setDigestEnabled(it)
+                                if (it) askNotificationPermission("Bật thông báo để nhận tóm tắt việc cần làm mỗi sáng.")
+                            }
+                        )
+                        if (digestEnabled) {
+                            TimePickerField(label = "Giờ gửi tóm tắt", value = digestTime, onValueChange = settingsViewModel::setDigestTime)
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        SwitchRow(
+                            title = "Tổng kết tuần",
+                            subtitle = "Tối Chủ nhật 19:00 — xem lại tuần và lập kế hoạch tuần tới",
+                            checked = weeklyReview,
+                            onChange = settingsViewModel::setWeeklyReviewEnabled
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        TimePickerField(
+                            label = "Giờ nhắc cho việc \"cả ngày\"",
+                            value = allDayReminder,
+                            onValueChange = settingsViewModel::setAllDayReminderTime
+                        )
+                    }
+
+                    // Tài khoản
+                    SettingsSection(title = "👤 Tài khoản") {
+                        OutlinedButton(
+                            onClick = { settingsViewModel.requestLogout(allDevices = false) },
+                            modifier = Modifier.fillMaxWidth()
+                        ) { Text("Đăng xuất khỏi máy này") }
+                        Spacer(Modifier.height(6.dp))
+                        TextButton(
+                            onClick = { settingsViewModel.requestLogout(allDevices = true) },
+                            modifier = Modifier.fillMaxWidth()
+                        ) { Text("Đăng xuất khỏi mọi thiết bị", color = PriorityHighColor) }
+                        Text(
+                            "Dùng khi mất điện thoại hoặc đăng nhập nhầm ở máy lạ.",
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
                     // About / FAQ section
                     SettingsSection(title = "ℹ️ Giới thiệu") {
                         Text("TaskFlow AI", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurface)
@@ -305,6 +433,17 @@ fun SettingsScreen(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun SwitchRow(title: String, subtitle: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { onChange(!checked) }) {
+        Column(Modifier.weight(1f)) {
+            Text(title, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Medium)
+            Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
+        }
+        Switch(checked = checked, onCheckedChange = onChange)
     }
 }
 

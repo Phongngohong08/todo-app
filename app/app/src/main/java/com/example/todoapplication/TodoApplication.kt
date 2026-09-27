@@ -2,6 +2,9 @@ package com.example.todoapplication
 
 import android.app.Application
 import com.example.todoapplication.data.repository.ThemeController
+import com.example.todoapplication.data.notifications.DigestScheduler
+import com.example.todoapplication.data.notifications.FocusSession
+import com.example.todoapplication.data.notifications.Notifications
 import com.example.todoapplication.di.ServiceLocator
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -23,6 +26,10 @@ class TodoApplication : Application() {
         super.onCreate()
         ServiceLocator.init(this)
         ThemeController.init(this)
+        Notifications.ensureChannels(this)
+        FocusSession.init(this)
+        // Tóm tắt buổi sáng + tổng kết tuần (worker tự bỏ qua khi chưa đăng nhập). REPLACE → gọi mỗi lần mở app vẫn an toàn.
+        DigestScheduler.scheduleAll(this)
 
         if (ServiceLocator.sessionManager.isLoggedIn()) {
             ServiceLocator.syncController.start()

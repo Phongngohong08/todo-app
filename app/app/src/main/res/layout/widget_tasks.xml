@@ -6,15 +6,35 @@
     android:background="@drawable/widget_background"
     android:padding="14dp">
 
-    <TextView
-        android:id="@+id/widget_header"
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="📋 Việc cần làm hôm nay"
-        android:textColor="#FF1B1B2A"
-        android:textSize="15sp"
-        android:textStyle="bold"
-        android:paddingBottom="8dp" />
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingBottom="8dp">
+
+        <TextView
+            android:id="@+id/widget_header"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="☀ Việc cần làm"
+            android:textColor="#FF1B1B2A"
+            android:textSize="15sp"
+            android:textStyle="bold" />
+
+        <!-- Nút thêm việc: mở thanh tạo nhanh của app -->
+        <TextView
+            android:id="@+id/widget_add"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:gravity="center"
+            android:text="+"
+            android:contentDescription="Thêm việc"
+            android:textColor="#FF5B5BD6"
+            android:textSize="24sp"
+            android:textStyle="bold" />
+    </LinearLayout>
 
     <ListView
         android:id="@+id/widget_list"

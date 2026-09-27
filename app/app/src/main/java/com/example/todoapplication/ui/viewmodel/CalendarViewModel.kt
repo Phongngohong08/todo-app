@@ -7,6 +7,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.example.todoapplication.data.repository.TaskRepository
 import com.example.todoapplication.di.ServiceLocator
 import com.example.todoapplication.domain.RecurrenceRules
+import com.example.todoapplication.domain.recurrenceSpec
 import com.example.todoapplication.domain.model.Task
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.SharingStarted
@@ -55,7 +56,7 @@ class CalendarViewModel(
             add(due, CalendarEntry(task, isProjected = false))
             // Việc đã xong thì lần kế tiếp đã là một task thật — không chiếu thêm
             if (!task.isCompleted) {
-                RecurrenceRules.projectedOccurrences(due, task.recurrence, task.recurrenceDays, horizon, zone)
+                RecurrenceRules.projectedOccurrences(due, task.recurrenceSpec(), horizon, zone)
                     .forEach { add(it, CalendarEntry(task, isProjected = true)) }
             }
         }

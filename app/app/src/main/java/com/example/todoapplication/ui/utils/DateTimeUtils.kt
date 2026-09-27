@@ -71,3 +71,42 @@ fun formatDateTime(millis: Long, zone: ZoneId = ZoneId.systemDefault()): String 
 
 fun formatTime(millis: Long, zone: ZoneId = ZoneId.systemDefault()): String =
     TIME_FORMAT.format(java.time.Instant.ofEpochMilli(millis).atZone(zone))
+
+private val DAY_MONTH = DateTimeFormatter.ofPattern("dd/MM")
+private val DAY_MONTH_YEAR = DateTimeFormatter.ofPattern("dd/MM/yyyy")
+
+/** "T2".."T7", "CN". */
+fun weekdayShort(date: LocalDate): String =
+    if (date.dayOfWeek == java.time.DayOfWeek.SUNDAY) "CN" else "T${date.dayOfWeek.value + 1}"
+
+/**
+ * Nhãn hạn chót gọn, dễ đọc: "Hôm nay", "Ngày mai 15:00", "Hôm qua", "T6 10/07", "T6 10/07/2027 09:00".
+ * Việc "cả ngày" không kèm giờ (giờ 23:59 lưu trong database chỉ là quy ước).
+ */
+fun formatDueLabel(
+    dueAt: Long,
+    allDay: Boolean,
+    today: LocalDate = LocalDate.now(),
+    zone: ZoneId = ZoneId.systemDefault()
+): String {
+    val dt = java.time.Instant.ofEpochMilli(dueAt).atZone(zone)
+    val date = dt.toLocalDate()
+    val day = when (date.toEpochDay() - today.toEpochDay()) {
+        0L -> "Hôm nay"
+        1L -> "Ngày mai"
+        -1L -> "Hôm qua"
+        else -> "${weekdayShort(date)} " + (if (date.year == today.year) DAY_MONTH else DAY_MONTH_YEAR).format(date)
+    }
+    return if (allDay) day else "$day ${TIME_FORMAT.format(dt)}"
+}
+
+/** Thời lượng ước tính: "25 phút", "1 giờ", "1 giờ 30 phút". */
+fun formatDuration(minutes: Int): String {
+    val h = minutes / 60
+    val m = minutes % 60
+    return when {
+        h == 0 -> "$m phút"
+        m == 0 -> "$h giờ"
+        else -> "$h giờ $m phút"
+    }
+}

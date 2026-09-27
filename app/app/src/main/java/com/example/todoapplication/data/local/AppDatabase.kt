@@ -14,6 +14,8 @@ import androidx.room.RoomDatabase
  *  - v4: bảng task_cache (bản sao chỉ-đọc) + subtask (chỉ có trên máy).
  *  - v5: offline-first — bảng tasks là nguồn dữ liệu chính (có cờ đồng bộ), subtasks có khóa ngoại,
  *        thêm categories, chat_messages, sync_state. Nâng cấp bằng [MIGRATION_4_5], giữ nguyên dữ liệu.
+ *  - v6: task có thêm "cả ngày", "Ngày của tôi", thời lượng ước tính, lặp mỗi N / theo ngày hoàn thành /
+ *        ngày kết thúc lặp. Nâng cấp bằng [MIGRATION_5_6] (chỉ thêm cột có giá trị mặc định).
  */
 @Database(
     entities = [
@@ -23,7 +25,7 @@ import androidx.room.RoomDatabase
         ChatMessageEntity::class,
         SyncStateEntity::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -42,7 +44,7 @@ abstract class AppDatabase : RoomDatabase() {
         fun get(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 INSTANCE ?: Room.databaseBuilder(context.applicationContext, AppDatabase::class.java, NAME)
-                    .addMigrations(MIGRATION_4_5)
+                    .addMigrations(MIGRATION_4_5, MIGRATION_5_6)
                     // Chỉ các schema cũ (1-3, trước khi export schema) mới được xóa-tạo lại.
                     .fallbackToDestructiveMigrationFrom(true, 1, 2, 3)
                     .fallbackToDestructiveMigrationOnDowngrade(true)

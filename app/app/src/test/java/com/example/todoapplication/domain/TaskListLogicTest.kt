@@ -40,7 +40,7 @@ class TaskListLogicTest {
     }
 
     @Test
-    fun `groupTasks splits today, future and completed today`() {
+    fun `groupTasks separates overdue, today, upcoming, no date and completed today`() {
         val tasks = listOf(
             task(id = "overdue", dueAt = now - 30 * hour),
             task(id = "tonight", dueAt = now + 10 * hour),       // 20h hôm nay
@@ -50,9 +50,55 @@ class TaskListLogicTest {
             task(id = "done-yesterday", status = TaskStatus.COMPLETED, completedAt = now - 24 * hour)
         )
         val sections = groupTasks(tasks, "DEFAULT", now, zone)
-        assertEquals(listOf("overdue", "tonight", "no-date"), sections.today.map { it.id })
-        assertEquals(listOf("tomorrow"), sections.future.map { it.id })
+        assertEquals(listOf("overdue"), sections.overdue.map { it.id })
+        assertEquals(listOf("tonight"), sections.today.map { it.id })
+        assertEquals(listOf("tomorrow"), sections.upcoming.map { it.id })
+        assertEquals(listOf("no-date"), sections.noDate.map { it.id })
         assertEquals(listOf("done-today"), sections.completedToday.map { it.id })
+    }
+
+    @Test
+    fun `all day task due today is not overdue in the afternoon`() {
+        // Tạo lúc 14h, chọn "Hôm nay" → trước đây hạn 9h sáng nên quá hạn ngay lập tức
+        val afternoon = ZonedDateTime.of(2026, 7, 8, 14, 0, 0, 0, zone).toInstant().toEpochMilli()
+        val todayAllDay = task(id = "a", dueAt = allDayDueInDays(0, zone, java.time.LocalDate.of(2026, 7, 8)))
+            .copy(dueAllDay = true)
+        assertFalse(todayAllDay.isOverdue(afternoon))
+        assertEquals(listOf("a"), groupTasks(listOf(todayAllDay), "DEFAULT", afternoon, zone).today.map { it.id })
+        // Sang ngày hôm sau mới quá hạn
+        assertTrue(todayAllDay.isOverdue(afternoon + 24 * hour))
+    }
+
+    @Test
+    fun `recommendation reason explains why`() {
+        assertEquals("Quá hạn 2 ngày · Ưu tiên cao", recommendationReason(task(priority = "HIGH", dueAt = now - 48 * hour), now, zone))
+        assertEquals("Hạn trong 5 giờ", recommendationReason(task(priority = "LOW", dueAt = now + 5 * hour), now, zone))
+        assertEquals("Hạn ngày mai", recommendationReason(task(priority = "LOW", dueAt = now + 20 * hour), now, zone))
+        assertEquals("Ưu tiên cao", recommendationReason(task(priority = "HIGH"), now, zone))
+    }
+
+    @Test
+    fun `my day suggestions put overdue first and skip tasks already chosen`() {
+        val today = java.time.LocalDate.of(2026, 7, 8)
+        val tasks = listOf(
+            task(id = "later", dueAt = now + 72 * hour),
+            task(id = "high-nodate", priority = "HIGH"),
+            task(id = "yesterday").copy(myDay = "2026-07-07"),
+            task(id = "due-today", dueAt = now + 3 * hour),
+            task(id = "overdue", dueAt = now - 5 * hour),
+            task(id = "chosen", dueAt = now - 5 * hour).copy(myDay = "2026-07-08"),
+            task(id = "done", status = TaskStatus.COMPLETED, dueAt = now - 5 * hour)
+        )
+        val ids = myDaySuggestions(tasks, today, now, zone).map { it.task.id }
+        assertEquals(listOf("overdue", "due-today", "yesterday", "high-nodate"), ids)
+    }
+
+    @Test
+    fun `smart filters`() {
+        assertTrue(SmartFilter.OVERDUE.matches(task(dueAt = now - hour), now))
+        assertFalse(SmartFilter.OVERDUE.matches(task(dueAt = now + hour), now))
+        assertTrue(SmartFilter.NO_DATE.matches(task(), now))
+        assertTrue(SmartFilter.HIGH_PRIORITY.matches(task(priority = "HIGH"), now))
     }
 
     @Test

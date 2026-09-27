@@ -25,6 +25,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.todoapplication.ui.components.AppTextField
+import com.example.todoapplication.ui.components.AppLogo
 import com.example.todoapplication.ui.navigation.Screen
 import com.example.todoapplication.ui.viewmodel.AuthEvent
 import com.example.todoapplication.ui.viewmodel.LoginViewModel
@@ -54,8 +55,8 @@ fun LoginScreen(
             when (event) {
                 is AuthEvent.Success -> {
                     Toast.makeText(context, event.message, Toast.LENGTH_SHORT).show()
-                    // Vào TaskList và XÓA màn Login khỏi lịch sử (inclusive) → bấm Back không quay lại Login.
-                    navController.navigate(Screen.TaskList.route) {
+                    // Vào tab Hôm nay và XÓA màn Login khỏi lịch sử (inclusive) → bấm Back không quay lại Login.
+                    navController.navigate(Screen.Today.route) {
                         popUpTo(Screen.Login.route) { inclusive = true }
                     }
                 }
@@ -88,14 +89,7 @@ fun LoginScreen(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(80.dp)
-                            .background(Color.White.copy(alpha = 0.2f), CircleShape),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text("✓", fontSize = 38.sp, color = Color.White, fontWeight = FontWeight.Bold)
-                    }
+                    AppLogo(size = 88.dp)
                     Spacer(Modifier.height(20.dp))
                     Text(
                         "TaskFlow AI",

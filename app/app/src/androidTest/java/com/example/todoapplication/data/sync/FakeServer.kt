@@ -65,7 +65,14 @@ class FakeServer : ApiService {
             id, "u1", input.title, input.description, input.priority, input.dueDate, input.status, input.category,
             input.recurrence, input.recurrenceDays, input.reminderOffsetMinutes, completedAt, input.sortOrder,
             input.subtasks, input.spawnedFrom ?: existing?.dto?.spawnedFrom,
-            existing?.dto?.createdAt ?: iso(now), iso(now)
+            existing?.dto?.createdAt ?: iso(now), iso(now),
+            // Trường mới: giống server thật — "" nghĩa là xóa giá trị
+            dueAllDay = input.dueAllDay,
+            myDay = input.myDay.ifEmpty { null },
+            estimatedMinutes = input.estimatedMinutes,
+            recurrenceInterval = input.recurrenceInterval,
+            recurrenceMode = input.recurrenceMode,
+            recurrenceUntil = input.recurrenceUntil.ifEmpty { null }
         )
         rows[id] = Row(dto, updatedAt = now)
         return Response.success(dto)
@@ -110,11 +117,12 @@ class FakeServer : ApiService {
     override suspend fun register(input: RegisterInput): Response<User> = unsupported()
     override suspend fun login(input: LoginInput): Response<AuthResponse> = unsupported()
     override fun refreshToken(input: RefreshTokenInput): Call<AuthResponse> = unsupported()
-    override suspend fun logout(input: RefreshTokenInput): Response<Unit> = unsupported()
+    override suspend fun logout(input: LogoutInput): Response<Unit> = unsupported()
     override suspend fun getPreferences(): Response<UserPreferences> = unsupported()
     override suspend fun updatePreferences(prefs: UserPreferences): Response<UserPreferences> = unsupported()
     override suspend fun getDailyPlan(date: String?, localTime: String?, timezone: String?): Response<DailyPlan> = unsupported()
     override suspend fun generateDailyPlan(date: String?, localTime: String?, timezone: String?): Response<DailyPlan> = unsupported()
+    override suspend fun saveDailyPlan(date: String, timezone: String?, input: SavePlanInput): Response<DailyPlan> = unsupported()
     override suspend fun chat(input: ChatInput): Response<ChatResponse> = unsupported()
     override suspend fun chatHistory(limit: Int): Response<List<ChatMessage>> = unsupported()
     override suspend fun parseTask(input: ParseTaskInput): Response<ParsedTask> = unsupported()

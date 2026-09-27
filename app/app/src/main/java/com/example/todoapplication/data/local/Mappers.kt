@@ -4,6 +4,7 @@ import com.example.todoapplication.data.model.ChatMessage
 import com.example.todoapplication.data.model.SubtaskDto
 import com.example.todoapplication.data.model.TaskDto
 import com.example.todoapplication.data.model.TaskInputDto
+import com.example.todoapplication.domain.model.RecurrenceMode
 import com.example.todoapplication.domain.model.Subtask
 import com.example.todoapplication.domain.model.Task
 import com.example.todoapplication.domain.model.TaskStatus
@@ -36,7 +37,14 @@ fun TaskEntity.toDomain(subtaskDone: Int = 0, subtaskTotal: Int = 0) = Task(
     updatedAt = updatedAt,
     subtaskDone = subtaskDone,
     subtaskTotal = subtaskTotal,
-    hasPendingSync = isDirty
+    hasPendingSync = isDirty,
+    dueAllDay = dueAllDay,
+    myDay = myDay,
+    estimatedMinutes = estimatedMinutes,
+    recurrenceInterval = recurrenceInterval,
+    recurrenceMode = recurrenceMode,
+    recurrenceUntil = recurrenceUntil,
+    deletedAt = if (isDeleted) updatedAt else null
 )
 
 fun TaskWithProgress.toDomain() = task.toDomain(subtaskDone, subtaskTotal)
@@ -64,6 +72,12 @@ fun TaskDto.toEntity(): TaskEntity {
         spawnedFrom = spawnedFrom,
         createdAt = created,
         updatedAt = parseIsoMillis(updatedAt) ?: created,
+        dueAllDay = dueAllDay ?: false,
+        myDay = myDay?.takeIf { it.isNotBlank() },
+        estimatedMinutes = estimatedMinutes ?: 0,
+        recurrenceInterval = (recurrenceInterval ?: 1).coerceAtLeast(1),
+        recurrenceMode = recurrenceMode ?: RecurrenceMode.SCHEDULE,
+        recurrenceUntil = parseIsoMillis(recurrenceUntil),
         isDirty = false,
         isDeleted = false,
         localVersion = 0
@@ -88,7 +102,13 @@ fun TaskEntity.toInputDto(subtasks: List<SubtaskEntity>) = TaskInputDto(
     completedAt = completedAt?.let { toIsoString(it) },
     sortOrder = sortOrder,
     subtasks = subtasks.map { SubtaskDto(id = it.id, title = it.title, done = it.isDone, position = it.position) },
-    spawnedFrom = spawnedFrom
+    spawnedFrom = spawnedFrom,
+    dueAllDay = dueAllDay,
+    myDay = myDay.orEmpty(),
+    estimatedMinutes = estimatedMinutes,
+    recurrenceInterval = recurrenceInterval,
+    recurrenceMode = recurrenceMode,
+    recurrenceUntil = recurrenceUntil?.let { toIsoString(it) }.orEmpty()
 )
 
 fun ChatMessage.toEntity() = ChatMessageEntity(

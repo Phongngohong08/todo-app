@@ -17,7 +17,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
-import com.example.todoapplication.data.model.ParsedTask
+import com.example.todoapplication.domain.model.TaskDraft
 import com.example.todoapplication.data.repository.QuickAddDraft
 import com.example.todoapplication.ui.navigation.Screen
 
@@ -125,7 +125,7 @@ fun TemplatesScreen(navController: NavController) {
                         shadowElevation = 1.dp,
                         modifier = Modifier.fillMaxWidth().clickable {
                             QuickAddDraft.set(
-                                ParsedTask(title = t.title, category = t.category)
+                                QuickAddDraft.Prefill(TaskDraft(title = t.title, category = t.category))
                             )
                             // Lưu kèm recurrence qua draft mở rộng không có -> mở chi tiết để người dùng chỉnh giờ/lặp
                             navController.navigate(Screen.TaskDetail.createRoute("new"))

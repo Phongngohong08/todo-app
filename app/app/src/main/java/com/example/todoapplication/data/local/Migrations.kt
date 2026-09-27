@@ -83,3 +83,19 @@ val MIGRATION_4_5: Migration = object : Migration(4, 5) {
         )
     }
 }
+
+/**
+ * v5 → v6: thêm các trường của đợt cải thiện trải nghiệm (cả ngày, Ngày của tôi, thời lượng, lặp nâng cao).
+ * Chỉ ADD COLUMN có DEFAULT → dữ liệu cũ giữ nguyên, task cũ = "có giờ", lặp mỗi 1 chu kỳ theo lịch.
+ * Câu lệnh phải khớp schema Room sinh ra (app/schemas/.../6.json) — MigrationTest kiểm tra.
+ */
+val MIGRATION_5_6: Migration = object : Migration(5, 6) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE `tasks` ADD COLUMN `dueAllDay` INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE `tasks` ADD COLUMN `myDay` TEXT")
+        db.execSQL("ALTER TABLE `tasks` ADD COLUMN `estimatedMinutes` INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE `tasks` ADD COLUMN `recurrenceInterval` INTEGER NOT NULL DEFAULT 1")
+        db.execSQL("ALTER TABLE `tasks` ADD COLUMN `recurrenceMode` TEXT NOT NULL DEFAULT 'SCHEDULE'")
+        db.execSQL("ALTER TABLE `tasks` ADD COLUMN `recurrenceUntil` INTEGER")
+    }
+}

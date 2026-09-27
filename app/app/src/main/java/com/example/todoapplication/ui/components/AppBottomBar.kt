@@ -6,11 +6,10 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.DateRange
-import androidx.compose.material.icons.filled.Schedule
-import androidx.compose.material.icons.filled.SmartToy
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -24,17 +23,16 @@ import androidx.navigation.NavController
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import com.example.todoapplication.ui.navigation.Screen
 
-/** Thanh điều hướng floating pill — lấy màu từ theme. */
+/** Thanh điều hướng floating pill — lấy màu từ theme. [activeTab]: 0 Hôm nay · 1 Việc làm · 2 Lịch · 3 Tôi. */
 @Composable
 fun AppBottomBar(navController: NavController, activeTab: Int) {
     data class NavItem(val route: String, val icon: ImageVector, val label: String)
 
     val items = listOf(
+        NavItem(Screen.Today.route, Icons.Default.WbSunny, "Hôm nay"),
         NavItem(Screen.TaskList.route, Icons.Default.Checklist, "Việc làm"),
         NavItem(Screen.Calendar.route, Icons.Default.DateRange, "Lịch"),
-        NavItem(Screen.DailyPlan.route, Icons.Default.Schedule, "Kế hoạch"),
-        NavItem(Screen.AICoach.route, Icons.Default.SmartToy, "AI Coach"),
-        NavItem(Screen.Stats.route, Icons.Default.BarChart, "Thống kê")
+        NavItem(Screen.Stats.route, Icons.Default.Person, "Tôi")
     )
 
     Box(

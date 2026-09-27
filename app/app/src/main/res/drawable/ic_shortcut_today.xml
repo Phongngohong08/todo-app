@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Icon app shortcut: nền tròn màu chủ đạo + biểu tượng trắng -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+    <path android:fillColor="#FF5B5BD6" android:pathData="M24,24m-22,0a22,22 0,1 1,44 0a22,22 0,1 1,-44 0" />
+    <path android:fillColor="#00000000" android:strokeColor="#FFFFFFFF" android:strokeWidth="3.2"
+        android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="M24,13V15M24,33V35M13,24H15M33,24H35M16.2,16.2L17.6,17.6M30.4,30.4L31.8,31.8M16.2,31.8L17.6,30.4M30.4,17.6L31.8,16.2M24,24m-5,0a5,5 0,1 1,10 0a5,5 0,1 1,-10 0" />
+</vector>

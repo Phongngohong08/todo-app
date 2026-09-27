@@ -1,5 +1,6 @@
 package com.example.todoapplication.data.local
 
+import androidx.room.ColumnInfo
 import androidx.room.Embedded
 import androidx.room.Entity
 import androidx.room.ForeignKey
@@ -36,6 +37,16 @@ data class TaskEntity(
     val spawnedFrom: String?,
     val createdAt: Long,
     val updatedAt: Long,
+    // ── Thêm ở v6 (khớp cột migration 000008 của backend) ──
+    /** Hạn chỉ có ngày: dueAt lưu ở 23:59 giờ địa phương, hiển thị không kèm giờ. */
+    @ColumnInfo(defaultValue = "0") val dueAllDay: Boolean = false,
+    /** "Ngày của tôi": ngày (yyyy-MM-dd, giờ địa phương) người dùng chọn làm việc này. */
+    val myDay: String? = null,
+    @ColumnInfo(defaultValue = "0") val estimatedMinutes: Int = 0,
+    @ColumnInfo(defaultValue = "1") val recurrenceInterval: Int = 1,
+    @ColumnInfo(defaultValue = "SCHEDULE") val recurrenceMode: String = "SCHEDULE",
+    /** Không sinh lần lặp có hạn sau mốc này (epoch millis). */
+    val recurrenceUntil: Long? = null,
     // ── Siêu dữ liệu đồng bộ (chỉ có trên máy) ──
     /** Có thay đổi chưa gửi lên server. */
     val isDirty: Boolean = false,

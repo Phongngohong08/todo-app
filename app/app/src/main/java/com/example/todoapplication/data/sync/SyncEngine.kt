@@ -9,6 +9,7 @@ import com.example.todoapplication.data.local.subtaskEntities
 import com.example.todoapplication.data.local.toEntity
 import com.example.todoapplication.data.local.toInputDto
 import com.example.todoapplication.data.model.CategoriesDto
+import com.example.todoapplication.data.repository.TaskRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -164,19 +165,21 @@ class SyncEngine(
                 incoming.forEach { subtaskDao.replaceForTask(it.id, it.subtaskEntities()) }
             }
 
-            val removed = body.deletedIds.orEmpty()
-                .filter { it !in dirty && it !in tombstones }
-                .toMutableList()
+            // Xóa ở thiết bị khác → thành bia mộ để hiện trong Thùng rác (khôi phục được), không xóa hẳn
+            val deletedElsewhere = body.deletedIds.orEmpty().filter { it !in dirty && it !in tombstones }
+            deletedElsewhere.chunked(SQL_BATCH).forEach { taskDao.markDeletedFromServer(it, clock()) }
+
+            val gone = mutableListOf<String>()
             if (cursor == null) {
-                // Lần tải toàn bộ: task sạch trên máy mà server không còn → đã bị xóa ở nơi khác
+                // Lần tải toàn bộ: task sạch trên máy mà server không còn → đã bị xóa ở nơi khác từ lâu
                 val onServer = body.tasks.orEmpty().mapTo(HashSet()) { it.id }
-                removed += taskDao.getCleanIds().filter { it !in onServer && it !in tombstones }
+                gone += taskDao.getCleanIds().filter { it !in onServer && it !in tombstones }
             }
-            removed.chunked(SQL_BATCH).forEach { taskDao.deleteByIds(it) }
+            gone.chunked(SQL_BATCH).forEach { taskDao.deleteByIds(it) }
 
             syncStateDao.update { it.copy(tasksCursor = body.serverTime) }
             changedIds = incoming.map { it.id }
-            removedIds = removed
+            removedIds = deletedElsewhere + gone
         }
 
         if (changedIds.isNotEmpty() || removedIds.isNotEmpty()) {
@@ -208,8 +211,8 @@ class SyncEngine(
         private const val TAG = "SyncEngine"
         private const val MAX_PUSH_ROUNDS = 3
         private const val SQL_BATCH = 500 // giới hạn số tham số trong một câu SQL (SQLite cũ: 999)
-        /** Giữ bia mộ đủ lâu để Snackbar "Hoàn tác" còn tác dụng dù đã đồng bộ việc xóa. */
-        const val TOMBSTONE_TTL_MS = 5 * 60_000L
+        /** Giữ bia mộ bằng thời gian Thùng rác (khôi phục được trong 30 ngày), rồi mới dọn. */
+        const val TOMBSTONE_TTL_MS = TaskRepository.TRASH_RETENTION_MS
         /**
          * Lỗi do dữ liệu — gửi lại cũng không khác, nên bỏ thay đổi thay vì thử mãi.
          * Cố ý KHÔNG gồm 404: server cũ (chưa hỗ trợ PUT tạo mới) trả 404 cho task mới — coi là lỗi tạm thời

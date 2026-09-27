@@ -1,3 +1,14 @@
 <resources>
-    <string name="app_name">Todo Application</string>
+    <string name="app_name">TaskFlow AI</string>
+
+    <!-- App shortcut (nhấn giữ icon app) -->
+    <string name="shortcut_add_short">Thêm việc</string>
+    <string name="shortcut_add_long">Thêm công việc mới</string>
+    <string name="shortcut_today_short">Hôm nay</string>
+    <string name="shortcut_today_long">Ngày của tôi</string>
+    <string name="shortcut_focus_short">Tập trung</string>
+    <string name="shortcut_focus_long">Hẹn giờ tập trung 25 phút</string>
+
+    <!-- Tên hiện trong bảng "Chia sẻ" của app khác -->
+    <string name="share_target_label">Thêm vào TaskFlow</string>
 </resources>

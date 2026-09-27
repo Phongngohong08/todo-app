@@ -12,8 +12,9 @@ import org.junit.runner.RunWith
 import java.time.Instant
 
 /**
- * Kiểm tra MIGRATION_4_5 trên SQLite thật của thiết bị: dựng DB v4 từ schema JSON đã export, thêm dữ liệu,
- * chạy migration, rồi so schema kết quả với 5.json (runMigrationsAndValidate) và kiểm tra dữ liệu.
+ * Kiểm tra MIGRATION_4_5 và MIGRATION_5_6 trên SQLite thật của thiết bị: dựng DB cũ từ schema JSON đã export,
+ * thêm dữ liệu, chạy migration, rồi so schema kết quả với file JSON của version đích (runMigrationsAndValidate)
+ * và kiểm tra dữ liệu.
  */
 @RunWith(AndroidJUnit4::class)
 class MigrationTest {
@@ -85,7 +86,7 @@ class MigrationTest {
         seedVersion4()
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val db = Room.databaseBuilder(context, AppDatabase::class.java, DB_NAME)
-            .addMigrations(MIGRATION_4_5)
+            .addMigrations(MIGRATION_4_5, MIGRATION_5_6)
             .build()
         try {
             // Mở DB kích hoạt migration + kiểm tra khớp schema của Room
@@ -96,6 +97,33 @@ class MigrationTest {
         } finally {
             db.close()
         }
+    }
+
+    @Test
+    fun migrate5To6_addsColumnsWithDefaultsAndKeepsData() {
+        helper.createDatabase(DB_NAME, 5).apply {
+            execSQL(
+                """
+                INSERT INTO tasks (id, title, description, priority, dueAt, status, category, recurrence, recurrenceDays,
+                    reminderOffsetMinutes, completedAt, sortOrder, spawnedFrom, createdAt, updatedAt, isDirty, isDeleted, localVersion)
+                VALUES ('t1', 'Tưới cây', '', 'LOW', 1000, 'TODO', 'PERSONAL', 'DAILY', '', 0, NULL, 1.0, NULL, 1, 2, 0, 0, 0)
+                """.trimIndent()
+            )
+            close()
+        }
+
+        val db = helper.runMigrationsAndValidate(DB_NAME, 6, true, MIGRATION_5_6)
+        db.query("SELECT title, dueAllDay, myDay, estimatedMinutes, recurrenceInterval, recurrenceMode, recurrenceUntil FROM tasks").use { c ->
+            assertTrue(c.moveToFirst())
+            assertEquals("Tưới cây", c.getString(0))
+            assertEquals(0, c.getInt(1))            // task cũ = có giờ
+            assertTrue(c.isNull(2))                 // chưa ở "Ngày của tôi"
+            assertEquals(0, c.getInt(3))
+            assertEquals(1, c.getInt(4))            // lặp mỗi 1 chu kỳ
+            assertEquals("SCHEDULE", c.getString(5))
+            assertTrue(c.isNull(6))
+        }
+        db.close()
     }
 
     private companion object {

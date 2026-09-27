@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.core.app.NotificationManagerCompat
 import androidx.work.WorkManager
 import com.example.todoapplication.data.local.AppDatabase
+import com.example.todoapplication.data.notifications.FocusSession
 import com.example.todoapplication.data.notifications.ReminderScheduler
 import com.example.todoapplication.data.sync.SyncScheduler
 import com.example.todoapplication.di.ServiceLocator
@@ -28,6 +29,8 @@ object UserDataCleaner {
         workManager.cancelAllWorkByTag(SyncScheduler.TAG)
         workManager.cancelAllWorkByTag(ReminderScheduler.TAG)
         NotificationManagerCompat.from(app).cancelAll()
+        ServiceLocator.localPrefs.clearAccountData()
+        FocusSession.stop(app)
 
         scope.launch {
             // Chờ lần đồng bộ đang chạy (nếu có) kết thúc để nó không ghi dữ liệu cũ vào DB vừa xóa

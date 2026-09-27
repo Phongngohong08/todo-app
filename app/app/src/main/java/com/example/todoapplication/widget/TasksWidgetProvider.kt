@@ -6,7 +6,7 @@ import android.appwidget.AppWidgetProvider
 import android.content.Context
 import android.content.Intent
 import android.widget.RemoteViews
-import com.example.todoapplication.MainActivity
+import com.example.todoapplication.ui.navigation.AppIntents
 import com.example.todoapplication.R
 
 /**
@@ -26,20 +26,28 @@ class TasksWidgetProvider : AppWidgetProvider() {
             views.setRemoteAdapter(R.id.widget_list, serviceIntent)
             views.setEmptyView(R.id.widget_list, R.id.widget_empty)
 
-            // Bấm vào header hoặc item → mở app
-            val openApp = Intent(context, MainActivity::class.java)
-            val openPending = PendingIntent.getActivity(
-                context, 0, openApp,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            // Tiêu đề → mở tab Hôm nay; nút "+" → mở thanh tạo nhanh
+            views.setOnClickPendingIntent(R.id.widget_header, openApp(context, 0, AppIntents.OPEN_TODAY))
+            views.setOnClickPendingIntent(R.id.widget_add, openApp(context, 1, AppIntents.OPEN_ADD))
+
+            // Mẫu cho từng dòng: ô tích / nội dung điền thêm extras khác nhau (fill-in) → phải MUTABLE
+            val template = PendingIntent.getActivity(
+                context, 2, Intent(context, WidgetActionActivity::class.java),
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
             )
-            views.setOnClickPendingIntent(R.id.widget_header, openPending)
-            views.setPendingIntentTemplate(R.id.widget_list, openPending)
+            views.setPendingIntentTemplate(R.id.widget_list, template)
 
             manager.updateAppWidget(widgetId, views)
         }
     }
 
     companion object {
+        private fun openApp(context: Context, requestCode: Int, open: String): PendingIntent =
+            PendingIntent.getActivity(
+                context, requestCode, AppIntents.main(context, open),
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+
         /** Gọi để widget tải lại dữ liệu (sau mỗi thay đổi task — xem TaskEffects). */
         fun refresh(context: Context) {
             val manager = AppWidgetManager.getInstance(context)

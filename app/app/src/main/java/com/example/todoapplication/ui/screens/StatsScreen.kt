@@ -77,7 +77,7 @@ fun StatsScreen(
     }
 
     Scaffold(
-        bottomBar = { BottomNavigationBar(navController, activeTab = 4) },
+        bottomBar = { BottomNavigationBar(navController, activeTab = 3) },
         containerColor = MaterialTheme.colorScheme.background
     ) { innerPadding ->
         Column(
@@ -95,7 +95,7 @@ fun StatsScreen(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
-                    "Trung tâm AI",
+                    "Của tôi",
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
@@ -194,7 +194,22 @@ fun StatsScreen(
                                 }
                             }
 
-                            // Big metric card — Hoàn thành / Đang chờ / Ngày hoàn hảo
+                            // Mục tiêu ngày + chuỗi
+                            state.goal?.let { goal ->
+                                item { GoalCard(goal, onEdit = { navController.navigate(Screen.Settings.route) }) }
+                            }
+
+                            // Lối tắt: nhìn lại & trợ lý
+                            item {
+                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    ShortcutRow("📅", "Tổng kết tuần", "So với tuần trước, lập kế hoạch tuần tới") { navController.navigate(Screen.WeeklyReview.route) }
+                                    ShortcutRow("🤖", "AI Coach", "Hỏi cách sắp xếp, vượt trì hoãn") { navController.navigate(Screen.AICoach.createRoute()) }
+                                    ShortcutRow("✅", "Đã hoàn thành", "Lịch sử việc đã xong") { navController.navigate(Screen.History.route) }
+                                    ShortcutRow("🗑️", "Thùng rác", "Khôi phục việc đã xóa trong 30 ngày") { navController.navigate(Screen.Trash.route) }
+                                }
+                            }
+
+                            // Big metric card — Hoàn thành / Đang chờ / Ngày đạt mục tiêu
                             item {
                                 Surface(
                                     shape = RoundedCornerShape(20.dp),
@@ -222,7 +237,7 @@ fun StatsScreen(
                                         VerticalDivider()
                                         BigMetric(
                                             value = "${state.perfectDays}",
-                                            label = "Ngày hoàn hảo",
+                                            label = "Ngày đạt mục tiêu",
                                             color = tertiary
                                         )
                                     }
@@ -744,4 +759,57 @@ private fun VerticalDivider() {
             .height(56.dp)
             .background(MaterialTheme.colorScheme.outlineVariant)
     )
+}
+
+@Composable
+private fun GoalCard(goal: com.example.todoapplication.domain.GoalProgress, onEdit: () -> Unit) {
+    Surface(
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.surface,
+        shadowElevation = 2.dp,
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onEdit)
+    ) {
+        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(contentAlignment = Alignment.Center, modifier = Modifier.size(64.dp)) {
+                CircularProgressIndicator(
+                    progress = { (goal.doneToday.toFloat() / goal.goal).coerceIn(0f, 1f) },
+                    modifier = Modifier.fillMaxSize(),
+                    strokeWidth = 6.dp,
+                    trackColor = MaterialTheme.colorScheme.surfaceVariant
+                )
+                Text("${goal.doneToday}/${goal.goal}", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+            }
+            Spacer(Modifier.width(16.dp))
+            Column(Modifier.weight(1f)) {
+                Text("🔥 Chuỗi ${goal.currentStreak} ngày", fontWeight = FontWeight.Bold, fontSize = 17.sp, color = MaterialTheme.colorScheme.onSurface)
+                Text("Kỷ lục: ${goal.bestStreak} ngày", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(
+                    if (goal.metToday) "Hôm nay đã đạt mục tiêu 🎉" else "Còn ${goal.remainingToday} việc để đạt mục tiêu hôm nay",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+            Text("Sửa", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+@Composable
+private fun ShortcutRow(emoji: String, title: String, subtitle: String, onClick: () -> Unit) {
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surface,
+        shadowElevation = 1.dp,
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick)
+    ) {
+        Row(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(emoji, fontSize = 20.sp)
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(title, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+                Text(subtitle, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Text("›", fontSize = 22.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
 }

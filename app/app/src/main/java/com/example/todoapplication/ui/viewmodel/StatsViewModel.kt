@@ -8,7 +8,11 @@ import com.example.todoapplication.data.model.MemoryItem
 import com.example.todoapplication.data.repository.AiRepository
 import com.example.todoapplication.data.repository.StatsRepository
 import com.example.todoapplication.data.repository.aiFailureMessage
+import com.example.todoapplication.data.repository.LocalPrefs
 import com.example.todoapplication.di.ServiceLocator
+import com.example.todoapplication.domain.GoalCalculator
+import com.example.todoapplication.domain.GoalProgress
+import com.example.todoapplication.domain.RecurrenceRules
 import com.example.todoapplication.domain.StatsCalculator
 import com.example.todoapplication.domain.model.StatsSummary
 import kotlinx.coroutines.Dispatchers
@@ -35,8 +39,10 @@ data class StatsUiState(
     val isLoadingWeekly: Boolean = true,
     /** Số việc hoàn thành theo từng ngày trong năm ("yyyy-MM-dd" -> count) cho bản đồ nhiệt. */
     val yearly: Map<String, Int> = emptyMap(),
-    /** Số ngày hoàn hảo = số ngày có hoàn thành ít nhất 1 việc trong năm. */
+    /** Số ngày trong năm ĐẠT MỤC TIÊU ngày (trước đây: chỉ cần xong 1 việc — quá dễ). */
     val perfectDays: Int = 0,
+    /** Mục tiêu hôm nay + chuỗi ngày. */
+    val goal: GoalProgress? = null,
     val memories: List<MemoryItem> = emptyList(),
     val isLoadingMemories: Boolean = false,
     val isExtracting: Boolean = false
@@ -50,22 +56,25 @@ data class StatsUiState(
 class StatsViewModel(
     repo: StatsRepository,
     private val aiRepository: AiRepository,
+    localPrefs: LocalPrefs,
     private val zone: () -> ZoneId = ZoneId::systemDefault
 ) : ViewModel() {
 
-    private data class ChartData(val weekly: List<Int>, val yearly: Map<String, Int>)
+    private data class ChartData(val weekly: List<Int>, val yearly: Map<String, Int>, val goal: GoalProgress)
 
     private val today = LocalDate.now(zone())
     private val since = minOf(
         StatsCalculator.startOfYear(today.year, zone()),
-        today.minusDays(6).atStartOfDay(zone()).toInstant().toEpochMilli()
+        // đủ xa để tính chuỗi ngày cả khi đang đầu năm
+        today.minusDays(400).atStartOfDay(zone()).toInstant().toEpochMilli()
     )
 
     // Gom thời điểm hoàn thành thành biểu đồ tuần + bản đồ nhiệt năm, trên luồng nền
-    private val charts = repo.observeCompletedTimes(since).map { times ->
+    private val charts = combine(repo.observeCompletedTimes(since), localPrefs.dailyGoal, localPrefs.daysOff) { times, goal, daysOff ->
         ChartData(
             weekly = StatsCalculator.weekly(times, today, zone()),
-            yearly = StatsCalculator.yearly(times, today.year, zone())
+            yearly = StatsCalculator.yearly(times, today.year, zone()),
+            goal = GoalCalculator.progress(times, goal, RecurrenceRules.parseWeekdays(daysOff), today, zone())
         )
     }.flowOn(Dispatchers.Default)
 
@@ -84,7 +93,8 @@ class StatsViewModel(
             weekly = charts.weekly,
             isLoadingWeekly = false,
             yearly = charts.yearly,
-            perfectDays = charts.yearly.size,
+            perfectDays = charts.yearly.values.count { it >= charts.goal.goal },
+            goal = charts.goal,
             memories = memory.memories,
             isLoadingMemories = memory.isLoading,
             isExtracting = memory.isExtracting
@@ -139,7 +149,7 @@ class StatsViewModel(
 
     companion object {
         val Factory = viewModelFactory {
-            initializer { StatsViewModel(ServiceLocator.statsRepository, ServiceLocator.aiRepository) }
+            initializer { StatsViewModel(ServiceLocator.statsRepository, ServiceLocator.aiRepository, ServiceLocator.localPrefs) }
         }
     }
 }

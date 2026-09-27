@@ -18,6 +18,14 @@ object Recurrence {
     const val MONTHLY = "MONTHLY"
 }
 
+/** Lần lặp kế tiếp tính từ đâu — xem RecurrenceRules. */
+object RecurrenceMode {
+    /** Theo lịch cố định, tính từ hạn cũ (họp mỗi thứ 2). */
+    const val SCHEDULE = "SCHEDULE"
+    /** Tính từ ngày hoàn thành (tưới cây 3 ngày sau lần tưới trước). */
+    const val COMPLETION = "COMPLETION"
+}
+
 data class Task(
     val id: String,
     val title: String,
@@ -36,10 +44,23 @@ data class Task(
     val updatedAt: Long = 0,
     val subtaskDone: Int = 0,
     val subtaskTotal: Int = 0,
-    val hasPendingSync: Boolean = false       // có thay đổi trên máy chưa gửi lên server
+    val hasPendingSync: Boolean = false,      // có thay đổi trên máy chưa gửi lên server
+    /** Hạn chỉ có ngày (dueAt = 23:59 giờ địa phương của ngày đó). */
+    val dueAllDay: Boolean = false,
+    /** "Ngày của tôi": ngày người dùng chọn làm việc này ("yyyy-MM-dd"); khác hôm nay = không còn hiệu lực. */
+    val myDay: String? = null,
+    val estimatedMinutes: Int = 0,
+    val recurrenceInterval: Int = 1,
+    val recurrenceMode: String = RecurrenceMode.SCHEDULE,
+    val recurrenceUntil: Long? = null,
+    /** Thời điểm bị xóa (chỉ có ý nghĩa với việc trong Thùng rác). */
+    val deletedAt: Long? = null
 ) {
     val isCompleted: Boolean get() = status == TaskStatus.COMPLETED
     val isRecurring: Boolean get() = recurrence != Recurrence.NONE
+
+    /** Việc nằm trong "Ngày của tôi" của ngày [today] ("yyyy-MM-dd"). */
+    fun isInMyDay(today: String): Boolean = myDay == today
 }
 
 data class Subtask(
@@ -58,7 +79,12 @@ data class TaskDraft(
     val category: String = "OTHER",
     val recurrence: String = Recurrence.NONE,
     val recurrenceDays: String = "",
-    val reminderOffsetMinutes: Int = 0
+    val reminderOffsetMinutes: Int = 0,
+    val dueAllDay: Boolean = false,
+    val estimatedMinutes: Int = 0,
+    val recurrenceInterval: Int = 1,
+    val recurrenceMode: String = RecurrenceMode.SCHEDULE,
+    val recurrenceUntil: Long? = null
 )
 
 /** Số liệu tổng hợp cho màn Thống kê (tính từ Room). */

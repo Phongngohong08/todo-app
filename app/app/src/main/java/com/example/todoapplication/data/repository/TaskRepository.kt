@@ -7,6 +7,7 @@ import com.example.todoapplication.data.local.TaskEntity
 import com.example.todoapplication.data.local.toDomain
 import com.example.todoapplication.domain.RecurrenceRules
 import com.example.todoapplication.domain.SortOrder
+import com.example.todoapplication.domain.model.RecurrenceMode
 import com.example.todoapplication.domain.model.Subtask
 import com.example.todoapplication.domain.model.Task
 import com.example.todoapplication.domain.model.TaskDraft
@@ -22,6 +23,9 @@ fun interface LocalChangeEffects {
     /** [changed]: bản mới của các task vừa ghi; [removedIds]: task vừa bị xóa. */
     fun afterLocalWrite(changed: List<TaskEntity>, removedIds: List<String>)
 }
+
+/** Kết quả "Bỏ qua lần này" của việc lặp. */
+enum class SkipResult { SKIPPED, NOT_RECURRING, SERIES_ENDED, NOT_FOUND }
 
 /**
  * [TẦNG DATA · REPOSITORY] Nguồn dữ liệu duy nhất về công việc cho tầng UI — theo kiến trúc offline-first:
@@ -56,6 +60,18 @@ class TaskRepository(
     fun observeScheduled(): Flow<List<Task>> =
         taskDao.observeScheduled().map { rows -> rows.map { it.toDomain() } }
 
+    /** Việc đã hoàn thành, mới nhất trước — cho màn Lịch sử. */
+    fun observeCompletedHistory(limit: Int = HISTORY_LIMIT): Flow<List<Task>> =
+        taskDao.observeCompleted(limit).map { rows -> rows.map { it.toDomain() } }
+
+    /** Việc hoàn thành từ [sinceMillis] — cho Tổng kết tuần. */
+    fun observeCompletedSince(sinceMillis: Long): Flow<List<Task>> =
+        taskDao.observeCompletedSince(sinceMillis).map { rows -> rows.map { it.toDomain() } }
+
+    /** Việc trong Thùng rác (đã xóa trong [TRASH_RETENTION_MS] gần nhất), mới xóa trước. */
+    fun observeTrash(): Flow<List<Task>> =
+        taskDao.observeTrash(clock() - TRASH_RETENTION_MS).map { rows -> rows.map { it.toDomain() } }
+
     /** Số task có thay đổi chưa gửi lên server. */
     fun observePendingSyncCount(): Flow<Int> = taskDao.observeDirtyCount().distinctUntilChanged()
 
@@ -66,7 +82,7 @@ class TaskRepository(
     // ── Ghi ──────────────────────────────────────────────────────────────────
 
     /** Tạo task (id sinh ngay trên máy — server nhận nguyên id này khi đồng bộ). */
-    suspend fun create(draft: TaskDraft, subtasks: List<Subtask> = emptyList()): Task {
+    suspend fun create(draft: TaskDraft, subtasks: List<Subtask> = emptyList(), myDay: String? = null): Task {
         val now = clock()
         val entity = TaskEntity(
             id = UUID.randomUUID().toString(),
@@ -84,6 +100,12 @@ class TaskRepository(
             spawnedFrom = null,
             createdAt = now,
             updatedAt = now,
+            dueAllDay = draft.dueAllDay && draft.dueAt != null,
+            myDay = myDay,
+            estimatedMinutes = draft.estimatedMinutes,
+            recurrenceInterval = RecurrenceRules.normalizeInterval(draft.recurrenceInterval),
+            recurrenceMode = draft.recurrenceMode,
+            recurrenceUntil = draft.recurrenceUntil,
             isDirty = true,
             localVersion = 1
         )
@@ -108,13 +130,20 @@ class TaskRepository(
                 category = draft.category,
                 recurrence = draft.recurrence,
                 recurrenceDays = draft.recurrenceDays,
-                reminderOffsetMinutes = draft.reminderOffsetMinutes
+                reminderOffsetMinutes = draft.reminderOffsetMinutes,
+                dueAllDay = draft.dueAllDay && draft.dueAt != null,
+                estimatedMinutes = draft.estimatedMinutes,
+                recurrenceInterval = RecurrenceRules.normalizeInterval(draft.recurrenceInterval),
+                recurrenceMode = draft.recurrenceMode,
+                recurrenceUntil = draft.recurrenceUntil
             )
         )
     }
 
-    suspend fun setPriority(id: String, priority: String): Boolean = mutate(id) { current ->
-        if (current.priority == priority) emptyList() else listOf(current.copy(priority = priority))
+    suspend fun setPriority(id: String, priority: String): Boolean = setPriority(listOf(id), priority)
+
+    suspend fun setPriority(ids: List<String>, priority: String): Boolean = mutateAll(ids) { current ->
+        if (current.priority == priority) null else current.copy(priority = priority)
     }
 
     /**
@@ -125,10 +154,8 @@ class TaskRepository(
         when {
             completed && current.status != TaskStatus.COMPLETED -> {
                 val now = clock()
-                listOfNotNull(
-                    current.copy(status = TaskStatus.COMPLETED, completedAt = now),
-                    spawnNextOccurrence(current, now)
-                )
+                val done = current.copy(status = TaskStatus.COMPLETED, completedAt = now)
+                listOfNotNull(done, spawnNextOccurrence(done, now))
             }
             !completed && current.status == TaskStatus.COMPLETED ->
                 listOfNotNull(
@@ -139,12 +166,65 @@ class TaskRepository(
         }
     }
 
-    /** Xóa (giữ "bia mộ" để đồng bộ việc xóa và cho phép [restore] trong vài phút). */
+    /**
+     * Đưa việc vào / bỏ khỏi "Ngày của tôi". [day] = "yyyy-MM-dd" (hôm nay), null = bỏ ra.
+     * Việc đã xong vẫn đổi được (người dùng có thể bỏ nó khỏi danh sách hôm nay).
+     */
+    suspend fun setMyDay(ids: List<String>, day: String?): Boolean = mutateAll(ids) { current ->
+        if (current.myDay == day) null else current.copy(myDay = day)
+    }
+
+    /**
+     * Dời hạn nhiều việc cùng lúc (nút "Dời tất cả" ở nhóm Quá hạn, hành động của AI Coach).
+     * [allDay] = hạn chỉ có ngày — caller truyền [dueAt] ở 23:59 giờ địa phương.
+     */
+    suspend fun reschedule(ids: List<String>, dueAt: Long?, allDay: Boolean): Boolean = mutateAll(ids) { current ->
+        if (current.status == TaskStatus.COMPLETED) null
+        else current.copy(dueAt = dueAt, dueAllDay = allDay && dueAt != null)
+    }
+
+    /**
+     * "Bỏ qua lần này": việc lặp nhảy sang lần kế tiếp theo lịch mà KHÔNG tính là đã hoàn thành
+     * (không vào thống kê, không làm đứt/tăng chuỗi).
+     */
+    suspend fun skipOccurrence(id: String): SkipResult {
+        var result = SkipResult.NOT_FOUND
+        mutate(id) { current ->
+            val due = current.dueAt
+            if (due == null || !RecurrenceRules.isRecurring(current.recurrence) || current.status == TaskStatus.COMPLETED) {
+                result = SkipResult.NOT_RECURRING
+                return@mutate emptyList()
+            }
+            val next = RecurrenceRules.skipDue(due, current.spec(), clock(), zone())
+            if (next == null) {
+                result = SkipResult.SERIES_ENDED
+                emptyList()
+            } else {
+                result = SkipResult.SKIPPED
+                listOf(current.copy(dueAt = next))
+            }
+        }
+        return result
+    }
+
+    /** Xóa (giữ "bia mộ" để đồng bộ việc xóa, Hoàn tác, và hiện trong Thùng rác [TRASH_RETENTION_MS]). */
     suspend fun delete(id: String): Boolean = mutate(id) { listOf(it.copy(isDeleted = true)) }
 
-    /** Hoàn tác xóa. */
+    /** Hoàn tác xóa / khôi phục từ Thùng rác. */
     suspend fun restore(id: String): Boolean = mutate(id, includeDeleted = true) { current ->
         if (current.isDeleted) listOf(current.copy(isDeleted = false)) else emptyList()
+    }
+
+    /**
+     * Xóa hẳn khỏi Thùng rác. Chỉ xóa được bia mộ ĐÃ đồng bộ việc xóa lên server — nếu xóa luôn bản chưa gửi,
+     * server vẫn giữ task và lần tải toàn bộ sau sẽ làm nó "sống lại". Trả số mục chưa xóa được (đang chờ gửi).
+     */
+    suspend fun purgeFromTrash(ids: List<String>): Int {
+        if (ids.isEmpty()) return 0
+        return db.withTransaction {
+            ids.chunked(SQL_BATCH).forEach { taskDao.purgeSyncedTombstones(it) }
+            ids.chunked(SQL_BATCH).sumOf { chunk -> taskDao.getByIds(chunk).count { it.isDeleted } }
+        }
     }
 
     /**
@@ -172,12 +252,17 @@ class TaskRepository(
 
     // ── Bước con (nằm trong task: sửa bước con = sửa task, cùng được đồng bộ) ──
 
-    suspend fun addSubtask(taskId: String, title: String): Boolean {
-        val clean = title.trim()
+    suspend fun addSubtask(taskId: String, title: String): Boolean = addSubtasks(taskId, listOf(title))
+
+    /** Thêm nhiều bước con một lần (vd AI Coach đề xuất chia nhỏ việc). Bỏ qua dòng trống. */
+    suspend fun addSubtasks(taskId: String, titles: List<String>): Boolean {
+        val clean = titles.map { it.trim() }.filter { it.isNotEmpty() }
         if (clean.isEmpty()) return false
         return mutate(taskId) { current ->
-            val position = subtaskDao.getForTask(taskId).size
-            subtaskDao.upsert(SubtaskEntity(UUID.randomUUID().toString(), taskId, clean, isDone = false, position = position))
+            var position = subtaskDao.getForTask(taskId).size
+            subtaskDao.upsertAll(clean.map {
+                SubtaskEntity(UUID.randomUUID().toString(), taskId, it, isDone = false, position = position++)
+            })
             listOf(current)
         }
     }
@@ -211,10 +296,33 @@ class TaskRepository(
                 ?: return@withTransaction null
             block(current).map { touch(it) }.also { taskDao.upsertAll(it) }
         } ?: return false
+        afterWrite(written)
+        return true
+    }
+
+    /**
+     * Như [mutate] nhưng cho nhiều task trong MỘT transaction (thao tác hàng loạt). [block] trả null = không đổi.
+     * Trả false nếu không task nào còn tồn tại.
+     */
+    private suspend fun mutateAll(ids: List<String>, block: (TaskEntity) -> TaskEntity?): Boolean {
+        if (ids.isEmpty()) return false
+        var found = false
+        val written = db.withTransaction {
+            ids.distinct().chunked(SQL_BATCH).flatMap { chunk ->
+                taskDao.getByIds(chunk).filter { !it.isDeleted }.mapNotNull { current ->
+                    found = true
+                    block(current)?.let { touch(it) }
+                }
+            }.also { if (it.isNotEmpty()) taskDao.upsertAll(it) }
+        }
+        afterWrite(written)
+        return found
+    }
+
+    private fun afterWrite(written: List<TaskEntity>) {
         if (written.isNotEmpty()) {
             effects.afterLocalWrite(written, written.filter { it.isDeleted }.map { it.id })
         }
-        return true
     }
 
     private fun touch(entity: TaskEntity) = entity.copy(
@@ -223,7 +331,10 @@ class TaskRepository(
         updatedAt = clock()
     )
 
-    /** Tạo lần lặp kế tiếp (gọi bên trong transaction của [setCompleted]). */
+    private fun TaskEntity.spec() =
+        RecurrenceRules.Spec(recurrence, recurrenceDays, recurrenceInterval, recurrenceMode, recurrenceUntil)
+
+    /** Tạo lần lặp kế tiếp (gọi bên trong transaction của [setCompleted]). [parent] đã mang completedAt. */
     private suspend fun spawnNextOccurrence(parent: TaskEntity, now: Long): TaskEntity? {
         val due = parent.dueAt ?: return null
         if (!RecurrenceRules.isRecurring(parent.recurrence)) return null
@@ -232,12 +343,15 @@ class TaskRepository(
         val existing = taskDao.getById(childId)
         if (existing != null && !existing.isDeleted) return null // đã có (vd đồng bộ về từ server)
 
+        val nextDue = RecurrenceRules.nextDueForCompletion(due, parent.spec(), parent.completedAt ?: now, now, zone())
+            ?: return null // đã qua ngày kết thúc lặp
+
         val child = TaskEntity(
             id = childId,
             title = parent.title,
             description = parent.description,
             priority = parent.priority,
-            dueAt = RecurrenceRules.nextDueAfter(due, parent.recurrence, parent.recurrenceDays, now, zone()),
+            dueAt = nextDue,
             status = TaskStatus.TODO,
             category = parent.category,
             recurrence = parent.recurrence,
@@ -248,6 +362,12 @@ class TaskRepository(
             spawnedFrom = parent.id,
             createdAt = existing?.createdAt ?: now,
             updatedAt = now,
+            dueAllDay = parent.dueAllDay,
+            myDay = null, // lần lặp mới không tự vào "Ngày của tôi"
+            estimatedMinutes = parent.estimatedMinutes,
+            recurrenceInterval = parent.recurrenceInterval,
+            recurrenceMode = parent.recurrenceMode.ifBlank { RecurrenceMode.SCHEDULE },
+            recurrenceUntil = parent.recurrenceUntil,
             localVersion = existing?.localVersion ?: 0
         )
         taskDao.upsert(child) // phải có task trước khi thêm bước con (khóa ngoại)
@@ -262,5 +382,12 @@ class TaskRepository(
         val child = taskDao.getById(RecurrenceRules.nextOccurrenceId(parent.id)) ?: return null
         if (child.isDeleted || child.status != TaskStatus.TODO) return null
         return child.copy(isDeleted = true)
+    }
+
+    companion object {
+        /** Việc đã xóa nằm trong Thùng rác bao lâu (khớp thời gian SyncEngine giữ bia mộ). */
+        const val TRASH_RETENTION_MS = 30L * 24 * 60 * 60 * 1000
+        private const val HISTORY_LIMIT = 500
+        private const val SQL_BATCH = 500
     }
 }

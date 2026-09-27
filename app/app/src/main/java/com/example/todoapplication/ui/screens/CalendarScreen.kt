@@ -57,7 +57,7 @@ fun CalendarScreen(
     )
 
     Scaffold(
-        bottomBar = { BottomNavigationBar(navController, activeTab = 1) },
+        bottomBar = { BottomNavigationBar(navController, activeTab = 2) },
         containerColor = MaterialTheme.colorScheme.background
     ) { innerPadding ->
         Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
@@ -201,12 +201,6 @@ fun CalendarScreen(
             }
         }
     }
-}
-
-private fun priorityColor(priority: String): Color = when (priority) {
-    "HIGH" -> PriorityHighColor
-    "MEDIUM" -> PriorityMediumColor
-    else -> PriorityLowColor
 }
 
 private fun priorityDotColor(entries: List<CalendarEntry>): Color {

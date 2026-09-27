@@ -1,5 +1,30 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <style name="Theme.TodoApplication" parent="android:Theme.Material.Light.NoActionBar" />
+    <style name="Theme.TodoApplication" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/window_background</item>
+    </style>
+
+    <!--
+      Activity trong suốt (hộp chọn "Hoãn…" từ thông báo, thao tác nhanh từ widget): chỉ hiện nội dung
+      Compose phía trên màn hình đang mở, không có nền/khung cửa sổ.
+    -->
+    <style name="Theme.TodoApplication.Translucent" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:backgroundDimEnabled">true</item>
+        <item name="android:windowAnimationStyle">@null</item>
+    </style>
+
+    <!--
+      Theme màn khởi động (SplashScreen API, thư viện core-splashscreen → cùng giao diện từ Android 10 tới 16).
+      MainActivity gọi installSplashScreen() rồi hệ thống tự chuyển sang postSplashScreenTheme.
+    -->
+    <style name="Theme.TodoApplication.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/splash_background</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/splash_icon</item>
+        <item name="windowSplashScreenAnimationDuration">800</item>
+        <item name="postSplashScreenTheme">@style/Theme.TodoApplication</item>
+    </style>
 </resources>

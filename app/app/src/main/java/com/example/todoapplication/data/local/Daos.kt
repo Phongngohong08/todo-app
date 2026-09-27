@@ -76,9 +76,57 @@ interface TaskDao {
     @Query("DELETE FROM tasks WHERE id IN (:ids)")
     suspend fun deleteByIds(ids: List<String>)
 
-    /** Dọn bia mộ đã đồng bộ xong và hết thời gian cho phép Hoàn tác. */
+    /** Dọn bia mộ đã đồng bộ xong và hết thời gian nằm trong Thùng rác. */
     @Query("DELETE FROM tasks WHERE isDeleted = 1 AND isDirty = 0 AND updatedAt < :before")
     suspend fun purgeTombstones(before: Long)
+
+    /** Người dùng xóa hẳn khỏi Thùng rác — chỉ bia mộ đã gửi việc xóa lên server. */
+    @Query("DELETE FROM tasks WHERE id IN (:ids) AND isDeleted = 1 AND isDirty = 0")
+    suspend fun purgeSyncedTombstones(ids: List<String>)
+
+    /**
+     * Task bị xóa ở thiết bị khác → giữ lại dạng bia mộ (sạch) để nó hiện trong Thùng rác máy này
+     * và có thể khôi phục. updatedAt = lúc nhận để tính hạn 30 ngày.
+     */
+    @Query("UPDATE tasks SET isDeleted = 1, isDirty = 0, updatedAt = :now WHERE id IN (:ids) AND isDeleted = 0")
+    suspend fun markDeletedFromServer(ids: List<String>, now: Long)
+
+    /**
+     * Thùng rác: việc đã xóa gần đây. Loại lần lặp bị "thu hồi" tự động khi mở lại việc cha (người dùng không
+     * xóa nó; khôi phục sẽ tạo bản trùng).
+     */
+    @Query(
+        """
+        SELECT * FROM tasks t
+        WHERE t.isDeleted = 1 AND t.updatedAt >= :since
+            AND NOT (t.spawnedFrom IS NOT NULL AND EXISTS (
+                SELECT 1 FROM tasks p WHERE p.id = t.spawnedFrom AND p.isDeleted = 0 AND p.status != 'COMPLETED'))
+        ORDER BY t.updatedAt DESC
+        """
+    )
+    fun observeTrash(since: Long): Flow<List<TaskEntity>>
+
+    /** Lịch sử: việc đã hoàn thành, mới nhất trước. */
+    @Query(
+        """
+        SELECT * FROM tasks
+        WHERE isDeleted = 0 AND status = 'COMPLETED' AND completedAt IS NOT NULL
+        ORDER BY completedAt DESC LIMIT :limit
+        """
+    )
+    fun observeCompleted(limit: Int): Flow<List<TaskEntity>>
+
+    /** Việc chưa xong có hạn tới [until] (quá hạn + hôm nay) — cho thông báo buổi sáng. */
+    @Query("SELECT * FROM tasks WHERE isDeleted = 0 AND status != 'COMPLETED' AND dueAt IS NOT NULL AND dueAt <= :until")
+    suspend fun getPendingDueBefore(until: Long): List<TaskEntity>
+
+    /** Việc chưa xong nằm trong "Ngày của tôi" của [day]. */
+    @Query("SELECT COUNT(*) FROM tasks WHERE isDeleted = 0 AND status != 'COMPLETED' AND myDay = :day")
+    suspend fun countMyDayPending(day: String): Int
+
+    /** Thời điểm hoàn thành + hạn chót của việc xong từ [since] — cho Tổng kết tuần. */
+    @Query("SELECT * FROM tasks WHERE isDeleted = 0 AND status = 'COMPLETED' AND completedAt >= :since")
+    fun observeCompletedSince(since: Long): Flow<List<TaskEntity>>
 
     // ── Thống kê ──
     @Query(
@@ -108,6 +156,15 @@ interface TaskDao {
 
     @Query("SELECT * FROM tasks WHERE isDeleted = 0 AND status != 'COMPLETED' ORDER BY dueAt IS NULL, dueAt ASC LIMIT :limit")
     suspend fun getPending(limit: Int): List<TaskEntity>
+
+    /** Widget: việc chưa xong, "Ngày của tôi" hôm nay lên đầu, rồi theo hạn chót. */
+    @Query(
+        """
+        SELECT * FROM tasks WHERE isDeleted = 0 AND status != 'COMPLETED'
+        ORDER BY (myDay = :today) DESC, dueAt IS NULL, dueAt ASC LIMIT :limit
+        """
+    )
+    suspend fun getForWidget(today: String, limit: Int): List<TaskEntity>
 
     @Query("SELECT id FROM tasks")
     suspend fun getAllIds(): List<String>

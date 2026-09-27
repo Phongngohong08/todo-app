@@ -24,10 +24,10 @@ interface ApiService {
     @POST("auth/refresh")
     fun refreshToken(@Body input: RefreshTokenInput): retrofit2.Call<AuthResponse>
 
-    // Thu hồi refresh token phía server (đăng xuất mọi thiết bị). Gửi refresh token trong body nên vẫn
+    // Thu hồi refresh token phía server (all_devices=false: chỉ máy này). Gửi refresh token trong body nên vẫn
     // chạy được khi access token đã hết hạn.
     @POST("auth/logout")
-    suspend fun logout(@Body input: RefreshTokenInput): Response<Unit>
+    suspend fun logout(@Body input: LogoutInput): Response<Unit>
 
     // Preferences
     @GET("preferences")
@@ -69,6 +69,14 @@ interface ApiService {
         @Query("date") date: String? = null,
         @Query("local_time") localTime: String? = null,
         @Query("tz") timezone: String? = null
+    ): Response<DailyPlan>
+
+    // Lưu lịch người dùng chỉnh tay (đổi giờ, bỏ khung) — không gọi AI
+    @PUT("plans/daily")
+    suspend fun saveDailyPlan(
+        @Query("date") date: String,
+        @Query("tz") timezone: String?,
+        @Body input: SavePlanInput
     ): Response<DailyPlan>
 
     // AI Coach

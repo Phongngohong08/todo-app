@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.example.todoapplication.data.repository.CategoryRepository
+import com.example.todoapplication.data.repository.SkipResult
 import com.example.todoapplication.data.repository.TaskRepository
 import com.example.todoapplication.di.ServiceLocator
 import com.example.todoapplication.domain.model.Subtask
@@ -23,6 +24,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.time.LocalDate
 import java.util.UUID
 
 /** Sự kiện một lần của màn chi tiết: đã tải xong task (kèm dữ liệu) / đã lưu / có lỗi. */
@@ -30,6 +32,8 @@ sealed interface TaskDetailEvent {
     data class Loaded(val task: Task) : TaskDetailEvent   // mang theo task để màn đổ vào các ô nhập
     data object Saved : TaskDetailEvent                    // lưu xong → màn popBackStack về danh sách
     data class Error(val message: String) : TaskDetailEvent
+    data class Info(val message: String) : TaskDetailEvent
+    data object Deleted : TaskDetailEvent
 }
 
 /**
@@ -108,15 +112,23 @@ class TaskDetailViewModel(
         }
     }
 
-    fun save(draft: TaskDraft) {
+    /** Lưu nội dung form. [inMyDay]: có nằm trong "Ngày của tôi" hôm nay không. */
+    fun save(draft: TaskDraft, inMyDay: Boolean) {
         if (_isBusy.value) return // chặn bấm Lưu hai lần
         _isBusy.value = true
         viewModelScope.launch {
+            val today = todayKey()
             val ok = if (isNew) {
-                repo.create(draft, draftSubtasks.value)
+                repo.create(draft, draftSubtasks.value, myDay = if (inMyDay) today else null)
                 true
             } else {
-                repo.update(taskId, draft)
+                val current = repo.getTask(taskId)
+                repo.update(taskId, draft).also { updated ->
+                    // Chỉ đổi khi người dùng thật sự bật/tắt — không xóa "Ngày của tôi" của một ngày khác
+                    if (updated && current != null && (current.myDay == today) != inMyDay) {
+                        repo.setMyDay(listOf(taskId), if (inMyDay) today else null)
+                    }
+                }
             }
             _isBusy.value = false
             _events.emit(
@@ -125,6 +137,32 @@ class TaskDetailViewModel(
             )
         }
     }
+
+    /** "Bỏ qua lần này" của việc lặp: nhảy sang lần kế tiếp, không tính là hoàn thành. */
+    fun skipOccurrence() {
+        if (isNew) return
+        viewModelScope.launch {
+            val msg = when (repo.skipOccurrence(taskId)) {
+                SkipResult.SKIPPED -> {
+                    repo.getTask(taskId)?.let { _events.emit(TaskDetailEvent.Loaded(it)) } // cập nhật hạn trên form
+                    "Đã bỏ qua lần này — chuyển sang lần kế tiếp"
+                }
+                SkipResult.SERIES_ENDED -> "Đây là lần lặp cuối cùng (đã tới ngày kết thúc)"
+                SkipResult.NOT_RECURRING -> "Chỉ bỏ qua được việc lặp lại có hạn chót"
+                SkipResult.NOT_FOUND -> "Công việc không còn tồn tại"
+            }
+            _events.emit(TaskDetailEvent.Info(msg))
+        }
+    }
+
+    fun delete() {
+        if (isNew) return
+        viewModelScope.launch {
+            if (repo.delete(taskId)) _events.emit(TaskDetailEvent.Deleted)
+        }
+    }
+
+    fun todayKey(): String = LocalDate.now().toString()
 
     companion object {
         const val NEW_TASK = "new"

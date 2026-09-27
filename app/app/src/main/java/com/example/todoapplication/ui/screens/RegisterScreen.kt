@@ -25,6 +25,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.todoapplication.ui.components.AppTextField
+import com.example.todoapplication.ui.components.AppLogo
 import com.example.todoapplication.ui.navigation.Screen
 import com.example.todoapplication.ui.viewmodel.AuthEvent
 import com.example.todoapplication.ui.viewmodel.RegisterViewModel
@@ -84,14 +85,7 @@ fun RegisterScreen(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(80.dp)
-                            .background(Color.White.copy(alpha = 0.2f), CircleShape),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text("🚀", fontSize = 34.sp)
-                    }
+                    AppLogo(size = 88.dp)
                     Spacer(Modifier.height(20.dp))
                     Text(
                         "Bắt đầu hành trình",

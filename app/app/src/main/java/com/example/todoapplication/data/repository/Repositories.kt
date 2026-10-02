@@ -6,7 +6,9 @@ import com.example.todoapplication.data.local.AppDatabase
 import com.example.todoapplication.data.local.CategoryEntity
 import com.example.todoapplication.data.local.ChatMessageEntity
 import com.example.todoapplication.data.local.toEntity
+import com.example.todoapplication.data.model.AssistInput
 import com.example.todoapplication.data.model.AuthResponse
+import com.example.todoapplication.data.model.BreakdownResponse
 import com.example.todoapplication.data.model.ChatInput
 import com.example.todoapplication.data.model.ChatResponse
 import com.example.todoapplication.data.model.DailyPlan
@@ -114,6 +116,14 @@ class PlanRepository(private val api: ApiService) {
 class AiRepository(private val api: ApiService) {
     suspend fun parseTask(text: String, localTime: String): Result<ParsedTask> =
         safeApiCall { api.parseTask(ParseTaskInput(text, localTime)) }
+
+    /** "Nhờ AI chia nhỏ việc này": các bước con gợi ý + tổng thời lượng ước tính (phút, 0 = không rõ). */
+    suspend fun breakdown(title: String, description: String): Result<BreakdownResponse> =
+        safeApiCall { api.breakdownTask(AssistInput(title, description)) }
+
+    /** Gợi ý thời lượng (phút) cho một việc. */
+    suspend fun estimate(title: String, description: String): Result<Int> =
+        safeApiCall { api.estimateTask(AssistInput(title, description)) }.map { it.estimatedMinutes }
 
     suspend fun listMemories(): Result<List<MemoryItem>> = safeApiCall { api.listMemories() }
 

@@ -74,6 +74,9 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation("androidx.compose.material:material-icons-extended")
 
+    // Khóa ứng dụng bằng vân tay / khuôn mặt / mã PIN máy
+    implementation(libs.androidx.biometric)
+
     // Background reminders / notifications
     implementation(libs.androidx.work.runtime.ktx)
 

@@ -6,6 +6,7 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.example.todoapplication.data.model.UserPreferences
 import com.example.todoapplication.data.notifications.DigestScheduler
+import com.example.todoapplication.data.notifications.ReminderScheduler
 import com.example.todoapplication.data.repository.ApiException
 import com.example.todoapplication.data.repository.AuthRepository
 import com.example.todoapplication.data.repository.CategoryRepository
@@ -59,7 +60,9 @@ class SettingsViewModel(
     private val sync: SyncController,
     private val authRepository: AuthRepository,
     /** Hẹn lại thông báo định kỳ sau khi đổi cài đặt (DigestScheduler cần Context — test truyền lambda rỗng). */
-    private val rescheduleNotifications: () -> Unit
+    private val rescheduleNotifications: () -> Unit,
+    /** Hẹn lại nhắc việc của mọi task (bật/tắt báo thức cho việc ưu tiên cao). */
+    private val rescheduleReminders: suspend () -> Unit = {}
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(
         SettingsUiState(
@@ -160,6 +163,28 @@ class SettingsViewModel(
     fun setWeeklyReviewEnabled(v: Boolean) { localPrefs.setWeeklyReviewEnabled(v); rescheduleNotifications() }
     fun setAllDayReminderTime(v: String) { localPrefs.setAllDayReminderTime(v) }
 
+    // ── Nhắc hẹn nâng cao (theo thiết bị) ──
+    val nagMinutes: StateFlow<Int> = localPrefs.nagMinutes
+    val nagHighOnly: StateFlow<Boolean> = localPrefs.nagHighOnly
+    val quietEnabled: StateFlow<Boolean> = localPrefs.quietEnabled
+    val quietStart: StateFlow<String> = localPrefs.quietStart
+    val quietEnd: StateFlow<String> = localPrefs.quietEnd
+    val alarmHighPriority: StateFlow<Boolean> = localPrefs.alarmHighPriority
+    val appLockEnabled: StateFlow<Boolean> = localPrefs.appLockEnabled
+
+    fun setNagMinutes(v: Int) = localPrefs.setNagMinutes(v)
+    fun setNagHighOnly(v: Boolean) = localPrefs.setNagHighOnly(v)
+    fun setQuietEnabled(v: Boolean) = localPrefs.setQuietEnabled(v)
+    fun setQuietStart(v: String) = localPrefs.setQuietStart(v)
+    fun setQuietEnd(v: String) = localPrefs.setQuietEnd(v)
+    fun setAppLockEnabled(v: Boolean) = localPrefs.setAppLockEnabled(v)
+
+    /** Bật/tắt báo thức toàn màn hình cho việc ưu tiên Cao — hẹn lại mọi nhắc việc theo cách mới. */
+    fun setAlarmHighPriority(v: Boolean) {
+        localPrefs.setAlarmHighPriority(v)
+        viewModelScope.launch { rescheduleReminders() }
+    }
+
     // ── Đăng xuất ──
     /**
      * Trước khi xóa dữ liệu trên máy, cố gửi nốt thay đổi chưa đồng bộ. Không gửi được (mất mạng)
@@ -194,7 +219,8 @@ class SettingsViewModel(
                     ServiceLocator.taskRepository,
                     ServiceLocator.syncController,
                     ServiceLocator.authRepository,
-                    rescheduleNotifications = { DigestScheduler.scheduleAll(ServiceLocator.context) }
+                    rescheduleNotifications = { DigestScheduler.scheduleAll(ServiceLocator.context) },
+                    rescheduleReminders = { ReminderScheduler.rescheduleAll(ServiceLocator.context) }
                 )
             }
         }

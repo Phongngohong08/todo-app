@@ -64,6 +64,7 @@ fun TodayScreen(
 
     var quickCreateText by remember { mutableStateOf<String?>(null) }
     var editingSlot by remember { mutableStateOf<Int?>(null) }
+    var postponeTarget by remember { mutableStateOf<com.example.todoapplication.domain.model.Task?>(null) }
 
     // Yêu cầu mở thanh tạo nhanh từ ngoài app (shortcut / chia sẻ / widget)
     val requested by QuickCreateRequest.pending.collectAsStateWithLifecycle()
@@ -82,6 +83,15 @@ fun TodayScreen(
                 is TodayEvent.Completed -> scope.launch {
                     val r = snackbar.showSnackbar("Đã hoàn thành: ${e.title}", actionLabel = "Hoàn tác", duration = SnackbarDuration.Short)
                     if (r == SnackbarResult.ActionPerformed) viewModel.reopen(e.taskId)
+                }
+                is TodayEvent.Postponed -> scope.launch {
+                    val label = "${com.example.todoapplication.ui.utils.weekdayShort(e.date)} ${e.date.dayOfMonth}/${e.date.monthValue}"
+                    val r = snackbar.showSnackbar("Đã hoãn sang $label", actionLabel = "Hoàn tác", duration = SnackbarDuration.Short)
+                    if (r == SnackbarResult.ActionPerformed) viewModel.undoPostpone(e.previous)
+                }
+                is TodayEvent.Duplicated -> scope.launch {
+                    val r = snackbar.showSnackbar("Đã nhân bản: ${e.title}", actionLabel = "Mở", duration = SnackbarDuration.Short)
+                    if (r == SnackbarResult.ActionPerformed) navController.navigate(Screen.TaskDetail.createRoute(e.taskId))
                 }
             }
         }
@@ -148,10 +158,15 @@ fun TodayScreen(
                             isInMyDay = true,
                             onToggleMyDay = { viewModel.removeFromMyDay(task) },
                             onFocus = { navController.navigate(Screen.Focus.createRoute(task.id)) },
+                            onDuplicate = { viewModel.duplicate(task) },
                             today = state.today
                         )
                     }
-                    if (task.isCompleted) card() else SwipeToCompleteBox(onComplete = { viewModel.toggleComplete(task) }) { card() }
+                    if (task.isCompleted) card()
+                    else SwipeToCompleteBox(
+                        onComplete = { viewModel.toggleComplete(task) },
+                        onPostpone = { postponeTarget = task }
+                    ) { card() }
                 }
             }
 
@@ -196,6 +211,17 @@ fun TodayScreen(
                 onRemove = { viewModel.removeSlot(index); editingSlot = null }
             )
         }
+    }
+
+    postponeTarget?.let { task ->
+        PostponeSheet(
+            taskTitle = task.title,
+            onDismiss = { postponeTarget = null },
+            onPick = { date ->
+                viewModel.postpone(task, date)
+                postponeTarget = null
+            }
+        )
     }
 
     quickCreateText?.let { initial ->

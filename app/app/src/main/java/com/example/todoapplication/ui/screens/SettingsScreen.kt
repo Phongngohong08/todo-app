@@ -1,9 +1,15 @@
 package com.example.todoapplication.ui.screens
 
+import android.app.NotificationManager
 import android.app.TimePickerDialog
+import android.content.Intent
+import android.net.Uri
+import android.os.Build
+import android.provider.Settings
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -30,7 +36,9 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import com.example.todoapplication.data.notifications.AlarmScheduler
 import com.example.todoapplication.data.repository.CategoryRepository
+import com.example.todoapplication.data.repository.LocalPrefs
 import com.example.todoapplication.data.repository.ThemeController
 import com.example.todoapplication.data.repository.ThemeMode
 import com.example.todoapplication.ui.components.rememberNotificationPermissionRequest
@@ -68,6 +76,13 @@ fun SettingsScreen(
     val digestTime by settingsViewModel.digestTime.collectAsStateWithLifecycle()
     val weeklyReview by settingsViewModel.weeklyReviewEnabled.collectAsStateWithLifecycle()
     val allDayReminder by settingsViewModel.allDayReminderTime.collectAsStateWithLifecycle()
+    val nagMinutes by settingsViewModel.nagMinutes.collectAsStateWithLifecycle()
+    val nagHighOnly by settingsViewModel.nagHighOnly.collectAsStateWithLifecycle()
+    val quietEnabled by settingsViewModel.quietEnabled.collectAsStateWithLifecycle()
+    val quietStart by settingsViewModel.quietStart.collectAsStateWithLifecycle()
+    val quietEnd by settingsViewModel.quietEnd.collectAsStateWithLifecycle()
+    val alarmHighPriority by settingsViewModel.alarmHighPriority.collectAsStateWithLifecycle()
+    val appLockEnabled by settingsViewModel.appLockEnabled.collectAsStateWithLifecycle()
     val askNotificationPermission = rememberNotificationPermissionRequest()
     var confirmLogout by remember { mutableStateOf<SettingsEvent.ConfirmLogout?>(null) }
 
@@ -388,6 +403,73 @@ fun SettingsScreen(
                         )
                     }
 
+                    // Nhắc hẹn nâng cao (theo thiết bị)
+                    SettingsSection(title = "⏰ Nhắc hẹn nâng cao") {
+                        Text("Nhắc lại tới khi xong", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Medium)
+                        Text(
+                            "Việc đến hạn mà chưa tích xong sẽ được nhắc lại (tối đa ${LocalPrefs.MAX_NAGS} lần).",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = 11.sp
+                        )
+                        Row(
+                            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(vertical = 8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            listOf(0 to "Tắt", 5 to "5 phút", 10 to "10 phút", 15 to "15 phút", 30 to "30 phút").forEach { (m, label) ->
+                                StatusFilterChip(text = label, selected = nagMinutes == m, onClick = { settingsViewModel.setNagMinutes(m) })
+                            }
+                        }
+                        if (nagMinutes > 0) {
+                            SwitchRow(
+                                title = "Chỉ việc ưu tiên Cao",
+                                subtitle = "Tắt để nhắc lại mọi việc có hạn",
+                                checked = nagHighOnly,
+                                onChange = settingsViewModel::setNagHighOnly
+                            )
+                        }
+                        HorizontalDivider(Modifier.padding(vertical = 10.dp), color = MaterialTheme.colorScheme.outlineVariant)
+                        SwitchRow(
+                            title = "Báo thức cho việc ưu tiên Cao",
+                            subtitle = "Đổ chuông + hiện toàn màn hình kể cả khi khóa máy, như đồng hồ báo thức",
+                            checked = alarmHighPriority,
+                            onChange = {
+                                settingsViewModel.setAlarmHighPriority(it)
+                                if (it) askNotificationPermission("Bật thông báo để báo thức cho việc quan trọng hoạt động.")
+                            }
+                        )
+                        if (alarmHighPriority) AlarmPermissionHints()
+                        HorizontalDivider(Modifier.padding(vertical = 10.dp), color = MaterialTheme.colorScheme.outlineVariant)
+                        SwitchRow(
+                            title = "Giờ yên lặng",
+                            subtitle = "Nhắc rơi vào khung giờ này sẽ dời tới lúc hết giờ yên lặng (báo thức vẫn kêu)",
+                            checked = quietEnabled,
+                            onChange = settingsViewModel::setQuietEnabled
+                        )
+                        if (quietEnabled) {
+                            Spacer(Modifier.height(8.dp))
+                            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                Box(Modifier.weight(1f)) { TimePickerField("Từ", quietStart, settingsViewModel::setQuietStart) }
+                                Box(Modifier.weight(1f)) { TimePickerField("Đến", quietEnd, settingsViewModel::setQuietEnd) }
+                            }
+                        }
+                    }
+
+                    // Bảo mật (theo thiết bị)
+                    SettingsSection(title = "🔒 Bảo mật") {
+                        SwitchRow(
+                            title = "Khóa ứng dụng",
+                            subtitle = "Dùng vân tay / khuôn mặt / mã PIN máy khi mở app hoặc quay lại sau ${AppLock.RELOCK_AFTER_MS / 1000} giây",
+                            checked = appLockEnabled,
+                            onChange = { enable ->
+                                if (enable && !AppLock.isAvailable(context)) {
+                                    Toast.makeText(context, "Máy chưa cài vân tay hoặc mã khóa màn hình", Toast.LENGTH_LONG).show()
+                                } else {
+                                    settingsViewModel.setAppLockEnabled(enable)
+                                }
+                            }
+                        )
+                    }
+
                     // Tài khoản
                     SettingsSection(title = "👤 Tài khoản") {
                         OutlinedButton(
@@ -433,6 +515,42 @@ fun SettingsScreen(
                 }
             }
         }
+    }
+}
+
+/**
+ * Báo thức cần 2 quyền đặc biệt mà người dùng có thể đã tắt: hẹn giờ chính xác (Android 12+) và
+ * hiện toàn màn hình (Android 14+). Thiếu quyền nào thì hiện nút mở đúng trang cài đặt hệ thống.
+ * Kiểm tra lại mỗi khi quay về app (ON_RESUME) vì người dùng bật quyền ở màn khác.
+ */
+@Composable
+private fun AlarmPermissionHints() {
+    val context = LocalContext.current
+    var exactOk by remember { mutableStateOf(true) }
+    var fullScreenOk by remember { mutableStateOf(true) }
+    androidx.lifecycle.compose.LifecycleEventEffect(androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+        exactOk = AlarmScheduler.canScheduleExact(context)
+        fullScreenOk = Build.VERSION.SDK_INT < 34 ||
+            context.getSystemService(NotificationManager::class.java).canUseFullScreenIntent()
+    }
+    val packageUri = Uri.parse("package:${context.packageName}")
+    if (!exactOk && Build.VERSION.SDK_INT >= 31) {
+        PermissionHint("Chưa cho phép hẹn giờ chính xác — báo thức có thể kêu trễ vài phút.") {
+            context.startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, packageUri))
+        }
+    }
+    if (!fullScreenOk && Build.VERSION.SDK_INT >= 34) {
+        PermissionHint("Chưa cho phép hiện toàn màn hình — báo thức chỉ hiện thành thông báo.") {
+            context.startActivity(Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT, packageUri))
+        }
+    }
+}
+
+@Composable
+private fun PermissionHint(text: String, onGrant: () -> Unit) {
+    Row(Modifier.fillMaxWidth().padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(text, fontSize = 11.sp, color = PriorityHighColor, modifier = Modifier.weight(1f))
+        TextButton(onClick = onGrant) { Text("Cấp quyền") }
     }
 }
 

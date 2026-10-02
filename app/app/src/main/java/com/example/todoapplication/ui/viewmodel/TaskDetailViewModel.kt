@@ -6,9 +6,11 @@ import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.example.todoapplication.data.repository.AiRepository
 import com.example.todoapplication.data.repository.CategoryRepository
 import com.example.todoapplication.data.repository.SkipResult
 import com.example.todoapplication.data.repository.TaskRepository
+import com.example.todoapplication.data.repository.aiFailureMessage
 import com.example.todoapplication.di.ServiceLocator
 import com.example.todoapplication.domain.model.Subtask
 import com.example.todoapplication.domain.model.Task
@@ -34,6 +36,10 @@ sealed interface TaskDetailEvent {
     data class Error(val message: String) : TaskDetailEvent
     data class Info(val message: String) : TaskDetailEvent
     data object Deleted : TaskDetailEvent
+    /** AI đã chia nhỏ — màn cho xem trước, người dùng chọn bước nào thêm. */
+    data class BreakdownReady(val steps: List<String>, val estimatedMinutes: Int) : TaskDetailEvent
+    data class EstimateReady(val minutes: Int) : TaskDetailEvent
+    data class Duplicated(val taskId: String) : TaskDetailEvent
 }
 
 /**
@@ -46,7 +52,8 @@ sealed interface TaskDetailEvent {
 class TaskDetailViewModel(
     savedStateHandle: SavedStateHandle,
     private val repo: TaskRepository,
-    private val categoryRepository: CategoryRepository
+    private val categoryRepository: CategoryRepository,
+    private val aiRepository: AiRepository
 ) : ViewModel() {
 
     val taskId: String = savedStateHandle.get<String>("taskId") ?: NEW_TASK
@@ -155,6 +162,76 @@ class TaskDetailViewModel(
         }
     }
 
+    // ── Trợ lý AI (cần mạng) ──
+
+    /** Đang chờ AI: null = rảnh. */
+    private val _aiWorking = MutableStateFlow<AiJob?>(null)
+    val aiWorking: StateFlow<AiJob?> = _aiWorking.asStateFlow()
+
+    enum class AiJob { BREAKDOWN, ESTIMATE }
+
+    /** "Nhờ AI chia nhỏ": dùng tiêu đề/mô tả ĐANG gõ trên form (chưa cần lưu). */
+    fun requestBreakdown(title: String, description: String) {
+        runAi(AiJob.BREAKDOWN, title) {
+            aiRepository.breakdown(title.trim(), description.trim()).fold(
+                onSuccess = { r ->
+                    val existing = subtasks.value.map { it.title.lowercase() }.toSet()
+                    val steps = r.subtasks.orEmpty().filter { it.isNotBlank() && it.lowercase() !in existing }
+                    if (steps.isEmpty()) TaskDetailEvent.Info("AI chưa nghĩ ra bước nào mới — thử viết mô tả rõ hơn")
+                    else TaskDetailEvent.BreakdownReady(steps, r.estimatedMinutes)
+                },
+                onFailure = { TaskDetailEvent.Error(it.aiFailureMessage("Không nhờ AI chia nhỏ được, thử lại sau")) }
+            )
+        }
+    }
+
+    fun requestEstimate(title: String, description: String) {
+        runAi(AiJob.ESTIMATE, title) {
+            aiRepository.estimate(title.trim(), description.trim()).fold(
+                onSuccess = { minutes ->
+                    if (minutes > 0) TaskDetailEvent.EstimateReady(minutes)
+                    else TaskDetailEvent.Info("AI chưa ước tính được việc này")
+                },
+                onFailure = { TaskDetailEvent.Error(it.aiFailureMessage("Không lấy được gợi ý thời lượng")) }
+            )
+        }
+    }
+
+    private fun runAi(job: AiJob, title: String, block: suspend () -> TaskDetailEvent) {
+        if (_aiWorking.value != null) return
+        if (title.isBlank()) {
+            viewModelScope.launch { _events.emit(TaskDetailEvent.Info("Nhập tiêu đề trước để AI hiểu việc cần làm")) }
+            return
+        }
+        _aiWorking.value = job
+        viewModelScope.launch {
+            val event = block()
+            _aiWorking.value = null
+            _events.emit(event)
+        }
+    }
+
+    /** Thêm các bước AI gợi ý mà người dùng đã chọn. */
+    fun addSubtasks(titles: List<String>) {
+        val clean = titles.map { it.trim() }.filter { it.isNotEmpty() }
+        if (clean.isEmpty()) return
+        if (isNew) {
+            draftSubtasks.update { list ->
+                list + clean.mapIndexed { i, t -> Subtask(UUID.randomUUID().toString(), t, isDone = false, position = list.size + i) }
+            }
+        } else {
+            viewModelScope.launch { repo.addSubtasks(taskId, clean) }
+        }
+    }
+
+    /** Nhân bản (bản đã lưu) rồi mở bản sao. */
+    fun duplicate() {
+        if (isNew) return
+        viewModelScope.launch {
+            repo.duplicate(taskId)?.let { _events.emit(TaskDetailEvent.Duplicated(it.id)) }
+        }
+    }
+
     fun delete() {
         if (isNew) return
         viewModelScope.launch {
@@ -172,7 +249,8 @@ class TaskDetailViewModel(
                 TaskDetailViewModel(
                     createSavedStateHandle(),
                     ServiceLocator.taskRepository,
-                    ServiceLocator.categoryRepository
+                    ServiceLocator.categoryRepository,
+                    ServiceLocator.aiRepository
                 )
             }
         }

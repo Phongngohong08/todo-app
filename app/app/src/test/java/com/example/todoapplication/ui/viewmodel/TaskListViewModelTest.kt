@@ -241,4 +241,79 @@ class TaskListViewModelTest {
         verifyBlocking(taskRepository) { create(eq(draft), any(), eq(today)) }
         assertEquals(TaskListEvent.Message("Đã thêm: Task new"), events.single())
     }
+
+    @Test
+    fun `bulk complete acts on selected pending tasks, clears selection and can be undone`() = runTest(dispatcher) {
+        whenever(taskRepository.setCompleted("a", true)).thenReturn(true)
+        whenever(taskRepository.setCompleted("b", true)).thenReturn(true)
+        val vm = viewModel()
+        val events = mutableListOf<TaskListEvent>()
+        val collector = launch { vm.events.collect { events += it } }
+        observe(vm)
+        tasks.value = listOf(task("a"), task("b"), task("c"))
+        advanceUntilIdle()
+
+        vm.toggleSelection("a")
+        vm.toggleSelection("b")
+        vm.toggleSelection("c")
+        vm.toggleSelection("c") // bỏ chọn lại
+        assertEquals(setOf("a", "b"), vm.selectedIds.value)
+
+        vm.completeSelected()
+        advanceUntilIdle()
+
+        assertTrue(vm.selectedIds.value.isEmpty())
+        verifyBlocking(taskRepository) { setCompleted("a", true) }
+        verifyBlocking(taskRepository) { setCompleted("b", true) }
+        verifyBlocking(taskRepository, never()) { setCompleted("c", true) }
+        val event = events.single() as TaskListEvent.BulkCompleted
+        assertEquals(listOf("a", "b"), event.ids)
+
+        vm.undoBulkComplete(event.ids)
+        advanceUntilIdle()
+        verifyBlocking(taskRepository) { setCompleted("a", false) }
+        verifyBlocking(taskRepository) { setCompleted("b", false) }
+        collector.cancel()
+    }
+
+    @Test
+    fun `select all picks visible pending tasks and bulk delete can be undone`() = runTest(dispatcher) {
+        whenever(taskRepository.delete(listOf("a", "b"))).thenReturn(true)
+        val vm = viewModel()
+        val events = mutableListOf<TaskListEvent>()
+        val collector = launch { vm.events.collect { events += it } }
+        observe(vm)
+        tasks.value = listOf(task("a"), task("b"), task("done", status = TaskStatus.COMPLETED, completedAt = now))
+        advanceUntilIdle()
+
+        vm.selectAllVisible()
+        assertEquals(setOf("a", "b"), vm.selectedIds.value)
+
+        vm.deleteSelected()
+        advanceUntilIdle()
+        assertEquals(TaskListEvent.BulkDeleted(listOf("a", "b")), events.single())
+
+        vm.undoBulkDelete(listOf("a", "b"))
+        advanceUntilIdle()
+        verifyBlocking(taskRepository) { restore(listOf("a", "b")) }
+        collector.cancel()
+    }
+
+    @Test
+    fun `postpone moves pending tasks to the chosen date and offers undo`() = runTest(dispatcher) {
+        val date = java.time.LocalDate.of(2026, 10, 10)
+        whenever(taskRepository.moveToDate(listOf("a"), date)).thenReturn(true)
+        val vm = viewModel()
+        val events = mutableListOf<TaskListEvent>()
+        val collector = launch { vm.events.collect { events += it } }
+
+        val a = task("a", dueAt = now)
+        vm.postpone(a, date)
+        vm.postpone(task("done", status = TaskStatus.COMPLETED), date) // việc đã xong: bỏ qua
+        advanceUntilIdle()
+
+        verifyBlocking(taskRepository) { moveToDate(listOf("a"), date) }
+        assertEquals(TaskListEvent.Rescheduled(1, listOf(a)), events.single())
+        collector.cancel()
+    }
 }

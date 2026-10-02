@@ -10,11 +10,15 @@ import com.example.todoapplication.domain.RecurrenceRules
 import com.example.todoapplication.domain.recurrenceSpec
 import com.example.todoapplication.domain.model.Task
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -28,13 +32,18 @@ data class CalendarUiState(
     val entriesByDay: Map<String, List<CalendarEntry>> = emptyMap()
 )
 
+sealed interface CalendarEvent {
+    /** Đã kéo việc sang ngày khác — Hoàn tác trả lại hạn cũ. */
+    data class Moved(val previous: Task, val date: LocalDate) : CalendarEvent
+}
+
 /**
  * [TẦNG VIEWMODEL] Màn Lịch: quan sát task có hạn chót trong Room rồi gom theo ngày.
  * Việc lặp chưa hoàn thành được "chiếu" thêm các lần kế tiếp trong 12 tháng tới bằng CHÍNH quy tắc mà
  * repository/server dùng để tạo lần lặp thật (RecurrenceRules) — lịch dự kiến và thực tế không lệch nhau.
  */
 class CalendarViewModel(
-    repo: TaskRepository,
+    private val repo: TaskRepository,
     private val zone: () -> ZoneId = ZoneId::systemDefault
 ) : ViewModel() {
 
@@ -42,6 +51,29 @@ class CalendarViewModel(
         .map { tasks -> CalendarUiState(isLoading = false, entriesByDay = buildEntries(tasks)) }
         .flowOn(Dispatchers.Default)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), CalendarUiState())
+
+    private val _events = MutableSharedFlow<CalendarEvent>()
+    val events: SharedFlow<CalendarEvent> = _events.asSharedFlow()
+
+    /** Kéo-thả trên lịch tuần: chuyển việc sang [date], giữ giờ hẹn (việc cả ngày vẫn là cả ngày). */
+    fun moveTask(taskId: String, date: LocalDate) {
+        val task = uiState.value.entriesByDay.values.asSequence().flatten()
+            .firstOrNull { it.task.id == taskId && !it.isProjected }?.task ?: return
+        if (task.isCompleted) return
+        val currentDay = task.dueAt?.let { Instant.ofEpochMilli(it).atZone(zone()).toLocalDate() }
+        if (currentDay == date) return
+        viewModelScope.launch {
+            if (repo.moveToDate(listOf(taskId), date)) _events.emit(CalendarEvent.Moved(task, date))
+        }
+    }
+
+    fun undoMove(previous: Task) {
+        viewModelScope.launch { repo.reschedule(listOf(previous.id), previous.dueAt, previous.dueAllDay) }
+    }
+
+    fun complete(task: Task) {
+        viewModelScope.launch { repo.setCompleted(task.id, completed = !task.isCompleted) }
+    }
 
     private fun buildEntries(tasks: List<Task>): Map<String, List<CalendarEntry>> {
         val zone = zone()
@@ -60,6 +92,8 @@ class CalendarViewModel(
                     .forEach { add(it, CalendarEntry(task, isProjected = true)) }
             }
         }
+        // Trong ngày: việc có giờ theo giờ, việc cả ngày xếp cuối
+        map.values.forEach { list -> list.sortWith(compareBy({ it.task.dueAllDay }, { it.task.dueAt })) }
         return map
     }
 

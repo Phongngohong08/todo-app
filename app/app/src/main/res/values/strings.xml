@@ -11,4 +11,5 @@
 
     <!-- Tên hiện trong bảng "Chia sẻ" của app khác -->
     <string name="share_target_label">Thêm vào TaskFlow</string>
+    <string name="widget_compact_description">Tiến độ mục tiêu hôm nay và việc tiếp theo</string>
 </resources>

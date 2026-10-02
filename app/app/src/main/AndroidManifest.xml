@@ -7,6 +7,11 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- Báo thức cho việc ưu tiên cao: đúng giờ (Android 12+ người dùng cấp trong cài đặt), hiện toàn màn hình -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    <!-- Khởi động lại máy → đặt lại báo thức (AlarmManager không tự giữ qua lần khởi động) -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <application
         android:name=".TodoApplication"
@@ -64,6 +69,31 @@
             android:theme="@style/Theme.TodoApplication.Translucent" />
 
         <!-- Nhận hành động Hoàn thành / Hoãn từ thông báo nhắc việc -->
+        <!-- Báo thức việc quan trọng: hiện trên màn hình khóa, tự bật màn hình -->
+        <activity
+            android:name=".ui.screens.AlarmActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:launchMode="singleInstance"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:taskAffinity=""
+            android:theme="@style/Theme.TodoApplication" />
+
+        <receiver
+            android:name=".data.notifications.AlarmReceiver"
+            android:exported="false" />
+
+        <!-- Broadcast hệ thống được bảo vệ (chỉ hệ thống gửi được) nên exported an toàn -->
+        <receiver
+            android:name=".data.notifications.BootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+
         <receiver
             android:name=".data.notifications.NotificationActionReceiver"
             android:exported="false" />
@@ -78,6 +108,18 @@
             <meta-data
                 android:name="android.appwidget.provider"
                 android:resource="@xml/tasks_widget_info" />
+        </receiver>
+
+        <!-- Widget nhỏ 2×2: tiến độ mục tiêu hôm nay + việc tiếp theo -->
+        <receiver
+            android:name=".widget.CompactWidgetProvider"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/tasks_widget_compact_info" />
         </receiver>
 
         <service

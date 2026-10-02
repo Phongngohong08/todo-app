@@ -94,6 +94,8 @@ fun TaskDetailScreen(
     var showUntilPicker by remember { mutableStateOf(false) }
     val subtasks by taskDetailViewModel.subtasks.collectAsStateWithLifecycle()
     val categories by taskDetailViewModel.categories.collectAsStateWithLifecycle()
+    val aiWorking by taskDetailViewModel.aiWorking.collectAsStateWithLifecycle()
+    var breakdown by remember { mutableStateOf<TaskDetailEvent.BreakdownReady?>(null) }
 
     val dueDate: LocalDate? = dueAt?.let { Instant.ofEpochMilli(it).atZone(zone).toLocalDate() }
     val dueTime: LocalTime? = if (dueAt != null && !dueAllDay) Instant.ofEpochMilli(dueAt!!).atZone(zone).toLocalTime() else null
@@ -140,6 +142,17 @@ fun TaskDetailScreen(
                 }
                 is TaskDetailEvent.Info -> Toast.makeText(context, event.message, Toast.LENGTH_SHORT).show()
                 is TaskDetailEvent.Error -> Toast.makeText(context, event.message, Toast.LENGTH_LONG).show()
+                is TaskDetailEvent.BreakdownReady -> breakdown = event
+                is TaskDetailEvent.EstimateReady -> {
+                    estimatedMinutes = event.minutes
+                    Toast.makeText(context, "AI gợi ý: ${formatDuration(event.minutes)}", Toast.LENGTH_SHORT).show()
+                }
+                is TaskDetailEvent.Duplicated -> {
+                    Toast.makeText(context, "Đã nhân bản — đang mở bản sao", Toast.LENGTH_SHORT).show()
+                    navController.navigate(Screen.TaskDetail.createRoute(event.taskId)) {
+                        popUpTo(Screen.TaskDetail.route) { inclusive = true }
+                    }
+                }
             }
         }
     }
@@ -194,6 +207,7 @@ fun TaskDetailScreen(
                         DetailOverflowMenu(
                             canSkip = recurrence != "NONE" && dueAt != null && !isCompleted,
                             onSkip = taskDetailViewModel::skipOccurrence,
+                            onDuplicate = taskDetailViewModel::duplicate,
                             onDelete = taskDetailViewModel::delete
                         )
                     }
@@ -383,7 +397,17 @@ fun TaskDetailScreen(
                     modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    listOf(0, 15, 25, 30, 45, 60, 90, 120, 180).forEach { m ->
+                    AiChip(
+                        label = "✨ AI gợi ý",
+                        working = aiWorking == TaskDetailViewModel.AiJob.ESTIMATE,
+                        onClick = { taskDetailViewModel.requestEstimate(title, description) }
+                    )
+                    val presets = listOf(0, 15, 25, 30, 45, 60, 90, 120, 180)
+                    // Giá trị lẻ (AI gợi ý / tạo từ máy khác) vẫn hiện thành một chip đang chọn
+                    if (estimatedMinutes !in presets) {
+                        StatusFilterChip(text = formatDuration(estimatedMinutes), selected = true, onClick = {})
+                    }
+                    presets.forEach { m ->
                         StatusFilterChip(
                             text = if (m == 0) "Chưa rõ" else formatDuration(m),
                             selected = estimatedMinutes == m,
@@ -570,6 +594,12 @@ fun TaskDetailScreen(
                         subtaskInput = ""
                     }
                 }
+                Spacer(Modifier.height(8.dp))
+                AiChip(
+                    label = "✨ Nhờ AI chia nhỏ việc này",
+                    working = aiWorking == TaskDetailViewModel.AiJob.BREAKDOWN,
+                    onClick = { taskDetailViewModel.requestBreakdown(title, description) }
+                )
             }
 
             Spacer(Modifier.height(8.dp))
@@ -590,6 +620,19 @@ fun TaskDetailScreen(
             onPick = { time -> setDue(dueDate ?: LocalDate.now(zone), time); showTimePicker = false }
         )
     }
+    breakdown?.let { result ->
+        BreakdownDialog(
+            steps = result.steps,
+            estimatedMinutes = result.estimatedMinutes,
+            canSetEstimate = estimatedMinutes == 0,
+            onDismiss = { breakdown = null },
+            onConfirm = { chosen, useEstimate ->
+                taskDetailViewModel.addSubtasks(chosen)
+                if (useEstimate) estimatedMinutes = result.estimatedMinutes
+                breakdown = null
+            }
+        )
+    }
     if (showUntilPicker) {
         DateDialog(
             initial = recurrenceUntil?.let { Instant.ofEpochMilli(it).atZone(zone).toLocalDate() } ?: (dueDate ?: LocalDate.now(zone)).plusMonths(1),
@@ -599,8 +642,74 @@ fun TaskDetailScreen(
     }
 }
 
+/** Nút gọi AI (hiện vòng quay khi đang chờ). */
 @Composable
-private fun DetailOverflowMenu(canSkip: Boolean, onSkip: () -> Unit, onDelete: () -> Unit) {
+private fun AiChip(label: String, working: Boolean, onClick: () -> Unit) {
+    Surface(
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.12f),
+        modifier = Modifier.clip(RoundedCornerShape(20.dp)).clickable(enabled = !working, onClick = onClick)
+    ) {
+        Row(Modifier.padding(horizontal = 14.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            if (working) {
+                CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.tertiary)
+                Spacer(Modifier.width(8.dp))
+            }
+            Text(label, color = MaterialTheme.colorScheme.tertiary, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+        }
+    }
+}
+
+/** Xem trước các bước AI gợi ý: bỏ chọn bước không cần rồi thêm. */
+@Composable
+private fun BreakdownDialog(
+    steps: List<String>,
+    estimatedMinutes: Int,
+    canSetEstimate: Boolean,
+    onDismiss: () -> Unit,
+    onConfirm: (List<String>, Boolean) -> Unit
+) {
+    val checked = remember(steps) { mutableStateListOf<Boolean>().apply { addAll(steps.map { true }) } }
+    var useEstimate by remember { mutableStateOf(canSetEstimate && estimatedMinutes > 0) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("AI gợi ý các bước") },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                steps.forEachIndexed { i, step ->
+                    Row(
+                        Modifier.fillMaxWidth().clickable { checked[i] = !checked[i] },
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Checkbox(checked = checked[i], onCheckedChange = { checked[i] = it })
+                        Text(step, fontSize = 14.sp)
+                    }
+                }
+                if (canSetEstimate && estimatedMinutes > 0) {
+                    HorizontalDivider(Modifier.padding(vertical = 6.dp))
+                    Row(
+                        Modifier.fillMaxWidth().clickable { useEstimate = !useEstimate },
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Checkbox(checked = useEstimate, onCheckedChange = { useEstimate = it })
+                        Text("Đặt thời lượng ước tính: ${formatDuration(estimatedMinutes)}", fontSize = 13.sp)
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            val count = checked.count { it }
+            TextButton(
+                enabled = count > 0 || useEstimate,
+                onClick = { onConfirm(steps.filterIndexed { i, _ -> checked[i] }, useEstimate) }
+            ) { Text(if (count > 0) "Thêm $count bước" else "Áp dụng") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Hủy") } }
+    )
+}
+
+@Composable
+private fun DetailOverflowMenu(canSkip: Boolean, onSkip: () -> Unit, onDuplicate: () -> Unit, onDelete: () -> Unit) {
     var expanded by remember { mutableStateOf(false) }
     Box {
         IconButton(onClick = { expanded = true }) {
@@ -614,6 +723,11 @@ private fun DetailOverflowMenu(canSkip: Boolean, onSkip: () -> Unit, onDelete: (
                     onClick = { expanded = false; onSkip() }
                 )
             }
+            DropdownMenuItem(
+                text = { Text("Nhân bản") },
+                leadingIcon = { Icon(Icons.Default.ContentCopy, contentDescription = null) },
+                onClick = { expanded = false; onDuplicate() }
+            )
             DropdownMenuItem(
                 text = { Text("Xóa", color = PriorityHighColor) },
                 leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null, tint = PriorityHighColor) },

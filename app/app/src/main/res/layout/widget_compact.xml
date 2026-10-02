@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Widget nhỏ 2×2: tiến độ mục tiêu hôm nay + việc tiếp theo + nút thêm -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/compact_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@drawable/widget_background"
+    android:padding="12dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <TextView
+            android:id="@+id/compact_progress"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="0/3"
+            android:textColor="#FF5B5BD6"
+            android:textSize="24sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/compact_add"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:gravity="center"
+            android:text="+"
+            android:contentDescription="Thêm việc"
+            android:textColor="#FF5B5BD6"
+            android:textSize="24sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/compact_caption"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="việc xong hôm nay"
+        android:textColor="#FF6B7280"
+        android:textSize="11sp" />
+
+    <ProgressBar
+        android:id="@+id/compact_bar"
+        style="@android:style/Widget.ProgressBar.Horizontal"
+        android:layout_width="match_parent"
+        android:layout_height="6dp"
+        android:layout_marginTop="6dp"
+        android:max="3"
+        android:progress="0"
+        android:progressTint="#FF5B5BD6"
+        android:progressBackgroundTint="#335B5BD6" />
+
+    <LinearLayout
+        android:id="@+id/compact_next_box"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:layout_marginTop="8dp"
+        android:orientation="vertical"
+        android:gravity="bottom">
+
+        <TextView
+            android:id="@+id/compact_next_due"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Tiếp theo"
+            android:textColor="#FF6B7280"
+            android:textSize="11sp" />
+
+        <TextView
+            android:id="@+id/compact_next"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:maxLines="2"
+            android:text="Không còn việc nào"
+            android:textColor="#FF1B1B2A"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+</LinearLayout>

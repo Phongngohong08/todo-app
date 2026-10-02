@@ -119,6 +119,35 @@ class TaskRepository(
         return entity.toDomain()
     }
 
+    /**
+     * Nhân bản việc: chép nội dung, hạn, lặp, nhắc, thời lượng và checklist (bỏ tích), tiêu đề thêm "(bản sao)".
+     * Bản sao là việc mới chưa xong; không thừa hưởng "Ngày của tôi".
+     */
+    suspend fun duplicate(id: String): Task? {
+        val src = taskDao.getById(id)?.takeUnless { it.isDeleted } ?: return null
+        val steps = subtaskDao.getForTask(id).map {
+            Subtask(id = UUID.randomUUID().toString(), title = it.title, isDone = false, position = it.position)
+        }
+        return create(
+            TaskDraft(
+                title = "${src.title} (bản sao)",
+                description = src.description,
+                priority = src.priority,
+                dueAt = src.dueAt,
+                category = src.category,
+                recurrence = src.recurrence,
+                recurrenceDays = src.recurrenceDays,
+                reminderOffsetMinutes = src.reminderOffsetMinutes,
+                dueAllDay = src.dueAllDay,
+                estimatedMinutes = src.estimatedMinutes,
+                recurrenceInterval = src.recurrenceInterval,
+                recurrenceMode = src.recurrenceMode,
+                recurrenceUntil = src.recurrenceUntil
+            ),
+            steps
+        )
+    }
+
     /** Sửa nội dung task. Trả false nếu task không còn (đã bị xóa ở nơi khác). */
     suspend fun update(id: String, draft: TaskDraft): Boolean = mutate(id) { current ->
         listOf(
@@ -210,9 +239,27 @@ class TaskRepository(
     /** Xóa (giữ "bia mộ" để đồng bộ việc xóa, Hoàn tác, và hiện trong Thùng rác [TRASH_RETENTION_MS]). */
     suspend fun delete(id: String): Boolean = mutate(id) { listOf(it.copy(isDeleted = true)) }
 
+    /** Xóa nhiều việc trong một transaction (chọn nhiều → Xóa). */
+    suspend fun delete(ids: List<String>): Boolean = mutateAll(ids) { it.copy(isDeleted = true) }
+
     /** Hoàn tác xóa / khôi phục từ Thùng rác. */
     suspend fun restore(id: String): Boolean = mutate(id, includeDeleted = true) { current ->
         if (current.isDeleted) listOf(current.copy(isDeleted = false)) else emptyList()
+    }
+
+    suspend fun restore(ids: List<String>) {
+        ids.forEach { restore(it) }
+    }
+
+    /**
+     * Dời các việc sang ngày [target], GIỮ giờ hẹn của từng việc (việc cả ngày / chưa có hạn → cả ngày).
+     * Dùng cho vuốt-để-hoãn, kéo thả trên lịch, và "Dời" hàng loạt.
+     */
+    suspend fun moveToDate(ids: List<String>, target: java.time.LocalDate): Boolean = mutateAll(ids) { current ->
+        if (current.status == TaskStatus.COMPLETED) return@mutateAll null
+        val (due, allDay) = com.example.todoapplication.domain.Reschedule.moveToDate(current.dueAt, current.dueAllDay, target, zone())
+        if (due == current.dueAt && allDay == current.dueAllDay) null
+        else current.copy(dueAt = due, dueAllDay = allDay)
     }
 
     /**

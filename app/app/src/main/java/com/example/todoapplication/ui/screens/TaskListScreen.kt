@@ -2,6 +2,7 @@ package com.example.todoapplication.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
@@ -75,6 +76,12 @@ fun TaskListScreen(
     var showAiAdd by remember { mutableStateOf(false) }
     var aiText by remember { mutableStateOf("") }
     var showQuickCreate by remember { mutableStateOf(false) }
+    // Việc đang chọn ngày hoãn (vuốt trái); showBulkPostpone = dời các việc đang chọn
+    var postponeTarget by remember { mutableStateOf<Task?>(null) }
+    var showBulkPostpone by remember { mutableStateOf(false) }
+    val selectedIds by taskListViewModel.selectedIds.collectAsStateWithLifecycle()
+    val selectionMode = selectedIds.isNotEmpty()
+    BackHandler(enabled = selectionMode) { taskListViewModel.clearSelection() }
 
     val lazyListState = rememberLazyListState()
     val haptics = LocalHapticFeedback.current
@@ -100,6 +107,18 @@ fun TaskListScreen(
                     val result = snackbarHostState.showSnackbar("Đã dời ${event.count} việc", actionLabel = "Hoàn tác", duration = SnackbarDuration.Long)
                     if (result == SnackbarResult.ActionPerformed) taskListViewModel.undoReschedule(event.previous)
                 }
+                is TaskListEvent.BulkCompleted -> scope.launch {
+                    val result = snackbarHostState.showSnackbar("Đã hoàn thành ${event.ids.size} việc", actionLabel = "Hoàn tác", duration = SnackbarDuration.Long)
+                    if (result == SnackbarResult.ActionPerformed) taskListViewModel.undoBulkComplete(event.ids)
+                }
+                is TaskListEvent.BulkDeleted -> scope.launch {
+                    val result = snackbarHostState.showSnackbar("Đã chuyển ${event.ids.size} việc vào Thùng rác", actionLabel = "Hoàn tác", duration = SnackbarDuration.Long)
+                    if (result == SnackbarResult.ActionPerformed) taskListViewModel.undoBulkDelete(event.ids)
+                }
+                is TaskListEvent.Duplicated -> scope.launch {
+                    val result = snackbarHostState.showSnackbar("Đã nhân bản: ${event.title}", actionLabel = "Mở", duration = SnackbarDuration.Short)
+                    if (result == SnackbarResult.ActionPerformed) navController.navigate(Screen.TaskDetail.createRoute(event.taskId))
+                }
                 is TaskListEvent.QuickAddReady -> {
                     QuickAddDraft.set(event.parsed)
                     showAiAdd = false
@@ -112,14 +131,33 @@ fun TaskListScreen(
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
+        topBar = {
+            // Thanh chọn nhiều ghim ở trên cùng (không cuộn mất khi chọn việc ở cuối danh sách)
+            if (selectionMode) {
+                Box(Modifier.statusBarsPadding().padding(horizontal = 12.dp, vertical = 8.dp)) {
+                    SelectionBar(
+                        count = selectedIds.size,
+                        onClose = taskListViewModel::clearSelection,
+                        onSelectAll = taskListViewModel::selectAllVisible,
+                        onComplete = taskListViewModel::completeSelected,
+                        onMyDay = taskListViewModel::addSelectedToMyDay,
+                        onPostpone = { showBulkPostpone = true },
+                        onPriority = taskListViewModel::setSelectedPriority,
+                        onDelete = taskListViewModel::deleteSelected
+                    )
+                }
+            }
+        },
         floatingActionButton = {
-            FloatingActionButton(
-                onClick = { showQuickCreate = true },
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
-                shape = CircleShape
-            ) {
-                Icon(Icons.Default.Add, contentDescription = "Thêm công việc")
+            if (!selectionMode) {
+                FloatingActionButton(
+                    onClick = { showQuickCreate = true },
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                    shape = CircleShape
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = "Thêm công việc")
+                }
             }
         },
         bottomBar = { BottomNavigationBar(navController, activeTab = 1) },
@@ -159,7 +197,8 @@ fun TaskListScreen(
                             sortMode = !sortMode
                             if (!sortMode) taskListViewModel.endSortMode()
                         },
-                        onAiAdd = { showAiAdd = true }
+                        onAiAdd = { showAiAdd = true },
+                        onMatrix = { navController.navigate(Screen.Matrix.route) }
                     )
                 }
 
@@ -268,15 +307,16 @@ fun TaskListScreen(
                     }
 
                     else -> {
+                        val onPostpone: (Task) -> Unit = { postponeTarget = it }
                         taskSection(
-                            "Quá hạn", state.sections.overdue, state, navController, taskListViewModel,
+                            "Quá hạn", state.sections.overdue, state, selectedIds, navController, taskListViewModel, onPostpone,
                             titleColor = StateOverdue,
-                            action = { RescheduleMenu(onPick = taskListViewModel::rescheduleOverdue) }
+                            action = if (selectionMode) null else ({ RescheduleMenu(onPick = taskListViewModel::rescheduleOverdue) })
                         )
-                        taskSection("Hôm nay", state.sections.today, state, navController, taskListViewModel)
-                        taskSection("Sắp tới", state.sections.upcoming, state, navController, taskListViewModel)
-                        taskSection("Chưa có hạn", state.sections.noDate, state, navController, taskListViewModel)
-                        taskSection("Đã xong hôm nay", state.sections.completedToday, state, navController, taskListViewModel, swipeable = false)
+                        taskSection("Hôm nay", state.sections.today, state, selectedIds, navController, taskListViewModel, onPostpone)
+                        taskSection("Sắp tới", state.sections.upcoming, state, selectedIds, navController, taskListViewModel, onPostpone)
+                        taskSection("Chưa có hạn", state.sections.noDate, state, selectedIds, navController, taskListViewModel, onPostpone)
+                        taskSection("Đã xong hôm nay", state.sections.completedToday, state, selectedIds, navController, taskListViewModel, onPostpone, swipeable = false)
                     }
                 }
             }
@@ -292,6 +332,28 @@ fun TaskListScreen(
             onSubmit = {
                 val nowRfc = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", Locale.US).format(Date())
                 taskListViewModel.parseQuickAdd(aiText, nowRfc)
+            }
+        )
+    }
+
+    postponeTarget?.let { task ->
+        PostponeSheet(
+            taskTitle = task.title,
+            onDismiss = { postponeTarget = null },
+            onPick = { date ->
+                taskListViewModel.postpone(task, date)
+                postponeTarget = null
+            }
+        )
+    }
+
+    if (showBulkPostpone) {
+        PostponeSheet(
+            taskTitle = "${selectedIds.size} việc đã chọn",
+            onDismiss = { showBulkPostpone = false },
+            onPick = { date ->
+                taskListViewModel.postponeSelected(date)
+                showBulkPostpone = false
             }
         )
     }
@@ -328,8 +390,10 @@ private fun LazyListScope.taskSection(
     title: String,
     tasks: List<Task>,
     state: TaskListUiState,
+    selectedIds: Set<String>,
     navController: NavController,
     viewModel: TaskListViewModel,
+    onPostpone: (Task) -> Unit,
     swipeable: Boolean = true,
     titleColor: Color? = null,
     action: (@Composable () -> Unit)? = null
@@ -343,12 +407,20 @@ private fun LazyListScope.taskSection(
         )
     }
     items(tasks, key = { it.id }, contentType = { "task" }) { task ->
+        val selectionMode = selectedIds.isNotEmpty()
         val onToggle = { if (task.isCompleted) viewModel.reopenTask(task.id) else viewModel.completeTask(task) }
         val card = @Composable {
             TaskCard(
                 task = task,
-                onCardClick = { navController.navigate(Screen.TaskDetail.createRoute(task.id)) },
-                onToggleComplete = onToggle,
+                onCardClick = {
+                    if (selectionMode) viewModel.toggleSelection(task.id)
+                    else navController.navigate(Screen.TaskDetail.createRoute(task.id))
+                },
+                onToggleComplete = if (selectionMode) ({ viewModel.toggleSelection(task.id) }) else onToggle,
+                selectionMode = selectionMode,
+                selected = task.id in selectedIds,
+                onLongClick = { viewModel.toggleSelection(task.id) },
+                onDuplicate = { viewModel.duplicate(task) },
                 onDeleteClick = { viewModel.deleteTask(task) },
                 recommendation = state.recommendations[task.id],
                 onSetPriority = { p -> viewModel.setPriority(task, p) },
@@ -359,7 +431,13 @@ private fun LazyListScope.taskSection(
             )
         }
         Box(Modifier.animateItem()) {
-            if (swipeable) SwipeToCompleteBox(onComplete = { viewModel.completeTask(task) }) { card() } else card()
+            if (swipeable) {
+                SwipeToCompleteBox(
+                    onComplete = { viewModel.completeTask(task) },
+                    onPostpone = { onPostpone(task) },
+                    enabled = !selectionMode
+                ) { card() }
+            } else card()
         }
     }
 }
@@ -460,7 +538,8 @@ private fun ListHeroCard(
     overdueCount: Int,
     sortMode: Boolean,
     onSortToggle: () -> Unit,
-    onAiAdd: () -> Unit
+    onAiAdd: () -> Unit,
+    onMatrix: () -> Unit
 ) {
     val primary = MaterialTheme.colorScheme.primary
     Box(
@@ -480,6 +559,9 @@ private fun ListHeroCard(
                         fontSize = 13.sp,
                         modifier = Modifier.padding(top = 4.dp)
                     )
+                }
+                IconButton(onClick = onMatrix, modifier = Modifier.size(38.dp)) {
+                    Icon(Icons.Default.GridView, contentDescription = "Ma trận Eisenhower", modifier = Modifier.size(20.dp), tint = Color.White)
                 }
                 IconButton(onClick = onAiAdd, modifier = Modifier.size(38.dp)) {
                     Icon(Icons.Default.AutoAwesome, contentDescription = "Thêm bằng AI", modifier = Modifier.size(20.dp), tint = Color.White)

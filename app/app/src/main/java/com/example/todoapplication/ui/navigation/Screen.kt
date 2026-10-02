@@ -36,4 +36,6 @@ sealed class Screen(val route: String) {
     object Trash : Screen("trash")
     object Settings : Screen("settings")
     object Templates : Screen("templates")
+    /** Ma trận Eisenhower: Quan trọng × Gấp, kéo thả việc giữa 4 ô. */
+    object Matrix : Screen("matrix")
 }

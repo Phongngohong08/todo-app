@@ -90,6 +90,14 @@ interface ApiService {
     @POST("ai/parse-task")
     suspend fun parseTask(@Body input: ParseTaskInput): Response<ParsedTask>
 
+    // AI chia nhỏ việc thành các bước con + ước tính tổng thời lượng (chưa lưu — app cho xem trước)
+    @POST("ai/breakdown")
+    suspend fun breakdownTask(@Body input: AssistInput): Response<BreakdownResponse>
+
+    // AI gợi ý thời lượng, dựa trên các việc người dùng từng ước tính
+    @POST("ai/estimate")
+    suspend fun estimateTask(@Body input: AssistInput): Response<EstimateResponse>
+
     @GET("ai/memories")
     suspend fun listMemories(): Response<List<MemoryItem>>
 

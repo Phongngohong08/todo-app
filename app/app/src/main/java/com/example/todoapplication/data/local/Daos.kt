@@ -157,6 +157,14 @@ interface TaskDao {
     @Query("SELECT * FROM tasks WHERE isDeleted = 0 AND status != 'COMPLETED' ORDER BY dueAt IS NULL, dueAt ASC LIMIT :limit")
     suspend fun getPending(limit: Int): List<TaskEntity>
 
+    /** Việc chưa xong có hạn — đặt lại nhắc việc sau khi khởi động lại máy. */
+    @Query("SELECT * FROM tasks WHERE isDeleted = 0 AND status != 'COMPLETED' AND dueAt IS NOT NULL")
+    suspend fun getPendingWithDue(): List<TaskEntity>
+
+    /** Số việc hoàn thành trong khoảng [from, to) — cho widget nhỏ. */
+    @Query("SELECT COUNT(*) FROM tasks WHERE isDeleted = 0 AND status = 'COMPLETED' AND completedAt >= :from AND completedAt < :to")
+    suspend fun countCompletedBetween(from: Long, to: Long): Int
+
     /** Widget: việc chưa xong, "Ngày của tôi" hôm nay lên đầu, rồi theo hạn chót. */
     @Query(
         """

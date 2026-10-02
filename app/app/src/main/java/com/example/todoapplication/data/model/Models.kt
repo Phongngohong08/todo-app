@@ -120,6 +120,21 @@ data class ParsedTask(
     val category: String = "OTHER"
 )
 
+/** Việc cần AI hỗ trợ (chia nhỏ / ước tính) — chưa cần lưu, dùng được cả khi đang tạo việc mới. */
+data class AssistInput(
+    val title: String,
+    val description: String = ""
+)
+
+data class BreakdownResponse(
+    val subtasks: List<String>? = null,
+    @SerializedName("estimated_minutes") val estimatedMinutes: Int = 0
+)
+
+data class EstimateResponse(
+    @SerializedName("estimated_minutes") val estimatedMinutes: Int = 0
+)
+
 data class ChatInput(
     val message: String,
     /** Giờ hiện tại của máy (RFC3339 kèm offset) để AI quy "thứ 2 tuần sau" ra ngày cụ thể. */

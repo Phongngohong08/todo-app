@@ -1,8 +1,10 @@
 package com.example.todoapplication.ui.screens
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -62,7 +64,10 @@ import java.time.LocalDateTime
  * Thẻ một công việc.
  * @param recommendation lý do "Nên làm trước" (null = không gợi ý) — hiển thị rõ VÌ SAO thay vì chỉ gắn nhãn.
  * @param onToggleMyDay null = ẩn lựa chọn "Ngày của tôi" trong menu.
+ * @param selectionMode đang chọn nhiều việc: ô tròn thành ô chọn, bấm thẻ = chọn/bỏ chọn (caller xử lý).
+ * @param onLongClick nhấn giữ thẻ (vd bắt đầu chọn nhiều việc).
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun TaskCard(
     task: Task,
@@ -76,16 +81,26 @@ fun TaskCard(
     isInMyDay: Boolean = false,
     onToggleMyDay: (() -> Unit)? = null,
     onFocus: (() -> Unit)? = null,
+    onDuplicate: (() -> Unit)? = null,
+    selectionMode: Boolean = false,
+    selected: Boolean = false,
+    onLongClick: (() -> Unit)? = null,
     today: LocalDate = LocalDate.now()
 ) {
     val isCompleted = task.isCompleted
     val isOverdue = task.isOverdue()
     val accentColor = priorityColor(task.priority)
+    val primary = MaterialTheme.colorScheme.primary
 
     Card(
-        modifier = modifier.fillMaxWidth().clickable(onClick = onCardClick),
+        modifier = modifier
+            .fillMaxWidth()
+            .combinedClickable(onClick = onCardClick, onLongClick = onLongClick)
+            .then(if (selected) Modifier.border(2.dp, primary, RoundedCornerShape(16.dp)) else Modifier),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        colors = CardDefaults.cardColors(
+            containerColor = if (selected) primary.copy(alpha = 0.08f) else MaterialTheme.colorScheme.surface
+        ),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         if (recommendation != null && !isCompleted) {
@@ -124,9 +139,21 @@ fun TaskCard(
                 }
             }
 
-            // Ô tích tròn: tích để hoàn thành, tích lại để mở lại
+            // Ô tích tròn: tích để hoàn thành, tích lại để mở lại. Khi đang chọn nhiều: ô chọn.
             Box(modifier = Modifier.padding(start = 8.dp).fillMaxHeight(), contentAlignment = Alignment.Center) {
-                Box(
+                if (selectionMode) {
+                    Box(
+                        modifier = Modifier
+                            .size(24.dp)
+                            .clip(RoundedCornerShape(7.dp))
+                            .background(if (selected) primary else Color.Transparent)
+                            .then(if (selected) Modifier else Modifier.border(2.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(7.dp)))
+                            .clickable(onClick = onCardClick),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (selected) Icon(Icons.Default.Check, contentDescription = "Đã chọn", tint = Color.White, modifier = Modifier.size(16.dp))
+                    }
+                } else Box(
                     modifier = Modifier
                         .size(24.dp)
                         .clip(CircleShape)
@@ -174,15 +201,19 @@ fun TaskCard(
                         Spacer(Modifier.width(4.dp))
                         Icon(Icons.Default.Refresh, contentDescription = "Lặp lại", modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.tertiary)
                     }
-                    PriorityFlagMenu(accentColor = accentColor, onSetPriority = onSetPriority)
-                    TaskOverflowMenu(
-                        isInMyDay = isInMyDay,
-                        isCompleted = isCompleted,
-                        onToggleMyDay = onToggleMyDay,
-                        onFocus = onFocus,
-                        onEdit = onCardClick,
-                        onDelete = onDeleteClick
-                    )
+                    // Đang chọn nhiều: ẩn menu từng thẻ, thao tác nằm ở thanh chọn phía trên
+                    if (!selectionMode) {
+                        PriorityFlagMenu(accentColor = accentColor, onSetPriority = onSetPriority)
+                        TaskOverflowMenu(
+                            isInMyDay = isInMyDay,
+                            isCompleted = isCompleted,
+                            onToggleMyDay = onToggleMyDay,
+                            onFocus = onFocus,
+                            onDuplicate = onDuplicate,
+                            onEdit = onCardClick,
+                            onDelete = onDeleteClick
+                        )
+                    }
                 }
 
                 if (task.description.isNotEmpty()) {
@@ -283,6 +314,7 @@ private fun TaskOverflowMenu(
     isCompleted: Boolean,
     onToggleMyDay: (() -> Unit)?,
     onFocus: (() -> Unit)?,
+    onDuplicate: (() -> Unit)?,
     onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
@@ -315,6 +347,13 @@ private fun TaskOverflowMenu(
                 leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
                 onClick = { expanded = false; onEdit() }
             )
+            if (onDuplicate != null) {
+                DropdownMenuItem(
+                    text = { Text("Nhân bản", color = MaterialTheme.colorScheme.onSurface) },
+                    leadingIcon = { Icon(Icons.Default.ContentCopy, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
+                    onClick = { expanded = false; onDuplicate() }
+                )
+            }
             DropdownMenuItem(
                 text = { Text("Xóa", color = PriorityHighColor) },
                 leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null, tint = PriorityHighColor) },
@@ -340,43 +379,178 @@ fun SectionHeader(
     }
 }
 
-/** Vuốt sang phải để hoàn thành (thẻ bật lại chỗ cũ; danh sách tự chuyển nó sang nhóm "Đã hoàn thành"). */
+/**
+ * Vuốt sang phải để hoàn thành; vuốt sang trái để hoãn (nếu có [onPostpone]).
+ * Thẻ luôn bật lại chỗ cũ — danh sách tự chuyển nó sang nhóm mới khi dữ liệu đổi.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SwipeToCompleteBox(onComplete: () -> Unit, content: @Composable () -> Unit) {
+fun SwipeToCompleteBox(
+    onComplete: () -> Unit,
+    onPostpone: (() -> Unit)? = null,
+    enabled: Boolean = true,
+    content: @Composable () -> Unit
+) {
+    if (!enabled) {
+        content()
+        return
+    }
     val haptics = LocalHapticFeedback.current
     val currentOnComplete by rememberUpdatedState(onComplete)
+    val currentOnPostpone by rememberUpdatedState(onPostpone)
     val dismissState = rememberSwipeToDismissBoxState()
     // Thay cho confirmValueChange (đã deprecated): phản ứng khi vuốt đủ xa rồi đưa thẻ về chỗ cũ
     LaunchedEffect(dismissState.currentValue) {
-        if (dismissState.currentValue == SwipeToDismissBoxValue.StartToEnd) {
-            haptics.performHapticFeedback(HapticFeedbackType.Confirm)
-            currentOnComplete()
-            dismissState.snapTo(SwipeToDismissBoxValue.Settled)
+        when (dismissState.currentValue) {
+            SwipeToDismissBoxValue.StartToEnd -> {
+                haptics.performHapticFeedback(HapticFeedbackType.Confirm)
+                currentOnComplete()
+            }
+            SwipeToDismissBoxValue.EndToStart -> {
+                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                currentOnPostpone?.invoke()
+            }
+            SwipeToDismissBoxValue.Settled -> return@LaunchedEffect
         }
+        dismissState.snapTo(SwipeToDismissBoxValue.Settled)
     }
     SwipeToDismissBox(
         state = dismissState,
         enableDismissFromStartToEnd = true,
-        enableDismissFromEndToStart = false,
+        enableDismissFromEndToStart = onPostpone != null,
         backgroundContent = {
+            val postponing = dismissState.dismissDirection == SwipeToDismissBoxValue.EndToStart
+            val color = if (postponing) PriorityMediumColor else StateCompleted
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .clip(RoundedCornerShape(16.dp))
-                    .background(StateCompleted.copy(alpha = 0.2f))
+                    .background(color.copy(alpha = 0.2f))
                     .padding(horizontal = 20.dp),
-                contentAlignment = Alignment.CenterStart
+                contentAlignment = if (postponing) Alignment.CenterEnd else Alignment.CenterStart
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Check, contentDescription = null, tint = StateCompleted)
+                    Icon(if (postponing) Icons.Default.Schedule else Icons.Default.Check, contentDescription = null, tint = color)
                     Spacer(Modifier.width(8.dp))
-                    Text("Hoàn thành", color = StateCompleted, fontWeight = FontWeight.Bold)
+                    Text(if (postponing) "Hoãn" else "Hoàn thành", color = color, fontWeight = FontWeight.Bold)
                 }
             }
         }
     ) {
         content()
+    }
+}
+
+/** Chọn ngày hoãn việc tới: Ngày mai / Cuối tuần / Thứ 2 tuần sau / 1 tuần nữa / Chọn ngày… */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun PostponeSheet(taskTitle: String, onDismiss: () -> Unit, onPick: (LocalDate) -> Unit) {
+    val today = remember { LocalDate.now() }
+    var showPicker by remember { mutableStateOf(false) }
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = MaterialTheme.colorScheme.surface,
+        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+    ) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 28.dp)) {
+            Text("Hoãn sang…", fontWeight = FontWeight.Bold, fontSize = 17.sp, color = MaterialTheme.colorScheme.onSurface)
+            Text(taskTitle, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Spacer(Modifier.height(8.dp))
+            com.example.todoapplication.domain.Reschedule.postponeOptions(today).forEach { option ->
+                ListItem(
+                    headlineContent = { Text(option.label) },
+                    supportingContent = { Text(com.example.todoapplication.ui.utils.weekdayShort(option.date) + " " + option.date.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM"))) },
+                    leadingContent = { Icon(Icons.Default.Event, contentDescription = null, tint = PriorityMediumColor) },
+                    modifier = Modifier.clickable { onPick(option.date) },
+                    colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                )
+            }
+            ListItem(
+                headlineContent = { Text("Chọn ngày…") },
+                leadingContent = { Icon(Icons.Default.DateRange, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                modifier = Modifier.clickable { showPicker = true },
+                colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+            )
+        }
+    }
+    if (showPicker) {
+        val state = rememberDatePickerState(
+            initialSelectedDateMillis = today.plusDays(1).atStartOfDay(java.time.ZoneOffset.UTC).toInstant().toEpochMilli()
+        )
+        DatePickerDialog(
+            onDismissRequest = { showPicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    showPicker = false
+                    state.selectedDateMillis?.let {
+                        onPick(java.time.Instant.ofEpochMilli(it).atZone(java.time.ZoneOffset.UTC).toLocalDate())
+                    }
+                }) { Text("Chọn") }
+            },
+            dismissButton = { TextButton(onClick = { showPicker = false }) { Text("Hủy") } }
+        ) { DatePicker(state = state) }
+    }
+}
+
+/**
+ * Thanh thao tác khi đang chọn nhiều việc (thay cho thẻ đầu trang): đếm số đã chọn + các thao tác hàng loạt.
+ */
+@Composable
+fun SelectionBar(
+    count: Int,
+    onClose: () -> Unit,
+    onSelectAll: () -> Unit,
+    onComplete: () -> Unit,
+    onMyDay: () -> Unit,
+    onPostpone: () -> Unit,
+    onPriority: (String) -> Unit,
+    onDelete: () -> Unit
+) {
+    Surface(
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(Modifier.padding(horizontal = 8.dp, vertical = 6.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = onClose) { Icon(Icons.Default.Close, contentDescription = "Thoát chọn", tint = Color.White) }
+                Text("Đã chọn $count", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp, modifier = Modifier.weight(1f))
+                TextButton(onClick = onSelectAll) { Text("Chọn tất cả", color = Color.White) }
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                BulkAction(Icons.Default.Check, "Xong", count > 0, onComplete)
+                BulkAction(Icons.Outlined.WbSunny, "Hôm nay", count > 0, onMyDay)
+                BulkAction(Icons.Default.Schedule, "Dời", count > 0, onPostpone)
+                Box {
+                    var open by remember { mutableStateOf(false) }
+                    BulkAction(Icons.Default.Flag, "Ưu tiên", count > 0) { open = true }
+                    DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+                        listOf("HIGH", "MEDIUM", "LOW").forEach { p ->
+                            DropdownMenuItem(
+                                text = { Text(priorityLabel(p)) },
+                                leadingIcon = { Icon(Icons.Default.Flag, contentDescription = null, tint = priorityColor(p)) },
+                                onClick = { open = false; onPriority(p) }
+                            )
+                        }
+                    }
+                }
+                BulkAction(Icons.Default.Delete, "Xóa", count > 0, onDelete)
+            }
+        }
+    }
+}
+
+@Composable
+private fun BulkAction(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, enabled: Boolean, onClick: () -> Unit) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(horizontal = 10.dp, vertical = 6.dp)
+    ) {
+        Icon(icon, contentDescription = label, tint = Color.White.copy(alpha = if (enabled) 1f else 0.4f))
+        Text(label, color = Color.White.copy(alpha = if (enabled) 1f else 0.4f), fontSize = 11.sp)
     }
 }
 
@@ -442,6 +616,38 @@ private val QUICK_TEMPLATES = listOf(
  * danh mục được tô màu và hiện thành chip xem trước ngay khi gõ (phân tích trên máy, không cần mạng).
  * Chip chọn tay vẫn dùng được khi câu không nói gì về ngày / danh mục / ưu tiên.
  */
+/**
+ * Nút micro: mở trình nhận giọng nói của hệ thống (tiếng Việt), trả câu nói được về [onResult].
+ * Máy không có dịch vụ nhận giọng nói → báo bằng Toast thay vì crash.
+ */
+@Composable
+fun VoiceInputButton(onResult: (String) -> Unit) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val launcher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val spoken = result.data
+            ?.getStringArrayListExtra(android.speech.RecognizerIntent.EXTRA_RESULTS)
+            ?.firstOrNull()
+            ?.trim()
+        if (result.resultCode == android.app.Activity.RESULT_OK && !spoken.isNullOrEmpty()) onResult(spoken)
+    }
+    IconButton(onClick = {
+        val intent = android.content.Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL, android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE, "vi-VN")
+            putExtra(android.speech.RecognizerIntent.EXTRA_PROMPT, "Nói việc cần làm, vd: \"Gọi mẹ 8h tối mai\"")
+        }
+        try {
+            launcher.launch(intent)
+        } catch (_: android.content.ActivityNotFoundException) {
+            android.widget.Toast.makeText(context, "Máy chưa có dịch vụ nhận giọng nói", android.widget.Toast.LENGTH_SHORT).show()
+        }
+    }) {
+        Icon(Icons.Default.Mic, contentDescription = "Nhập bằng giọng nói", tint = MaterialTheme.colorScheme.primary)
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun QuickCreateSheet(
@@ -510,6 +716,11 @@ fun QuickCreateSheet(
                 modifier = Modifier.fillMaxWidth().focusRequester(focus),
                 shape = RoundedCornerShape(16.dp),
                 visualTransformation = transformation,
+                trailingIcon = {
+                    VoiceInputButton { spoken ->
+                        text = if (text.isBlank()) spoken else text.trimEnd() + " " + spoken
+                    }
+                },
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = MaterialTheme.colorScheme.primary,
                     unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,

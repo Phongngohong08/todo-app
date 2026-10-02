@@ -126,6 +126,8 @@ class FakeServer : ApiService {
     override suspend fun chat(input: ChatInput): Response<ChatResponse> = unsupported()
     override suspend fun chatHistory(limit: Int): Response<List<ChatMessage>> = unsupported()
     override suspend fun parseTask(input: ParseTaskInput): Response<ParsedTask> = unsupported()
+    override suspend fun breakdownTask(input: AssistInput): Response<BreakdownResponse> = unsupported()
+    override suspend fun estimateTask(input: AssistInput): Response<EstimateResponse> = unsupported()
     override suspend fun listMemories(): Response<List<MemoryItem>> = unsupported()
     override suspend fun triggerMemoryExtraction(): Response<MemoryExtractionResult> = unsupported()
     override suspend fun deleteMemory(id: String): Response<Unit> = unsupported()

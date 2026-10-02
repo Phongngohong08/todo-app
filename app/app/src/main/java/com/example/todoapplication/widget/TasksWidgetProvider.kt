@@ -50,6 +50,7 @@ class TasksWidgetProvider : AppWidgetProvider() {
 
         /** Gọi để widget tải lại dữ liệu (sau mỗi thay đổi task — xem TaskEffects). */
         fun refresh(context: Context) {
+            CompactWidgetProvider.update(context)
             val manager = AppWidgetManager.getInstance(context)
             val ids = manager.getAppWidgetIds(
                 android.content.ComponentName(context, TasksWidgetProvider::class.java)

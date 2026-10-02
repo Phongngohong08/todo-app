@@ -92,6 +92,7 @@ app/src/main/java/com/example/todoapplication/
     GoalsAndReview.kt            # Mục tiêu ngày + chuỗi (ngày nghỉ), Tổng kết tuần
     PlanLogic.kt                 # Chỉnh lịch trình AI (dồn khung), phát hiện lịch đã cũ
     SnoozeOptions.kt             # Các mốc "Hoãn…"
+    Scheduling.kt                # Giờ yên lặng, dời việc sang ngày khác (giữ giờ), các mốc "Hoãn sang…", ma trận Eisenhower
     SortOrder.kt                 # Fractional indexing cho kéo-thả
     StatsCalculator.kt           # Biểu đồ tuần / bản đồ nhiệt theo ngày lịch
   data/
@@ -113,12 +114,13 @@ app/src/main/java/com/example/todoapplication/
       LocalPrefs.kt              # Cài đặt cục bộ (mục tiêu đệm, thông báo) dạng StateFlow
       CoachActionApplier.kt      # Áp dụng hành động AI Coach đề xuất (sau khi người dùng xác nhận)
       ...                        # SessionEvents, QuickAddDraft, ThemeController, NetworkCallExt
-    notifications/               # Nhắc việc (+ Hoãn…), DigestWorker (tóm tắt sáng, tổng kết tuần), FocusSession (Pomodoro)
-  widget/                        # App widget đọc thẳng Room; WidgetActionActivity (tích xong / mở việc)
+    notifications/               # Nhắc việc (+ Hoãn…), DigestWorker (tóm tắt sáng, tổng kết tuần), FocusSession (Pomodoro); nhắc lại tới khi xong, giờ yên lặng; Alarms.kt (báo thức toàn màn hình + BootReceiver)
+  widget/                        # App widget đọc thẳng Room; WidgetActionActivity (tích xong / mở việc); CompactWidgetProvider (widget nhỏ 2×2)
   di/ServiceLocator.kt           # Manual DI — đồ thị phụ thuộc ghi trong file
   ui/
     viewmodel/                   # ViewModel của từng màn (Today, TaskList, TaskDetail, Review/History/Trash, ...)
-    screens/                     # Màn hình Compose + TaskComponents (thẻ việc, thanh tạo nhanh dùng chung) + SnoozeActivity
+    screens/                     # Màn hình Compose + TaskComponents (thẻ việc, thanh tạo nhanh dùng chung) + SnoozeActivity, AlarmActivity, AppLock (khóa ứng dụng)
+    components/DragDrop.kt       # Kéo-thả giữa các vùng (lịch tuần, ma trận) theo tọa độ gốc màn hình
     components/, theme/, navigation/, utils/
 app/schemas/                     # Schema Room đã export (4.json, 5.json, 6.json) — dùng cho MigrationTest
 ```
@@ -131,16 +133,18 @@ app/schemas/                     # Schema Room đã export (4.json, 5.json, 6.js
 | :--- | :--- |
 | `LoginScreen` / `RegisterScreen` | Đăng nhập / đăng ký; báo lỗi rõ ràng (email đã dùng, sai mật khẩu, thao tác quá nhanh) |
 | `TodayScreen` | Tab mặc định: **Ngày của tôi** (danh sách tự chọn mỗi ngày), gợi ý thêm việc (quá hạn / đến hạn / hôm qua chưa xong / ưu tiên cao), vòng **mục tiêu ngày + chuỗi 🔥**, **lịch trình AI** tích xong trên lịch, đổi giờ (dồn khung sau), báo lịch đã cũ, thanh đếm ngược tập trung |
-| `TaskListScreen` | Tab "Việc làm": nhóm **Quá hạn (Dời tất cả) / Hôm nay / Sắp tới / Chưa có hạn / Đã xong hôm nay**, **bộ lọc thông minh** + danh mục + tìm kiếm (debounce), "⚡ Nên làm trước · lý do", tích/vuốt để hoàn thành (**Hoàn tác**), kéo-thả lưu thứ tự, kéo-để-làm-mới, banner offline, ☁ trên thẻ chưa đồng bộ |
-| `QuickCreateSheet` | Thanh tạo nhanh: **bộ phân tích câu tiếng Việt chạy trên máy** (`QuickAddParser`) tô màu ngày/giờ/ưu tiên/#danh mục/lặp ngay khi gõ, không cần mạng; nút AI cho câu phức tạp |
-| `TaskDetailScreen` | Thêm/sửa task: hạn **ngày + giờ tùy chọn** (không giờ = cả ngày), **thời lượng ước tính**, Ngày của tôi, lặp **mỗi N / theo lịch hoặc ngày hoàn thành / ngày kết thúc**, **Bỏ qua lần này**, lời nhắc, bước con (kể cả khi đang tạo mới) |
+| `TaskListScreen` | Tab "Việc làm": nhóm **Quá hạn (Dời tất cả) / Hôm nay / Sắp tới / Chưa có hạn / Đã xong hôm nay**, **bộ lọc thông minh** + danh mục + tìm kiếm (debounce), "⚡ Nên làm trước · lý do", tích/vuốt để hoàn thành (**Hoàn tác**), kéo-thả lưu thứ tự, kéo-để-làm-mới, banner offline, ☁ trên thẻ chưa đồng bộ, vuốt trái để **hoãn**, **nhấn giữ để chọn nhiều** (hoàn thành / Ngày của tôi / dời / ưu tiên / xóa hàng loạt, có Hoàn tác), **nhân bản** |
+| `QuickCreateSheet` | Thanh tạo nhanh: **bộ phân tích câu tiếng Việt chạy trên máy** (`QuickAddParser`) tô màu ngày/giờ/ưu tiên/#danh mục/lặp ngay khi gõ, không cần mạng; nút AI cho câu phức tạp; **🎤 nhập bằng giọng nói** (`RecognizerIntent`, vi-VN) |
+| `TaskDetailScreen` | Thêm/sửa task: hạn **ngày + giờ tùy chọn** (không giờ = cả ngày), **thời lượng ước tính**, Ngày của tôi, lặp **mỗi N / theo lịch hoặc ngày hoàn thành / ngày kết thúc**, **Bỏ qua lần này**, lời nhắc, bước con (kể cả khi đang tạo mới); **✨ AI chia nhỏ** (xem trước, chọn bước) và **✨ AI gợi ý thời lượng**; **Nhân bản** |
 | `FocusScreen` | Hẹn giờ tập trung 25'/5' cho một việc; lưu mốc kết thúc nên đóng app vẫn đúng, hết giờ có thông báo |
-| `CalendarScreen` | Lịch tháng; lần lặp **dự kiến** hiển thị mờ, khác với task thật |
+| `CalendarScreen` | **Tháng / Tuần / Lịch trình (30 ngày)**; ở chế độ Tuần **nhấn giữ rồi kéo việc sang ngày khác** để dời hạn (giữ giờ, Hoàn tác); lần lặp **dự kiến** hiển thị mờ, không kéo được |
+| `MatrixScreen` | **Ma trận Eisenhower** (Quan trọng × Gấp): kéo việc giữa 4 ô → đổi ưu tiên / hạn tương ứng (`Eisenhower.move`), có Hoàn tác |
 | `AICoachScreen` | Chat với AI Coach — lịch sử lưu trên server; **thẻ hành động đề xuất** (dời hạn, chia bước con, tạo việc, đổi ưu tiên, thêm vào Ngày của tôi) chỉ áp dụng khi bấm "Áp dụng" (`CoachActionApplier`) |
 | `StatsScreen` | Tab "Tôi": mục tiêu + chuỗi ngày, lối tắt, thống kê/biểu đồ/bản đồ nhiệt **tính từ Room** (xem được khi offline), Trí nhớ AI |
 | `WeeklyReviewScreen` · `HistoryScreen` · `TrashScreen` | Tổng kết 7 ngày so với tuần trước (+ nhờ AI lập kế hoạch tuần tới) · việc đã xong theo ngày · thùng rác 30 ngày |
-| `SettingsScreen` | Giao diện Sáng/Tối; giờ giấc cho lập lịch AI; **mục tiêu ngày + ngày nghỉ**; danh mục; **thông báo** (tóm tắt sáng, tổng kết tuần, giờ nhắc việc cả ngày); **đăng xuất máy này / mọi thiết bị** |
+| `SettingsScreen` | Giao diện Sáng/Tối; giờ giấc cho lập lịch AI; **mục tiêu ngày + ngày nghỉ**; danh mục; **thông báo** (tóm tắt sáng, tổng kết tuần, giờ nhắc việc cả ngày); **đăng xuất máy này / mọi thiết bị**; **nhắc hẹn nâng cao** (nhắc lại tới khi xong, báo thức việc ưu tiên Cao, giờ yên lặng); **khóa ứng dụng** |
 | `TemplatesScreen` | Thư viện mẫu nhiệm vụ |
+| `AlarmActivity` · `LockScreen` | Báo thức toàn màn hình (hiện trên màn khóa) · màn che khi app đang khóa (`BiometricPrompt`) |
 
 ---
 
@@ -149,10 +153,15 @@ app/schemas/                     # Schema Room đã export (4.json, 5.json, 6.js
 - **Checklist (bước con)** — bảng `subtasks` có khóa ngoại `ON DELETE CASCADE`; thẻ task hiện tiến độ `☑ 2/5` đếm bằng subquery ngay trong SQL. Bước con nằm trong task khi đồng bộ (task là *aggregate root*).
 - **Kéo-thả có lưu** — "fractional indexing": thả task giữa A và B chỉ gán `sortOrder` ở giữa → chỉ một dòng thay đổi và cần đồng bộ. Trong lúc kéo, thứ tự chỉ đổi trong bộ nhớ (mượt 60fps), thả tay mới ghi database; có rung phản hồi (haptic).
 - **Thông báo có nút** "Hoàn thành" / "Hoãn 1 giờ" / **"Hoãn…"** (hộp chọn `SnoozeActivity`: 15 phút, tối nay, sáng mai…) — "Hoàn thành" ghi vào Room nên chạy được khi offline; lượt hoãn có job WorkManager riêng nên không bị hủy khi đồng bộ lại nhắc việc; việc đã xong ở máy khác thì không nhắc nữa.
+- **Nhắc lại tới khi xong & giờ yên lặng** — `ReminderWorker` tự hẹn lần nhắc kế tiếp (tối đa 12 lần) và dời nhắc rơi vào giờ yên lặng; các job này dùng `APPEND_OR_REPLACE` vì được hẹn từ chính worker đang chạy (REPLACE sẽ tự hủy chính nó).
+- **Báo thức cho việc ưu tiên Cao** — `AlarmManager.setAlarmClock` (thiếu quyền hẹn chính xác thì `setAndAllowWhileIdle`), thông báo kênh báo thức với **full-screen intent** mở `AlarmActivity` trên màn khóa, chuông lặp (`FLAG_INSISTENT`); `BootReceiver` hẹn lại sau khi khởi động máy / cập nhật app.
+- **Kéo-thả giữa các vùng** — `DragDrop.kt`: vùng thả ghi lại tọa độ gốc màn hình (`boundsInRoot`), thẻ "bóng" đi theo ngón tay; dùng cho lịch tuần và ma trận Eisenhower.
+- **Khóa ứng dụng** — `BiometricPrompt` (vân tay / khuôn mặt / mã PIN máy, `BIOMETRIC_WEAK or DEVICE_CREDENTIAL`); quyết định khóa ngay ở `onStart` để nội dung không lộ ra trước khi che; `MainActivity` là `FragmentActivity`.
 - **Tóm tắt buổi sáng & tổng kết tuần** — `DigestWorker` đọc Room (không cần mạng), tự hẹn lần kế tiếp.
 - **Quyền thông báo xin đúng lúc** — chỉ hỏi (kèm giải thích) khi người dùng đặt hạn/nhắc việc, bật tóm tắt hoặc bắt đầu tập trung, không hỏi ngay khi mở app.
 - **App shortcut & chia sẻ** — nhấn giữ icon: Thêm việc / Hôm nay / Tập trung; "Chia sẻ → Thêm vào TaskFlow" từ app khác mở thanh tạo nhanh đã điền sẵn.
 - **Widget màn hình chính** — `RemoteViewsService` đọc thẳng Room ("Ngày của tôi" lên đầu), tự làm mới sau mỗi thay đổi; **ô tích hoàn thành ngay trên widget** và nút **+** (qua `WidgetActionActivity` trong suốt — Android 12+ cấm broadcast tự mở Activity).
+- **Widget nhỏ 2×2** — `CompactWidgetProvider`: số việc xong hôm nay / mục tiêu + thanh tiến độ, việc tiếp theo, nút **+**; đọc Room trong `goAsync()` và vẽ lại cùng lúc với widget danh sách.
 - **AI Quick Add / AI Coach / Lịch trình AI** — báo rõ khi hết lượt AI (HTTP 429) hoặc AI chưa bật (503).
 - **Icon & màn khởi động** — adaptive icon vẽ bằng vector (nền gradient thương hiệu + "thẻ công việc" có dấu tích và tia sáng AI) kèm lớp **monochrome** cho themed icon Android 13+; màn khởi động dùng **SplashScreen API** (`core-splashscreen`) với icon **AnimatedVectorDrawable** trên Android 12+ (dấu tích tự vẽ bằng `trimPathEnd`, tia sáng bật ra) và hiệu ứng thoát mượt (`setOnExitAnimationListener`). Logo trong app (`AppLogo`) và icon thông báo dùng chung hình.
 - **Hiệu năng danh sách** — nhóm/sắp xếp/gợi ý tính trong ViewModel trên `Dispatchers.Default`; thời gian là `Long` (không parse chuỗi ISO khi vẽ); `LazyColumn` dùng `key` + `contentType`; `DateTimeFormatter` dùng lại (thread-safe).
@@ -214,3 +223,6 @@ Chạy với backend trên máy tính: đổi thành `http://10.0.2.2:8080/api/v
 | `ACCESS_NETWORK_STATE` | Theo dõi trạng thái mạng: banner offline, đồng bộ lại khi có mạng |
 | `POST_NOTIFICATIONS` | Nhắc việc, tóm tắt buổi sáng, tổng kết tuần, hết giờ tập trung (Android 13+) — **xin đúng lúc**, không xin khi mở app |
 | `VIBRATE` | Rung khi có thông báo nhắc việc |
+| `SCHEDULE_EXACT_ALARM` | Báo thức cho việc ưu tiên Cao kêu đúng phút (Android 12+; người dùng cấp trong Thiết lập — thiếu thì báo thức vẫn kêu nhưng có thể trễ) |
+| `USE_FULL_SCREEN_INTENT` | Hiện báo thức toàn màn hình trên màn khóa (Android 14+ cần người dùng cho phép) |
+| `RECEIVE_BOOT_COMPLETED` | Hẹn lại nhắc việc / báo thức sau khi khởi động lại máy |

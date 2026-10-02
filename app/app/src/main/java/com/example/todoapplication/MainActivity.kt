@@ -3,10 +3,10 @@ package com.example.todoapplication
 import android.content.Intent
 import android.os.Bundle
 import android.view.animation.DecelerateInterpolator
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.fragment.app.FragmentActivity
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -38,7 +38,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
  * Nhiệm vụ: dựng cây UI bằng Compose và đóng vai "router" (NavHost) chuyển giữa các màn.
  * Cũng là nơi nhận "đường dẫn" từ ngoài app: bấm thông báo, widget, app shortcut, chia sẻ từ app khác.
  */
-class MainActivity : ComponentActivity() {
+// FragmentActivity (thay vì ComponentActivity): BiometricPrompt của khóa ứng dụng cần nó
+class MainActivity : FragmentActivity() {
 
     /** Yêu cầu điều hướng từ Intent (onCreate / onNewIntent) chờ NavHost xử lý. */
     private val pendingLink = MutableStateFlow<PendingLink?>(null)
@@ -105,6 +106,8 @@ class MainActivity : ComponentActivity() {
                     }
 
                     // NavHost = "bảng định tuyến": route nào → hiển thị Composable nào (như router ở backend)
+                    val appLocked by AppLock.locked.collectAsStateWithLifecycle()
+
                     NavHost(navController = navController, startDestination = startDestination) {
                         composable(Screen.Login.route) { LoginScreen(navController) }
                         composable(Screen.Register.route) { RegisterScreen(navController) }
@@ -138,10 +141,25 @@ class MainActivity : ComponentActivity() {
                         composable(Screen.Trash.route) { TrashScreen(navController) }
                         composable(Screen.Settings.route) { SettingsScreen(navController) }
                         composable(Screen.Templates.route) { TemplatesScreen(navController) }
+                        composable(Screen.Matrix.route) { MatrixScreen(navController) }
                     }
+
+                    // Che toàn bộ app khi đang khóa (NavHost vẫn giữ nguyên trạng thái bên dưới)
+                    if (appLocked) LockScreen()
                 }
             }
         }
+    }
+
+    // Khóa ứng dụng: quyết định khóa ngay ở onStart (trước khung hình đầu) để nội dung không lộ ra chớp nhoáng
+    override fun onStart() {
+        super.onStart()
+        AppLock.onStart(enabled = ServiceLocator.sessionManager.isLoggedIn() && ServiceLocator.localPrefs.appLockEnabled.value)
+    }
+
+    override fun onStop() {
+        super.onStop()
+        AppLock.onStop()
     }
 
     override fun onNewIntent(intent: Intent) {

@@ -41,6 +41,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneId
 
 const val ALL_CATEGORIES = "ALL"
@@ -81,6 +82,11 @@ sealed interface TaskListEvent {
     data class Deleted(val taskId: String, val title: String) : TaskListEvent
     /** Đã dời hạn hàng loạt — Hoàn tác trả lại hạn cũ của từng việc. */
     data class Rescheduled(val count: Int, val previous: List<Task>) : TaskListEvent
+    /** Hoàn thành nhiều việc (chọn nhiều) — Hoàn tác mở lại tất cả. */
+    data class BulkCompleted(val ids: List<String>) : TaskListEvent
+    data class BulkDeleted(val ids: List<String>) : TaskListEvent
+    /** Đã nhân bản — màn cho mở bản sao. */
+    data class Duplicated(val taskId: String, val title: String) : TaskListEvent
 }
 
 /**
@@ -275,6 +281,97 @@ class TaskListViewModel(
                 repo.reschedule(tasks.map { it.id }, key.first, key.second)
             }
         }
+    }
+
+    /** Vuốt trái → chọn ngày: dời việc sang ngày đó, giữ giờ hẹn. Hoàn tác trả hạn cũ. */
+    fun postpone(task: Task, date: LocalDate) = postpone(listOf(task), date)
+
+    fun postpone(tasks: List<Task>, date: LocalDate) {
+        val pending = tasks.filter { !it.isCompleted }
+        if (pending.isEmpty()) return
+        viewModelScope.launch {
+            if (repo.moveToDate(pending.map { it.id }, date)) emit(TaskListEvent.Rescheduled(pending.size, pending))
+        }
+    }
+
+    fun duplicate(task: Task) {
+        viewModelScope.launch {
+            repo.duplicate(task.id)?.let { emit(TaskListEvent.Duplicated(it.id, it.title)) }
+        }
+    }
+
+    // ── Chọn nhiều ──
+    private val _selectedIds = MutableStateFlow<Set<String>>(emptySet())
+    /** Rỗng = không ở chế độ chọn (chọn hết rồi bỏ hết cũng thoát chế độ chọn). */
+    val selectedIds: StateFlow<Set<String>> = _selectedIds
+
+    fun toggleSelection(taskId: String) {
+        _selectedIds.update { if (taskId in it) it - taskId else it + taskId }
+    }
+
+    /** Chọn tất cả việc chưa xong đang hiển thị (theo bộ lọc hiện tại). */
+    fun selectAllVisible() {
+        _selectedIds.value = uiState.value.manualOrder.map { it.id }.toSet()
+    }
+
+    fun clearSelection() {
+        _selectedIds.value = emptySet()
+    }
+
+    private fun selectedTasks(): List<Task> {
+        val ids = _selectedIds.value
+        val state = uiState.value
+        return (state.manualOrder + state.sections.completedToday).filter { it.id in ids }
+    }
+
+    fun completeSelected() {
+        val pending = selectedTasks().filter { !it.isCompleted }
+        clearSelection()
+        if (pending.isEmpty()) return
+        viewModelScope.launch {
+            val done = pending.filter { repo.setCompleted(it.id, completed = true) }.map { it.id }
+            if (done.isNotEmpty()) emit(TaskListEvent.BulkCompleted(done))
+        }
+    }
+
+    fun undoBulkComplete(ids: List<String>) {
+        viewModelScope.launch { ids.forEach { repo.setCompleted(it, completed = false) } }
+    }
+
+    fun deleteSelected() {
+        val ids = _selectedIds.value.toList()
+        clearSelection()
+        viewModelScope.launch {
+            if (repo.delete(ids)) emit(TaskListEvent.BulkDeleted(ids))
+        }
+    }
+
+    fun undoBulkDelete(ids: List<String>) {
+        viewModelScope.launch { repo.restore(ids) }
+    }
+
+    fun addSelectedToMyDay() {
+        val ids = _selectedIds.value.toList()
+        clearSelection()
+        viewModelScope.launch {
+            repo.setMyDay(ids, todayKey())
+            emit(TaskListEvent.Message("Đã thêm ${ids.size} việc vào Ngày của tôi ☀"))
+        }
+    }
+
+    fun setSelectedPriority(priority: String) {
+        val ids = _selectedIds.value.toList()
+        clearSelection()
+        viewModelScope.launch {
+            repo.setPriority(ids, priority)
+            emit(TaskListEvent.Message("Đã đổi ưu tiên ${ids.size} việc"))
+        }
+    }
+
+    fun postponeSelected(date: LocalDate) {
+        val tasks = selectedTasks()
+        clearSelection()
+        postpone(tasks, date)
     }
 
     /** Tạo nhanh từ thanh nhập (không qua màn chi tiết). Danh mục mới gõ sau "#" được tạo luôn. */

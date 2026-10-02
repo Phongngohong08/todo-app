@@ -74,6 +74,9 @@ data class TodayUiState(
 sealed interface TodayEvent {
     data class Message(val text: String) : TodayEvent
     data class Completed(val taskId: String, val title: String) : TodayEvent
+    /** Đã hoãn (dời hạn + bỏ khỏi Ngày của tôi) — Hoàn tác trả lại như cũ. */
+    data class Postponed(val previous: Task, val date: LocalDate) : TodayEvent
+    data class Duplicated(val taskId: String, val title: String) : TodayEvent
 }
 
 /**
@@ -180,6 +183,29 @@ class TodayViewModel(
 
     fun reopen(taskId: String) {
         viewModelScope.launch { repo.setCompleted(taskId, false) }
+    }
+
+    /** Vuốt trái: dời việc sang [date] (giữ giờ) và bỏ khỏi "Ngày của tôi" hôm nay. */
+    fun postpone(task: Task, date: LocalDate) {
+        if (task.isCompleted) return
+        viewModelScope.launch {
+            repo.moveToDate(listOf(task.id), date)
+            repo.setMyDay(listOf(task.id), null)
+            _events.emit(TodayEvent.Postponed(task, date))
+        }
+    }
+
+    fun undoPostpone(previous: Task) {
+        viewModelScope.launch {
+            repo.reschedule(listOf(previous.id), previous.dueAt, previous.dueAllDay)
+            repo.setMyDay(listOf(previous.id), previous.myDay)
+        }
+    }
+
+    fun duplicate(task: Task) {
+        viewModelScope.launch {
+            repo.duplicate(task.id)?.let { _events.emit(TodayEvent.Duplicated(it.id, it.title)) }
+        }
     }
 
     fun createQuickTask(result: QuickCreateResult) {

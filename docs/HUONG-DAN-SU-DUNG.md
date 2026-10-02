@@ -62,6 +62,7 @@ Tab **Hôm nay** trả lời câu hỏi *"hôm nay mình làm gì?"*.
 - Là danh sách việc **bạn chọn** cho hôm nay (khác với "việc có hạn hôm nay"). Mỗi sáng danh sách tự làm mới.
 - Thêm việc vào Ngày của tôi bằng: nút ☀ ở mục **Gợi ý**, menu **⋮ → Thêm vào Ngày của tôi** trên thẻ việc, công tắc trong màn chi tiết, hoặc tích **"☀ Thêm vào Ngày của tôi"** khi tạo nhanh.
 - Tích ô tròn (hoặc vuốt sang phải) để hoàn thành; có **Hoàn tác** ở thanh thông báo phía dưới.
+- **Vuốt sang trái** để hoãn việc sang ngày khác — việc được dời hạn và rời khỏi Ngày của tôi hôm nay (có Hoàn tác).
 
 ### Gợi ý cho hôm nay
 App gợi ý những việc nên cân nhắc: **quá hạn**, **đến hạn hôm nay**, **hôm qua đã chọn mà chưa xong**, và **ưu tiên cao chưa có hạn**. Nhấn ☀ để thêm từng việc, hoặc **Thêm tất cả**.
@@ -78,7 +79,7 @@ App gợi ý những việc nên cân nhắc: **quá hạn**, **đến hạn hô
 
 ## 4. Thêm việc nhanh (gõ câu tự nhiên)
 
-Nhấn nút **+** (ở tab Hôm nay hoặc Việc làm) rồi **gõ như nói chuyện**. App hiểu ngay khi bạn gõ — **không cần mạng** — và tô màu phần đã hiểu, kèm dòng **"Hiểu là: …"** để bạn kiểm tra:
+Nhấn nút **+** (ở tab Hôm nay hoặc Việc làm) rồi **gõ như nói chuyện** — hoặc bấm **🎤** trong ô nhập để **nói** (tiếng Việt, dùng dịch vụ nhận giọng nói của máy). App hiểu ngay khi bạn gõ — **không cần mạng** — và tô màu phần đã hiểu, kèm dòng **"Hiểu là: …"** để bạn kiểm tra:
 
 ```
 Nộp báo cáo mai 3h chiều !cao #Công việc
@@ -125,10 +126,17 @@ Nộp báo cáo mai 3h chiều !cao #Công việc
 - **Kéo danh sách xuống** để đồng bộ ngay với máy chủ.
 
 ### Trên mỗi thẻ việc
-- **Ô tròn** / **vuốt sang phải**: hoàn thành. **🚩**: đổi độ ưu tiên. **⋮**: Thêm vào Ngày của tôi · Bắt đầu tập trung · Chỉnh sửa · Xóa.
+- **Ô tròn** / **vuốt sang phải**: hoàn thành. **Vuốt sang trái**: **hoãn** — chọn *Ngày mai / Cuối tuần / Thứ 2 tuần sau / 1 tuần nữa / Chọn ngày…* (giữ nguyên giờ hẹn, có Hoàn tác). **🚩**: đổi độ ưu tiên. **⋮**: Thêm vào Ngày của tôi · Bắt đầu tập trung · **Nhân bản** · Chỉnh sửa · Xóa.
 - Dòng **⚡ Nên làm trước · lý do** (ví dụ *"Quá hạn 2 ngày · Ưu tiên cao"*, *"Hạn trong 5 giờ"*) đánh dấu tối đa 3 việc nên làm trước, dựa trên hạn chót và độ ưu tiên.
 - Chip ở đáy thẻ: danh mục, hạn (*Hôm nay*, *Ngày mai 15:00*, *T6 10/07*…), ⏱ thời lượng, ☑ tiến độ bước con, kiểu lặp.
 - ☀ = đang trong Ngày của tôi · ☁ = thay đổi chưa gửi lên máy chủ · 🔁 = việc lặp.
+
+### Chọn nhiều việc
+**Nhấn giữ** một thẻ để vào chế độ chọn, rồi bấm thêm các thẻ khác. Thanh trên cùng có: **Chọn tất cả** · **Xong** · **Hôm nay** (đưa vào Ngày của tôi) · **Dời** · **Ưu tiên** · **Xóa**. Hoàn thành / xóa / dời hàng loạt đều có **Hoàn tác**. Bấm **✕** hoặc nút Quay lại để thoát.
+
+### Ma trận ưu tiên (Eisenhower)
+Nút **▦** ở thẻ đầu trang mở ma trận 4 ô: **Làm ngay** (quan trọng · gấp) · **Lên lịch** (quan trọng · chưa gấp) · **Làm nhanh** (gấp · ít quan trọng) · **Để sau**. *Quan trọng* = ưu tiên Cao; *Gấp* = hạn tới hết ngày mai (gồm quá hạn).
+**Nhấn giữ một việc rồi kéo sang ô khác** — app tự đổi ưu tiên và/hoặc hạn cho khớp (vào ô gấp → hạn hôm nay; ra khỏi ô gấp → dời 1 tuần). Có Hoàn tác.
 
 ---
 
@@ -140,13 +148,13 @@ Bấm vào thẻ để mở. Các mục:
 2. **☀ Ngày của tôi** — công tắc thêm/bỏ việc khỏi danh sách hôm nay.
 3. **🎯 Độ ưu tiên** — Thấp / Trung bình / Cao.
 4. **📅 Hạn chót** — chọn nhanh (Hôm nay / Ngày mai / 3 ngày sau / Cuối tuần / Không), hoặc chọn **ngày** và (tùy chọn) **giờ**. Không chọn giờ = **Cả ngày**.
-5. **⏱ Thời lượng ước tính** — 15 phút … 3 giờ. Giúp AI xếp lịch trong ngày đúng độ dài.
+5. **⏱ Thời lượng ước tính** — 15 phút … 3 giờ, hoặc **✨ AI gợi ý** (AI ước tính dựa trên những việc bạn từng đặt thời lượng). Giúp AI xếp lịch trong ngày đúng độ dài.
 6. **🏷️ Danh mục** — chọn hoặc tạo danh mục mới (tối đa 50 ký tự).
 7. **🔁 Lặp lại** — xem [mục 7](#7-việc-lặp-lại).
 8. **🔔 Lời nhắc** — việc có giờ: đúng giờ / trước 5, 10, 30 phút, 1 giờ, 1 ngày. Việc cả ngày: buổi sáng của ngày đến hạn (giờ đặt trong Thiết lập) hoặc trước 1 ngày.
-9. **✅ Các bước con** — checklist có thanh tiến độ.
+9. **✅ Các bước con** — checklist có thanh tiến độ. **✨ Nhờ AI chia nhỏ việc này**: AI gợi ý các bước (dựa trên tiêu đề + mô tả đang gõ), bạn bỏ chọn bước không cần rồi bấm **Thêm**; nếu chưa đặt thời lượng, có thể áp luôn thời lượng AI ước tính. Cần mạng.
 
-Trên thanh tiêu đề (việc đã có): **⏱** bắt đầu tập trung; **⋮ → Bỏ qua lần này** (việc lặp) · **Xóa**.
+Trên thanh tiêu đề (việc đã có): **⏱** bắt đầu tập trung; **⋮ → Bỏ qua lần này** (việc lặp) · **Nhân bản** (tạo bản sao gồm cả bước con, rồi mở bản sao) · **Xóa**.
 
 ---
 
@@ -174,9 +182,12 @@ Trên thanh tiêu đề (việc đã có): **⏱** bắt đầu tập trung; **�
 
 ## 9. Tab Lịch
 
-- **◀ ▶** chuyển tháng; ngày có việc có **chấm màu** theo độ ưu tiên.
-- Việc lặp hiện ở **tất cả các ngày lặp** trong 12 tháng tới (tôn trọng "mỗi N" và ngày kết thúc); các lần tương lai hiện **mờ** với nhãn "dự kiến".
-- Bấm một ngày để xem danh sách việc; bấm việc để mở chi tiết.
+Ba cách xem (nút chuyển ở đầu màn):
+- **Tháng**: **◀ ▶** chuyển tháng; ngày có việc có **chấm màu** theo độ ưu tiên. Bấm một ngày để xem danh sách việc.
+- **Tuần**: 7 ngày của tuần, mỗi ngày một hàng. **Nhấn giữ một việc rồi kéo sang ngày khác** để dời hạn (giữ nguyên giờ, có Hoàn tác). "Về tuần này" để quay lại.
+- **Lịch trình**: mọi việc có hạn trong 30 ngày tới, gom theo ngày; tích ô tròn để hoàn thành ngay.
+- Việc lặp hiện ở **tất cả các ngày lặp** trong 12 tháng tới (tôn trọng "mỗi N" và ngày kết thúc); các lần tương lai hiện **mờ** với nhãn "dự kiến" và không kéo được.
+- Bấm việc để mở chi tiết.
 
 ---
 
@@ -217,6 +228,11 @@ Tối Chủ nhật 19:00 app gửi thông báo nhắc xem Tổng kết tuần (t
 - **Tóm tắt buổi sáng** (mặc định 07:30): *"3 việc đến hạn · 1 việc quá hạn · 4 việc trong Ngày của tôi"*. Ngày trống thì không gửi. Bấm để mở tab Hôm nay.
 - **Tổng kết tuần**: tối Chủ nhật 19:00.
 
+### Nhắc hẹn nâng cao (Thiết lập → ⏰)
+- **Nhắc lại tới khi xong**: việc đến hạn mà chưa tích xong sẽ được nhắc lại sau mỗi 5 / 10 / 15 / 30 phút (tối đa 12 lần). Mặc định chỉ áp dụng cho việc **ưu tiên Cao**; tắt công tắc để áp dụng cho mọi việc.
+- **Báo thức cho việc ưu tiên Cao**: đổ chuông như đồng hồ báo thức và **hiện toàn màn hình kể cả khi khóa máy**, với nút **Hoàn thành / Hoãn 10 phút / Tắt báo thức**. Nếu máy chưa cho phép *hẹn giờ chính xác* hoặc *hiện toàn màn hình*, Thiết lập hiện nút **Cấp quyền** mở đúng trang cài đặt. Báo thức được hẹn lại sau khi khởi động lại máy.
+- **Giờ yên lặng** (vd 22:00 – 07:00): nhắc việc rơi vào khung này được dời tới lúc hết giờ yên lặng. Báo thức của việc ưu tiên Cao vẫn kêu.
+
 ---
 
 ## 13. Widget, lối tắt & chia sẻ
@@ -225,6 +241,7 @@ Tối Chủ nhật 19:00 app gửi thông báo nhắc xem Tổng kết tuần (t
 1. Nhấn giữ vùng trống màn hình chính → **Widgets** → **TaskFlow AI** → kéo ra màn hình.
 2. Widget liệt kê việc chưa xong, **Ngày của tôi (☀) lên đầu**, hạn quá hạn tô đỏ.
 3. **Bấm ○** để hoàn thành ngay trên widget · **bấm tên việc** để mở việc đó · **+** để thêm việc · bấm tiêu đề để mở tab Hôm nay.
+4. **Widget nhỏ 2×2** (*Tiến độ mục tiêu hôm nay*): số việc đã xong / mục tiêu ngày kèm thanh tiến độ, **việc tiếp theo** (bấm để mở) và nút **+**.
 
 ### Lối tắt (nhấn giữ icon app)
 **Thêm việc** · **Hôm nay** · **Tập trung**.
@@ -251,6 +268,8 @@ Mở **Tôi → ⚙**:
 - **🏷️ Danh mục**: thêm / xóa danh mục tự tạo (3 danh mục mặc định không xóa được).
 - Nhấn **Lưu thiết lập** cho các mục trên (lưu theo tài khoản).
 - **🔔 Thông báo** (áp dụng ngay, theo từng máy): bật/tắt và giờ **tóm tắt buổi sáng**, bật/tắt **tổng kết tuần**, **giờ nhắc cho việc "cả ngày"**.
+- **⏰ Nhắc hẹn nâng cao** (theo từng máy): nhắc lại tới khi xong, báo thức cho việc ưu tiên Cao, giờ yên lặng — xem [mục 12](#12-nhắc-nhở--thông-báo).
+- **🔒 Bảo mật** (theo từng máy): **Khóa ứng dụng** bằng vân tay / khuôn mặt / mã PIN máy — hỏi khi mở app và khi quay lại sau hơn 30 giây. Cần cài sẵn vân tay hoặc mã khóa màn hình.
 - **👤 Tài khoản**:
   - **Đăng xuất khỏi máy này** — các thiết bị khác vẫn đăng nhập.
   - **Đăng xuất khỏi mọi thiết bị** — dùng khi mất điện thoại hoặc đăng nhập nhầm ở máy lạ.

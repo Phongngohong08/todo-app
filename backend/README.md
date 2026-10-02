@@ -17,6 +17,7 @@
 9. **Thống kê (Statistics)**: Cung cấp báo cáo gọn: số việc **đã hoàn thành**, số việc **đang chờ**, phân bố việc đang chờ **theo danh mục**, và số việc hoàn thành mỗi ngày trong **7 ngày gần nhất**.
 10. **Mục tiêu hằng ngày**: `daily_goal` (số việc/ngày) và `days_off` (ngày nghỉ, vd `"SAT,SUN"`) trong `/preferences` — app dùng để tính chuỗi ngày đạt mục tiêu.
 11. **Hạn "cả ngày"**: `due_all_day = true` nghĩa là hạn chỉ có ngày (app lưu hạn ở 23:59 giờ địa phương để phép so sánh "quá hạn" vẫn đúng).
+12. **Trợ lý AI cho từng việc**: `POST /ai/breakdown` chia một việc thành các bước con + ước tính tổng thời lượng; `POST /ai/estimate` gợi ý thời lượng dựa trên các việc người dùng từng ước tính. Cả hai chỉ trả gợi ý (app cho xem trước rồi mới lưu) và tính vào giới hạn lượt AI.
 
 > **Phía ứng dụng Android** còn có **Nhắc nhở local (Reminders)** qua WorkManager: tự gửi thông báo khi task đến hạn `due_date` — tính năng client-side, không phụ thuộc backend/FCM.
 
@@ -96,7 +97,7 @@ Khi gặp `401` ở bất kỳ endpoint được bảo vệ nào, client nên t�
 | `/auth/register` (theo IP) | 3 lần liền, sau đó 1 lần/phút |
 | `/auth/refresh`, `/auth/logout` (theo IP) | 10 lần liền, sau đó 30 lần/phút |
 | Mọi API đã đăng nhập (theo user) | 60 request liền, sau đó 5 request/giây |
-| AI: chat, parse-task, lập lịch, phân tích trí nhớ (theo user) | `AI_RATE_PER_MINUTE` lượt/phút và `AI_DAILY_LIMIT_PER_USER` lượt/ngày (reset 0h theo `APP_TIMEZONE`) |
+| AI: chat, parse-task, breakdown, estimate, lập lịch, phân tích trí nhớ (theo user) | `AI_RATE_PER_MINUTE` lượt/phút và `AI_DAILY_LIMIT_PER_USER` lượt/ngày (reset 0h theo `APP_TIMEZONE`) |
 | `/ai/memories/trigger-extraction` (theo user) | Thêm: 2 lần liền, sau đó 1 lần/20 phút |
 
 Lập lịch chỉ trừ lượt AI khi người dùng còn việc chưa xong (không có việc thì trả lịch rỗng, không gọi AI). Bộ đếm nằm trong bộ nhớ tiến trình và reset khi khởi động lại; nếu chạy nhiều instance thì cần chuyển sang Redis.
@@ -126,6 +127,8 @@ Tất cả endpoint dưới đây (trừ nhóm `/auth`) yêu cầu header `Autho
 | `POST` | `/api/v1/ai/parse-task` | **Quick Add**: gửi `{ "text": "...", "local_time": "<RFC3339>" }`, nhận về task có cấu trúc (`title`, `description`, `priority`, `due_date`, `category`). **Không** tự lưu task |
 | `POST` | `/api/v1/ai/chat` | Trò chuyện với AI Coach. Body `{ "message": "...", "local_time": "<RFC3339>" }` (local_time để AI quy "thứ 2 tuần sau" ra ngày). Trả `{ "reply": "...", "actions": [...] }` |
 | `GET` | `/api/v1/ai/chat/history?limit=50` | Lịch sử chat (cũ → mới) để app hiển thị lại cuộc trò chuyện |
+| `POST` | `/api/v1/ai/breakdown` | **Chia nhỏ việc**: body `{ "title": "...", "description": "..." }` (title bắt buộc, ≤255 ký tự; description ≤2000). Trả `{ "subtasks": [...], "estimated_minutes": n }` — tối đa 10 bước (đã bỏ ký hiệu đầu dòng, khử trùng lặp), thời lượng làm tròn 5 phút trong 5–1440 (0 = không rõ). **Không** tự lưu |
+| `POST` | `/api/v1/ai/estimate` | **Ước tính thời lượng**: cùng body, trả `{ "estimated_minutes": n }`. AI tham khảo tối đa 20 việc gần nhất người dùng đã tự đặt thời lượng |
 | `GET` · `DELETE` | `/api/v1/ai/memories` · `/memories/{id}` | Xem / xóa trí nhớ dài hạn |
 | `POST` | `/api/v1/ai/memories/trigger-extraction` | Phân tích thủ công (nhìn lại 30 ngày), trả `{ analyzed, extracted }` |
 

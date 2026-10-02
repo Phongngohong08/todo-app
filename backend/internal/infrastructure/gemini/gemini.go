@@ -475,6 +475,83 @@ Return ONLY the JSON array.`
 	return insights, nil
 }
 
+// BreakdownTask chia một việc lớn thành các bước con cụ thể, làm được ngay, kèm tổng thời lượng ước tính (phút).
+//
+//	title = "Viết tiểu luận môn Triết"
+//	→ ["Chọn đề tài và đọc yêu cầu", "Tìm 5 tài liệu tham khảo", "Lập dàn ý", ...], 240
+func (c *GeminiClient) BreakdownTask(ctx context.Context, title, description string) ([]string, int, error) {
+	if c == nil || c.client == nil {
+		return nil, 0, errNotInitialized
+	}
+	systemPrompt := `You help a person break a to-do item into small, concrete, actionable steps.
+Return 3 to 8 steps in order. Each step starts with a verb, is specific, and takes roughly 10-60 minutes.
+Do not number the steps. Write in the SAME language as the task (Vietnamese stays Vietnamese).
+Also estimate the total time in minutes for the whole task.
+Return ONLY a JSON object: {"subtasks": ["...", "..."], "estimated_minutes": 120}`
+	userPrompt := fmt.Sprintf("Task: %s\nDetails: %s", title, description)
+
+	raw, err := c.generateJSON(ctx, systemPrompt, userPrompt)
+	if err != nil {
+		return nil, 0, classifyErr(fmt.Errorf("gemini breakdown error: %w", err))
+	}
+	var out struct {
+		Subtasks         []string `json:"subtasks"`
+		EstimatedMinutes int      `json:"estimated_minutes"`
+	}
+	if err := unmarshalLenient(raw, &out); err != nil {
+		return nil, 0, fmt.Errorf("failed to parse Gemini breakdown response: %w. Raw: %s", err, raw)
+	}
+	return out.Subtasks, out.EstimatedMinutes, nil
+}
+
+// EstimateTask ước tính thời lượng (phút) cho một việc. examples = các việc người dùng đã tự ước tính trước đây,
+// giúp AI hiệu chỉnh theo nhịp làm việc của chính người đó (người làm nhanh / chậm).
+func (c *GeminiClient) EstimateTask(ctx context.Context, title, description string, examples []domain.EstimateExample) (int, error) {
+	if c == nil || c.client == nil {
+		return 0, errNotInitialized
+	}
+	systemPrompt := `You estimate how many minutes a person needs to finish a to-do item.
+Use the person's own past estimates (if given) to calibrate to their pace.
+Return ONLY a JSON object: {"estimated_minutes": 45}`
+	examplesJSON, _ := json.Marshal(examples)
+	userPrompt := fmt.Sprintf("Task: %s\nDetails: %s\n\nThis person's past estimates:\n%s", title, description, examplesJSON)
+
+	raw, err := c.generateJSON(ctx, systemPrompt, userPrompt)
+	if err != nil {
+		return 0, classifyErr(fmt.Errorf("gemini estimate error: %w", err))
+	}
+	var out struct {
+		EstimatedMinutes int `json:"estimated_minutes"`
+	}
+	if err := unmarshalLenient(raw, &out); err != nil {
+		return 0, fmt.Errorf("failed to parse Gemini estimate response: %w. Raw: %s", err, raw)
+	}
+	return out.EstimatedMinutes, nil
+}
+
+// generateJSON gọi model với system prompt + một tin người dùng, ép trả JSON, nhiệt độ thấp (ổn định).
+func (c *GeminiClient) generateJSON(ctx context.Context, systemPrompt, userPrompt string) (string, error) {
+	config := &genai.GenerateContentConfig{
+		SystemInstruction: &genai.Content{Parts: []*genai.Part{{Text: systemPrompt}}},
+		ResponseMIMEType:  "application/json",
+		Temperature:       genai.Ptr[float32](0.3),
+	}
+	contents := []*genai.Content{{Parts: []*genai.Part{{Text: userPrompt}}}}
+	resp, err := c.client.Models.GenerateContent(ctx, c.model, contents, config)
+	if err != nil {
+		return "", err
+	}
+	return resp.Text(), nil
+}
+
+// unmarshalLenient đọc JSON; thử lại sau khi gỡ hàng rào markdown nếu model lỡ bọc ```json.
+func unmarshalLenient(raw string, v any) error {
+	if err := json.Unmarshal([]byte(raw), v); err != nil {
+		return json.Unmarshal([]byte(stripCodeBlocks(raw)), v)
+	}
+	return nil
+}
+
 // stripCodeBlocks gỡ hàng rào markdown ```json ... ``` khi LLM lỡ bọc JSON trong code block.
 // Ví dụ: s = "```json\n{\"title\":\"X\"}\n```"  →  "{\"title\":\"X\"}"
 func stripCodeBlocks(s string) string {

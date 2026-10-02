@@ -11,6 +11,7 @@ import (
 	"time"
 	"todo-backend/internal/domain"
 	"todo-backend/internal/infrastructure/ratelimit"
+	"todo-backend/internal/usecase/assist"
 	"todo-backend/internal/usecase/auth"
 	"todo-backend/internal/usecase/category"
 	"todo-backend/internal/usecase/coach"
@@ -41,6 +42,7 @@ type RouteManager struct {
 	coachUC    *coach.CoachUseCase
 	memoryUC   *memory.MemoryUseCase
 	quickAddUC *quickadd.QuickAddUseCase
+	assistUC   *assist.AssistUseCase
 	categoryUC *category.CategoryUseCase
 	memoryRepo domain.MemoryRepository
 	statsRepo  domain.StatsRepository
@@ -64,6 +66,7 @@ type Dependencies struct {
 	Coach      *coach.CoachUseCase
 	Memory     *memory.MemoryUseCase
 	QuickAdd   *quickadd.QuickAddUseCase
+	Assist     *assist.AssistUseCase
 	Categories *category.CategoryUseCase
 	MemoryRepo domain.MemoryRepository
 	StatsRepo  domain.StatsRepository
@@ -85,6 +88,7 @@ func NewRouteManager(deps Dependencies, opts Options) *RouteManager {
 		coachUC:    deps.Coach,
 		memoryUC:   deps.Memory,
 		quickAddUC: deps.QuickAdd,
+		assistUC:   deps.Assist,
 		categoryUC: deps.Categories,
 		memoryRepo: deps.MemoryRepo,
 		statsRepo:  deps.StatsRepo,
@@ -176,6 +180,8 @@ func (rm *RouteManager) SetupRouter() (*gin.Engine, error) {
 				aiGroup.POST("/chat", rm.ai.middleware(), rm.handleAIChat)
 				aiGroup.GET("/chat/history", rm.handleChatHistory)
 				aiGroup.POST("/parse-task", rm.ai.middleware(), rm.handleParseTask)
+				aiGroup.POST("/breakdown", rm.ai.middleware(), rm.handleBreakdownTask) // chia nhỏ việc thành bước con
+				aiGroup.POST("/estimate", rm.ai.middleware(), rm.handleEstimateTask)   // gợi ý thời lượng
 				aiGroup.GET("/memories", rm.handleListMemories)
 				aiGroup.DELETE("/memories/:id", rm.handleDeleteMemory)
 				aiGroup.POST("/memories/trigger-extraction", // phân tích thủ công (nút "Phân tích" trong app)
@@ -699,6 +705,38 @@ func (rm *RouteManager) handleChatHistory(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, messages)
+}
+
+// AssistInput: việc cần AI hỗ trợ (chưa cần lưu — dùng được cả khi đang tạo việc mới).
+type AssistInput struct {
+	Title       string `json:"title" binding:"required,max=255"`
+	Description string `json:"description" binding:"max=2000"`
+}
+
+func (rm *RouteManager) handleBreakdownTask(c *gin.Context) {
+	var input AssistInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	result, err := rm.assistUC.Breakdown(c.Request.Context(), input.Title, input.Description)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, result)
+}
+
+func (rm *RouteManager) handleEstimateTask(c *gin.Context) {
+	var input AssistInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	minutes, err := rm.assistUC.Estimate(c.Request.Context(), c.GetString("userID"), input.Title, input.Description)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"estimated_minutes": minutes})
 }
 
 type ParseTaskInput struct {

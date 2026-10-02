@@ -16,6 +16,7 @@ import (
 	"todo-backend/internal/infrastructure/qdrant"
 	"todo-backend/internal/infrastructure/router"
 	"todo-backend/internal/infrastructure/worker"
+	"todo-backend/internal/usecase/assist"
 	"todo-backend/internal/usecase/auth"
 	"todo-backend/internal/usecase/category"
 	"todo-backend/internal/usecase/coach"
@@ -88,6 +89,7 @@ func main() {
 	coachUC := coach.NewCoachUseCase(chatRepo, taskRepo, qdrantClient, geminiClient, geminiClient)
 	memoryUC := memory.NewMemoryUseCase(taskRepo, chatRepo, qdrantClient, geminiClient, geminiClient)
 	quickAddUC := quickadd.NewQuickAddUseCase(geminiClient)
+	assistUC := assist.NewAssistUseCase(geminiClient, taskRepo)
 	categoryUC := category.NewCategoryUseCase(categoryRepo)
 
 	// 6. Setup HTTP router
@@ -99,6 +101,7 @@ func main() {
 			Coach:      coachUC,
 			Memory:     memoryUC,
 			QuickAdd:   quickAddUC,
+			Assist:     assistUC,
 			Categories: categoryUC,
 			MemoryRepo: qdrantClient,
 			StatsRepo:  statsRepo,

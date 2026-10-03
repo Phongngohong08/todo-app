@@ -61,6 +61,12 @@ type TaskInput struct {
 	RecurrenceInterval *int    `json:"recurrence_interval" binding:"omitempty,min=1,max=365"`
 	RecurrenceMode     *string `json:"recurrence_mode" binding:"omitempty,oneof=SCHEDULE COMPLETION"`
 	RecurrenceUntil    *string `json:"recurrence_until" binding:"omitempty,max=40"`
+
+	// Trường thêm ở migration 000009 — cũng là con trỏ (nil = giữ nguyên). start_at: "" = xóa.
+	Tags           *[]string `json:"tags" binding:"omitempty,max=20"`
+	Section        *string   `json:"section" binding:"omitempty,max=50"`
+	StartAt        *string   `json:"start_at" binding:"omitempty,max=40"`
+	ExtraReminders *[]int    `json:"extra_reminders" binding:"omitempty,max=10"`
 }
 
 // myDayLayout: định dạng ngày của "Ngày của tôi" (ngày theo lịch của người dùng, không có giờ).
@@ -97,6 +103,11 @@ func normalizeSubtasks(in []domain.Subtask) []domain.Subtask {
 	seen := make(map[string]bool, len(in))
 	for _, s := range in {
 		s.Title = strings.TrimSpace(s.Title)
+		if s.DueDate != nil {
+			if _, err := time.Parse(myDayLayout, strings.TrimSpace(*s.DueDate)); err != nil {
+				s.DueDate = nil
+			}
+		}
 		if s.Title == "" || seen[s.ID] {
 			continue
 		}
@@ -144,6 +155,8 @@ func (u *TaskUseCase) Save(ctx context.Context, id, userID string, input TaskInp
 		Subtasks:           []domain.Subtask{},
 		RecurrenceInterval: 1,
 		RecurrenceMode:     domain.RecurrenceModeSchedule,
+		Tags:               []string{},
+		ExtraReminders:     []int{},
 		CreatedAt:          now,
 	}
 	prevStatus := domain.StatusTodo
@@ -160,6 +173,10 @@ func (u *TaskUseCase) Save(ctx context.Context, id, userID string, input TaskInp
 		task.RecurrenceInterval = existing.RecurrenceInterval
 		task.RecurrenceMode = existing.RecurrenceMode
 		task.RecurrenceUntil = existing.RecurrenceUntil
+		task.Tags = existing.Tags
+		task.Section = existing.Section
+		task.StartAt = existing.StartAt
+		task.ExtraReminders = existing.ExtraReminders
 		prevStatus = existing.Status
 	}
 	if err := applyExtendedFields(task, input); err != nil {
@@ -174,6 +191,14 @@ func (u *TaskUseCase) Save(ctx context.Context, id, userID string, input TaskInp
 	task.Recurrence = normalizeRecurrence(input.Recurrence)
 	task.RecurrenceDays = input.RecurrenceDays
 	task.ReminderOffsetMinutes = input.ReminderOffsetMinutes
+	// Khung giờ chỉ có nghĩa khi có hạn; bắt đầu sau hạn là dữ liệu sai
+	if task.StartAt != nil {
+		if task.DueDate == nil {
+			task.StartAt = nil
+		} else if task.StartAt.After(*task.DueDate) {
+			return nil, domain.NewValidationError("Giờ bắt đầu phải trước hạn chót")
+		}
+	}
 	if input.Status != "" {
 		task.Status = domain.TaskStatus(input.Status)
 	}
@@ -251,6 +276,27 @@ func applyExtendedFields(task *domain.Task, input TaskInput) error {
 			}
 			task.RecurrenceUntil = &until
 		}
+	}
+	if input.Tags != nil {
+		task.Tags = NormalizeTags(*input.Tags)
+	}
+	if input.Section != nil {
+		task.Section = strings.TrimSpace(*input.Section)
+	}
+	if input.StartAt != nil {
+		raw := strings.TrimSpace(*input.StartAt)
+		if raw == "" {
+			task.StartAt = nil
+		} else {
+			start, err := time.Parse(time.RFC3339, raw)
+			if err != nil {
+				return domain.NewValidationError("start_at phải là thời điểm RFC3339")
+			}
+			task.StartAt = &start
+		}
+	}
+	if input.ExtraReminders != nil {
+		task.ExtraReminders = NormalizeReminders(*input.ExtraReminders)
 	}
 	if task.RecurrenceInterval < 1 {
 		task.RecurrenceInterval = 1
@@ -398,6 +444,10 @@ func (u *TaskUseCase) spawnNextOccurrence(ctx context.Context, parent *domain.Ta
 		RecurrenceUntil:       parent.RecurrenceUntil,
 		EstimatedMinutes:      parent.EstimatedMinutes,
 		ReminderOffsetMinutes: parent.ReminderOffsetMinutes,
+		ExtraReminders:        parent.ExtraReminders,
+		Tags:                  parent.Tags,
+		Section:               parent.Section,
+		StartAt:               shiftedStart(parent, nextDue),
 		SortOrder:             parent.SortOrder,
 		Subtasks:              nextOccurrenceSubtasks(parent.Subtasks),
 		SpawnedFrom:           &parentID,
@@ -474,4 +524,63 @@ func inputFromTask(t *domain.Task) TaskInput {
 		Subtasks:              t.Subtasks,
 		SpawnedFrom:           t.SpawnedFrom,
 	}
+}
+
+const (
+	maxTags         = 10
+	maxTagLength    = 30
+	maxReminders    = 5
+	maxReminderMins = 10080 // nhắc trước tối đa 7 ngày
+)
+
+// NormalizeTags chuẩn hóa nhãn: bỏ "@"/"#" đầu, chữ thường, khoảng trắng → "-", bỏ dấu phẩy (dùng làm dấu ngăn
+// khi lưu), bỏ trùng; tối đa 10 nhãn, mỗi nhãn tối đa 30 ký tự. Giống TagRules bên app.
+func NormalizeTags(in []string) []string {
+	out := []string{}
+	seen := map[string]bool{}
+	for _, raw := range in {
+		t := strings.ToLower(strings.TrimSpace(raw))
+		t = strings.TrimLeft(t, "@#")
+		t = strings.ReplaceAll(t, ",", "")
+		t = strings.Join(strings.Fields(t), "-")
+		if r := []rune(t); len(r) > maxTagLength {
+			t = string(r[:maxTagLength])
+		}
+		if t == "" || seen[t] {
+			continue
+		}
+		seen[t] = true
+		out = append(out, t)
+		if len(out) == maxTags {
+			break
+		}
+	}
+	return out
+}
+
+// NormalizeReminders: bỏ giá trị ngoài 0..7 ngày, bỏ trùng, sắp tăng dần, tối đa 5.
+func NormalizeReminders(in []int) []int {
+	out := []int{}
+	seen := map[int]bool{}
+	for _, m := range in {
+		if m < 0 || m > maxReminderMins || seen[m] {
+			continue
+		}
+		seen[m] = true
+		out = append(out, m)
+	}
+	sort.Ints(out)
+	if len(out) > maxReminders {
+		out = out[:maxReminders]
+	}
+	return out
+}
+
+// shiftedStart dời giờ bắt đầu theo đúng khoảng mà hạn chót đã dời (giữ nguyên độ dài khung giờ).
+func shiftedStart(parent *domain.Task, nextDue time.Time) *time.Time {
+	if parent.StartAt == nil || parent.DueDate == nil {
+		return nil
+	}
+	start := nextDue.Add(-parent.DueDate.Sub(*parent.StartAt))
+	return &start
 }

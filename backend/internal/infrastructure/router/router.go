@@ -15,6 +15,8 @@ import (
 	"todo-backend/internal/usecase/auth"
 	"todo-backend/internal/usecase/category"
 	"todo-backend/internal/usecase/coach"
+	"todo-backend/internal/usecase/focus"
+	"todo-backend/internal/usecase/habit"
 	"todo-backend/internal/usecase/memory"
 	"todo-backend/internal/usecase/plan"
 	"todo-backend/internal/usecase/quickadd"
@@ -44,6 +46,8 @@ type RouteManager struct {
 	quickAddUC *quickadd.QuickAddUseCase
 	assistUC   *assist.AssistUseCase
 	categoryUC *category.CategoryUseCase
+	habitUC    *habit.HabitUseCase
+	focusUC    *focus.FocusUseCase
 	memoryRepo domain.MemoryRepository
 	statsRepo  domain.StatsRepository
 	userRepo   domain.UserRepository
@@ -68,6 +72,8 @@ type Dependencies struct {
 	QuickAdd   *quickadd.QuickAddUseCase
 	Assist     *assist.AssistUseCase
 	Categories *category.CategoryUseCase
+	Habits     *habit.HabitUseCase
+	Focus      *focus.FocusUseCase
 	MemoryRepo domain.MemoryRepository
 	StatsRepo  domain.StatsRepository
 	UserRepo   domain.UserRepository
@@ -90,6 +96,8 @@ func NewRouteManager(deps Dependencies, opts Options) *RouteManager {
 		quickAddUC: deps.QuickAdd,
 		assistUC:   deps.Assist,
 		categoryUC: deps.Categories,
+		habitUC:    deps.Habits,
+		focusUC:    deps.Focus,
 		memoryRepo: deps.MemoryRepo,
 		statsRepo:  deps.StatsRepo,
 		userRepo:   deps.UserRepo,
@@ -164,6 +172,22 @@ func (rm *RouteManager) SetupRouter() (*gin.Engine, error) {
 				tasksGroup.DELETE("/:id", rm.handleDeleteTask)
 
 				tasksGroup.POST("/:id/complete", rm.handleCompleteTask)
+			}
+
+			// Thói quen: đồng bộ giống tasks (PUT idempotent, id do client sinh) + đánh dấu theo ngày
+			habitsGroup := protected.Group("/habits")
+			{
+				habitsGroup.GET("/sync", rm.handleSyncHabits)
+				habitsGroup.PUT("/:id", rm.handleSaveHabit)
+				habitsGroup.DELETE("/:id", rm.handleDeleteHabit)
+				habitsGroup.PUT("/:id/checkins/:date", rm.handleSetHabitCheckin)
+			}
+
+			// Lịch sử tập trung (Pomodoro): chỉ thêm, id do client sinh
+			focusGroup := protected.Group("/focus-sessions")
+			{
+				focusGroup.GET("/sync", rm.handleSyncFocusSessions)
+				focusGroup.PUT("/:id", rm.handleRecordFocusSession)
 			}
 
 			// Daily Plans Routes (giới hạn AI kiểm tra bên trong handler: chỉ trừ lượt khi thực sự gọi AI)
@@ -510,6 +534,8 @@ func (rm *RouteManager) handleSyncTasks(c *gin.Context) {
 
 type CategoriesPayload struct {
 	Categories []string `json:"categories" binding:"max=50,dive,max=50"`
+	// Cài đặt hiển thị từng danh sách (màu, emoji, mục). Client cũ không gửi (nil) → giữ nguyên.
+	Lists *[]domain.ListSettings `json:"lists,omitempty" binding:"omitempty,max=60"`
 }
 
 func (rm *RouteManager) handleListCategories(c *gin.Context) {
@@ -518,7 +544,12 @@ func (rm *RouteManager) handleListCategories(c *gin.Context) {
 		respondError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, CategoriesPayload{Categories: names})
+	lists, err := rm.categoryUC.Settings(c.Request.Context(), c.GetString("userID"))
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, CategoriesPayload{Categories: names, Lists: &lists})
 }
 
 func (rm *RouteManager) handleReplaceCategories(c *gin.Context) {
@@ -532,7 +563,16 @@ func (rm *RouteManager) handleReplaceCategories(c *gin.Context) {
 		respondError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, CategoriesPayload{Categories: names})
+	out := CategoriesPayload{Categories: names}
+	if input.Lists != nil {
+		lists, err := rm.categoryUC.ReplaceSettings(c.Request.Context(), c.GetString("userID"), *input.Lists)
+		if err != nil {
+			respondError(c, err)
+			return
+		}
+		out.Lists = &lists
+	}
+	c.JSON(http.StatusOK, out)
 }
 
 func (rm *RouteManager) handleDeleteTask(c *gin.Context) {
@@ -933,6 +973,8 @@ func respondError(c *gin.Context, err error) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": validation.Message})
 	case errors.Is(err, domain.ErrTaskNotFound):
 		c.JSON(http.StatusNotFound, gin.H{"error": "task not found"})
+	case errors.Is(err, domain.ErrNotFound):
+		c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
 	case errors.Is(err, domain.ErrInvalidStatusTrans):
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Công việc đã được hoàn thành trước đó"})
 	case errors.Is(err, domain.ErrEmailExists):

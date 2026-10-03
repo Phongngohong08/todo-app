@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
+	"strings"
 	"time"
 	"todo-backend/internal/domain"
 )
@@ -21,7 +23,8 @@ func NewPostgresTaskRepository(db *sql.DB) *PostgresTaskRepository {
 const taskColumns = `id, user_id, title, description, priority, due_date, status, category, recurrence,
 	recurrence_days, reminder_offset_minutes, completed_at, sort_order, subtasks, spawned_from,
 	created_at, updated_at, deleted_at, due_all_day, my_day, estimated_minutes,
-	recurrence_interval, recurrence_mode, recurrence_until`
+	recurrence_interval, recurrence_mode, recurrence_until,
+	tags, section, start_at, extra_reminders`
 
 type rowScanner interface {
 	Scan(dest ...any) error
@@ -34,6 +37,8 @@ func scanTask(row rowScanner) (*domain.Task, error) {
 		subtasks    []byte
 		spawnedFrom sql.NullString
 		myDay       sql.NullString
+		tags        string
+		extra       string
 	)
 	err := row.Scan(
 		&task.ID, &task.UserID, &task.Title, &description, &task.Priority, &task.DueDate,
@@ -41,6 +46,7 @@ func scanTask(row rowScanner) (*domain.Task, error) {
 		&task.CompletedAt, &task.SortOrder, &subtasks, &spawnedFrom,
 		&task.CreatedAt, &task.UpdatedAt, &task.DeletedAt, &task.DueAllDay, &myDay, &task.EstimatedMinutes,
 		&task.RecurrenceInterval, &task.RecurrenceMode, &task.RecurrenceUntil,
+		&tags, &task.Section, &task.StartAt, &extra,
 	)
 	if err != nil {
 		return nil, err
@@ -52,6 +58,8 @@ func scanTask(row rowScanner) (*domain.Task, error) {
 	if myDay.Valid && myDay.String != "" {
 		task.MyDay = &myDay.String
 	}
+	task.Tags = SplitList(tags)
+	task.ExtraReminders = SplitInts(extra)
 	task.Subtasks = []domain.Subtask{}
 	if len(subtasks) > 0 {
 		if err := json.Unmarshal(subtasks, &task.Subtasks); err != nil {
@@ -88,7 +96,7 @@ func (r *PostgresTaskRepository) Upsert(ctx context.Context, task *domain.Task) 
 	query := `
 		INSERT INTO tasks (` + taskColumns + `)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18,
-			$19, $20, $21, $22, $23, $24)
+			$19, $20, $21, $22, $23, $24, $25, $26, $27, $28)
 		ON CONFLICT (id) DO UPDATE SET
 			title = EXCLUDED.title, description = EXCLUDED.description, priority = EXCLUDED.priority,
 			due_date = EXCLUDED.due_date, status = EXCLUDED.status, category = EXCLUDED.category,
@@ -98,7 +106,9 @@ func (r *PostgresTaskRepository) Upsert(ctx context.Context, task *domain.Task) 
 			updated_at = EXCLUDED.updated_at, deleted_at = EXCLUDED.deleted_at,
 			due_all_day = EXCLUDED.due_all_day, my_day = EXCLUDED.my_day,
 			estimated_minutes = EXCLUDED.estimated_minutes, recurrence_interval = EXCLUDED.recurrence_interval,
-			recurrence_mode = EXCLUDED.recurrence_mode, recurrence_until = EXCLUDED.recurrence_until
+			recurrence_mode = EXCLUDED.recurrence_mode, recurrence_until = EXCLUDED.recurrence_until,
+			tags = EXCLUDED.tags, section = EXCLUDED.section, start_at = EXCLUDED.start_at,
+			extra_reminders = EXCLUDED.extra_reminders
 		WHERE tasks.user_id = EXCLUDED.user_id
 	`
 	interval := task.RecurrenceInterval
@@ -115,6 +125,7 @@ func (r *PostgresTaskRepository) Upsert(ctx context.Context, task *domain.Task) 
 		task.CompletedAt, task.SortOrder, subtasksJSON, task.SpawnedFrom,
 		task.CreatedAt, task.UpdatedAt, task.DeletedAt,
 		task.DueAllDay, task.MyDay, task.EstimatedMinutes, interval, mode, task.RecurrenceUntil,
+		JoinList(task.Tags), task.Section, task.StartAt, JoinInts(task.ExtraReminders),
 	)
 	if err != nil {
 		return err
@@ -236,4 +247,36 @@ func (r *PostgresTaskRepository) ListLogs(ctx context.Context, userID string, si
 	}
 
 	return logs, rows.Err()
+}
+
+// SplitList tách chuỗi "a,b,c" đã lưu thành mảng (rỗng → mảng rỗng, không phải nil, để JSON là []).
+func SplitList(s string) []string {
+	out := []string{}
+	for _, p := range strings.Split(s, ",") {
+		if p = strings.TrimSpace(p); p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+func JoinList(items []string) string { return strings.Join(items, ",") }
+
+// SplitInts tách "60,1440" thành [60 1440]; phần không phải số bị bỏ qua.
+func SplitInts(s string) []int {
+	out := []int{}
+	for _, p := range SplitList(s) {
+		if n, err := strconv.Atoi(p); err == nil {
+			out = append(out, n)
+		}
+	}
+	return out
+}
+
+func JoinInts(items []int) string {
+	parts := make([]string, len(items))
+	for i, n := range items {
+		parts[i] = strconv.Itoa(n)
+	}
+	return strings.Join(parts, ",")
 }

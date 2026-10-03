@@ -60,6 +60,8 @@ type Subtask struct {
 	Title    string `json:"title" binding:"required,max=255"`
 	Done     bool   `json:"done"`
 	Position int    `json:"position"`
+	// Hạn của riêng bước này ("yyyy-MM-dd", tùy chọn) — vd "nộp bản nháp" trước hạn của cả việc.
+	DueDate *string `json:"due_date,omitempty" binding:"omitempty,max=10"`
 }
 
 type Task struct {
@@ -80,6 +82,10 @@ type Task struct {
 	ReminderOffsetMinutes int        `json:"reminder_offset_minutes"` // số phút nhắc trước hạn (0 = đúng giờ)
 	MyDay                 *string    `json:"my_day"`                  // "yyyy-MM-dd": ngày người dùng chọn làm việc này
 	EstimatedMinutes      int        `json:"estimated_minutes"`       // thời lượng ước tính (0 = chưa có)
+	Tags                  []string   `json:"tags"`                    // nhãn (đã chuẩn hóa: chữ thường, không khoảng trắng)
+	Section               string     `json:"section"`                 // mục trong danh sách (cột Kanban), "" = chưa phân mục
+	StartAt               *time.Time `json:"start_at"`                // giờ bắt đầu; cùng due_date tạo khung thời gian
+	ExtraReminders        []int      `json:"extra_reminders"`         // lời nhắc thêm (phút trước hạn), ngoài reminder_offset_minutes
 	CompletedAt           *time.Time `json:"completed_at"`
 	SortOrder             float64    `json:"sort_order"` // nhỏ hơn đứng trước
 	Subtasks              []Subtask  `json:"subtasks"`

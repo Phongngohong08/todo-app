@@ -20,6 +20,8 @@ import (
 	"todo-backend/internal/usecase/auth"
 	"todo-backend/internal/usecase/category"
 	"todo-backend/internal/usecase/coach"
+	"todo-backend/internal/usecase/focus"
+	"todo-backend/internal/usecase/habit"
 	"todo-backend/internal/usecase/memory"
 	"todo-backend/internal/usecase/plan"
 	"todo-backend/internal/usecase/quickadd"
@@ -90,7 +92,9 @@ func main() {
 	memoryUC := memory.NewMemoryUseCase(taskRepo, chatRepo, qdrantClient, geminiClient, geminiClient)
 	quickAddUC := quickadd.NewQuickAddUseCase(geminiClient)
 	assistUC := assist.NewAssistUseCase(geminiClient, taskRepo)
-	categoryUC := category.NewCategoryUseCase(categoryRepo)
+	categoryUC := category.NewCategoryUseCase(categoryRepo, categoryRepo)
+	habitUC := habit.NewHabitUseCase(db.NewPostgresHabitRepository(pgDB))
+	focusUC := focus.NewFocusUseCase(db.NewPostgresFocusRepository(pgDB))
 
 	// 6. Setup HTTP router
 	routeManager := router.NewRouteManager(
@@ -103,6 +107,8 @@ func main() {
 			QuickAdd:   quickAddUC,
 			Assist:     assistUC,
 			Categories: categoryUC,
+			Habits:     habitUC,
+			Focus:      focusUC,
 			MemoryRepo: qdrantClient,
 			StatsRepo:  statsRepo,
 			UserRepo:   userRepo,

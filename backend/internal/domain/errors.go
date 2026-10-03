@@ -10,6 +10,8 @@ var (
 	ErrInvalidToken       = errors.New("invalid or expired token")
 	// ErrAIUnavailable: chưa cấu hình GEMINI_API_KEY → tính năng AI tạm không dùng được (HTTP 503).
 	ErrAIUnavailable = errors.New("AI service is not configured")
+	// ErrNotFound: bản ghi (thói quen, phiên tập trung...) không tồn tại hoặc không thuộc người dùng (HTTP 404).
+	ErrNotFound = errors.New("not found")
 )
 
 // ValidationError là lỗi do dữ liệu đầu vào không hợp lệ; Message được trả nguyên văn cho client (HTTP 400).

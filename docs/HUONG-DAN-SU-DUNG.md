@@ -1,6 +1,6 @@
 # Hướng dẫn sử dụng — TaskFlow AI
 
-Ứng dụng quản lý công việc (To-Do List) tích hợp AI, thiết kế tối giản. Tài liệu này hướng dẫn người dùng cuối sử dụng toàn bộ tính năng của ứng dụng.
+Ứng dụng **quản lý công việc cá nhân** tích hợp AI: không chỉ là danh sách việc cần làm mà gom cả **lập kế hoạch ngày** (Ngày của tôi, lịch trình AI), **tổ chức công việc** (danh sách, mục, bảng Kanban, nhãn, bộ lọc đã lưu, ma trận ưu tiên), **thời gian** (lịch tháng / tuần / lịch trình, khung giờ, nhắc hẹn, báo thức), **thói quen**, **tập trung** (Pomodoro + lịch sử) và **nhìn lại** (mục tiêu, thống kê, tổng kết tuần, AI Coach). Mọi thứ dùng được khi offline và đồng bộ giữa các máy. Tài liệu này hướng dẫn người dùng cuối sử dụng toàn bộ tính năng của ứng dụng.
 
 ---
 
@@ -41,10 +41,10 @@ Thanh điều hướng dưới có 4 tab:
 
 | Tab | Dùng để |
 | :--- | :--- |
-| ☀ **Hôm nay** | Chọn việc làm hôm nay ("Ngày của tôi"), xem mục tiêu ngày, lịch trình AI |
-| ✔ **Việc làm** | Toàn bộ công việc, tìm kiếm, lọc, sắp xếp |
-| 📅 **Lịch** | Xem việc theo ngày trong tháng |
-| 👤 **Tôi** | Mục tiêu & chuỗi ngày, thống kê, tổng kết tuần, AI Coach, lịch sử, thùng rác, thiết lập |
+| ☀ **Hôm nay** | Chọn việc làm hôm nay ("Ngày của tôi"), thói quen hôm nay, mục tiêu ngày, lịch trình AI |
+| ✔ **Việc làm** | Toàn bộ công việc: tìm kiếm, lọc (danh sách, nhãn, bộ lọc đã lưu), sắp xếp, chọn nhiều; lối vào **Danh sách / Kanban** và **Ma trận ưu tiên** |
+| 📅 **Lịch** | Xem việc theo tháng / tuần (kéo thả đổi ngày) / lịch trình 30 ngày |
+| 👤 **Tôi** | Mục tiêu & chuỗi ngày, thống kê & thời gian tập trung, thói quen, danh sách, tổng kết tuần, AI Coach, lịch sử, thùng rác, thiết lập |
 
 ---
 
@@ -65,7 +65,10 @@ Tab **Hôm nay** trả lời câu hỏi *"hôm nay mình làm gì?"*.
 - **Vuốt sang trái** để hoãn việc sang ngày khác — việc được dời hạn và rời khỏi Ngày của tôi hôm nay (có Hoàn tác).
 
 ### Gợi ý cho hôm nay
-App gợi ý những việc nên cân nhắc: **quá hạn**, **đến hạn hôm nay**, **hôm qua đã chọn mà chưa xong**, và **ưu tiên cao chưa có hạn**. Nhấn ☀ để thêm từng việc, hoặc **Thêm tất cả**.
+App gợi ý những việc nên cân nhắc: **quá hạn**, **đến hạn hôm nay**, **có bước con đến hạn / quá hạn**, **hôm qua đã chọn mà chưa xong**, và **ưu tiên cao chưa có hạn**. Nhấn ☀ để thêm từng việc, hoặc **Thêm tất cả**.
+
+### 🌱 Thói quen hôm nay
+Nếu bạn có [thói quen](#thói-quen), tab Hôm nay hiện các thói quen **cần làm hôm nay** (kèm 🔥 chuỗi). Bấm để đánh dấu đã làm, bấm lần nữa để bỏ. **Tất cả** mở màn Thói quen.
 
 ### 🗓 Lịch trình AI
 - Nhấn **Xếp lịch** / **Xếp lại**: AI xếp các việc thành khung giờ. Nếu bạn đã chọn Ngày của tôi, AI **chỉ xếp các việc đã chọn**; mỗi khung dài đúng **thời lượng ước tính** của việc (nếu có).
@@ -82,9 +85,10 @@ App gợi ý những việc nên cân nhắc: **quá hạn**, **đến hạn hô
 Nhấn nút **+** (ở tab Hôm nay hoặc Việc làm) rồi **gõ như nói chuyện** — hoặc bấm **🎤** trong ô nhập để **nói** (tiếng Việt, dùng dịch vụ nhận giọng nói của máy). App hiểu ngay khi bạn gõ — **không cần mạng** — và tô màu phần đã hiểu, kèm dòng **"Hiểu là: …"** để bạn kiểm tra:
 
 ```
-Nộp báo cáo mai 3h chiều !cao #Công việc
+Nộp báo cáo mai 3h chiều !cao #Công việc @khách-hàng
 ```
-→ tiêu đề **Nộp báo cáo**, hạn **ngày mai 15:00**, ưu tiên **Cao**, danh mục **Công việc**.
+→ tiêu đề **Nộp báo cáo**, hạn **ngày mai 15:00**, ưu tiên **Cao**, danh sách **Công việc**, nhãn **@khách-hàng**.
+Việc không chọn danh sách sẽ vào **📥 Hộp thư đến** (trước đây là "Khác") — sắp xếp sau.
 
 | Bạn gõ | App hiểu |
 | :--- | :--- |
@@ -96,7 +100,8 @@ Nộp báo cáo mai 3h chiều !cao #Công việc
 | `3h`, `15:30`, `9 giờ sáng`, `8h rưỡi tối`, `3h chiều` | Giờ (không ghi buổi: 1–6 giờ hiểu là chiều) |
 | `sáng mai`, `tối nay`, `chiều mai` | Ngày + giờ mặc định của buổi (9:00 / 12:00 / 15:00 / 20:00) |
 | `!cao`, `!gấp`, `p1` · `!tb`, `p2` · `!thấp`, `p3` | Độ ưu tiên |
-| `#Công việc`, `#work`, `#Học tiếng Anh` | Danh mục (tên chưa có sẽ được tạo mới) |
+| `#Công việc`, `#work`, `#Học tiếng Anh` | Danh sách (tên chưa có sẽ được tạo mới) |
+| `@nhà`, `@gấp` | Nhãn (gắn được nhiều nhãn) |
 | `hằng ngày`, `mỗi tuần`, `mỗi tháng`, `mỗi thứ 2 và thứ 5` | Việc lặp lại |
 
 - Gõ **không dấu** cũng được (`nop bao cao mai 3h chieu`).
@@ -121,18 +126,29 @@ Nộp báo cáo mai 3h chiều !cao #Công việc
 ### Tìm & lọc
 - **Ô tìm kiếm**: lọc theo tiêu đề/mô tả.
 - **Bộ lọc nhanh**: Tất cả · **Quá hạn** · **Ưu tiên cao** · **Chưa có hạn** · **Việc lặp**.
-- **Danh mục**: Mọi danh mục / Cá nhân / Công việc / Khác / danh mục bạn tự tạo.
+- **Danh sách**: Mọi danh sách / Cá nhân / Công việc / Hộp thư đến / danh sách bạn tự tạo.
+- **Nhãn**: Mọi nhãn / @nhà / @gấp … (chỉ hiện khi bạn đã gắn nhãn).
+- **⭐ Bộ lọc của tôi**: khi đang lọc, bấm **💾 Lưu bộ lọc** để đặt tên cho tổ hợp hiện tại (danh sách + nhãn + bộ lọc nhanh + từ khóa), ví dụ *"Việc nhà gấp"*. Bấm chip ⭐ để áp dụng lại, **nhấn giữ** để xóa. **✕ Bỏ lọc** xóa mọi bộ lọc. Bộ lọc đã lưu nằm trên máy này.
 - **Sắp xếp**: Thủ công (kéo-thả) / Hạn chót / Ưu tiên / Tên (A-Z). Nút ☰ ở thẻ đầu trang bật chế độ **kéo-thả**.
 - **Kéo danh sách xuống** để đồng bộ ngay với máy chủ.
 
 ### Trên mỗi thẻ việc
 - **Ô tròn** / **vuốt sang phải**: hoàn thành. **Vuốt sang trái**: **hoãn** — chọn *Ngày mai / Cuối tuần / Thứ 2 tuần sau / 1 tuần nữa / Chọn ngày…* (giữ nguyên giờ hẹn, có Hoàn tác). **🚩**: đổi độ ưu tiên. **⋮**: Thêm vào Ngày của tôi · Bắt đầu tập trung · **Nhân bản** · Chỉnh sửa · Xóa.
 - Dòng **⚡ Nên làm trước · lý do** (ví dụ *"Quá hạn 2 ngày · Ưu tiên cao"*, *"Hạn trong 5 giờ"*) đánh dấu tối đa 3 việc nên làm trước, dựa trên hạn chót và độ ưu tiên.
-- Chip ở đáy thẻ: danh mục, hạn (*Hôm nay*, *Ngày mai 15:00*, *T6 10/07*…), ⏱ thời lượng, ☑ tiến độ bước con, kiểu lặp.
+- Chip ở đáy thẻ: danh sách › mục, hạn (*Hôm nay*, *Ngày mai 15:00 (từ 14:00)*, *T6 10/07*…), ⏱ thời lượng, ☑ tiến độ bước con, @nhãn, kiểu lặp.
 - ☀ = đang trong Ngày của tôi · ☁ = thay đổi chưa gửi lên máy chủ · 🔁 = việc lặp.
 
 ### Chọn nhiều việc
 **Nhấn giữ** một thẻ để vào chế độ chọn, rồi bấm thêm các thẻ khác. Thanh trên cùng có: **Chọn tất cả** · **Xong** · **Hôm nay** (đưa vào Ngày của tôi) · **Dời** · **Ưu tiên** · **Xóa**. Hoàn thành / xóa / dời hàng loạt đều có **Hoàn tác**. Bấm **✕** hoặc nút Quay lại để thoát.
+
+### Danh sách & bảng Kanban
+Nút **🗂** ở thẻ đầu trang (hoặc **Tôi → Danh sách**) mở các danh sách: mỗi danh sách có **biểu tượng**, **màu**, số việc đang chờ / quá hạn. Bấm **✎** để đổi biểu tượng & màu, **+** để tạo danh sách mới.
+
+Bấm vào một danh sách để mở:
+- **Kanban** (mặc định): mỗi **mục** là một cột (vd *Cần làm · Đang làm · Chờ phản hồi*), cột đầu là **Chưa phân mục**. **Nhấn giữ một thẻ rồi kéo sang cột khác** (có Hoàn tác). Gõ vào ô **+ Thêm việc** cuối cột để thêm nhanh việc vào đúng cột đó.
+- **Danh sách**: các mục xếp dọc.
+- Nút **≡+** thêm mục; menu ⋮ trên cột: **Đổi tên** (các việc đi theo) · **Chuyển sang trái/phải** · **Xóa mục** (việc trong mục về *Chưa phân mục*, không bị xóa).
+- Trong chi tiết công việc cũng chọn được **Mục** của danh sách.
 
 ### Ma trận ưu tiên (Eisenhower)
 Nút **▦** ở thẻ đầu trang mở ma trận 4 ô: **Làm ngay** (quan trọng · gấp) · **Lên lịch** (quan trọng · chưa gấp) · **Làm nhanh** (gấp · ít quan trọng) · **Để sau**. *Quan trọng* = ưu tiên Cao; *Gấp* = hạn tới hết ngày mai (gồm quá hạn).
@@ -147,12 +163,14 @@ Bấm vào thẻ để mở. Các mục:
 1. **📝 Tên & Mô tả**.
 2. **☀ Ngày của tôi** — công tắc thêm/bỏ việc khỏi danh sách hôm nay.
 3. **🎯 Độ ưu tiên** — Thấp / Trung bình / Cao.
-4. **📅 Hạn chót** — chọn nhanh (Hôm nay / Ngày mai / 3 ngày sau / Cuối tuần / Không), hoặc chọn **ngày** và (tùy chọn) **giờ**. Không chọn giờ = **Cả ngày**.
+4. **📅 Hạn chót** — chọn nhanh (Hôm nay / Ngày mai / 3 ngày sau / Cuối tuần / Không), hoặc chọn **ngày** và (tùy chọn) **giờ**. Không chọn giờ = **Cả ngày**. Khi có giờ, thêm được **giờ bắt đầu** để thành **khung giờ** (vd *09:00 → 10:30*): lời nhắc tính theo giờ bắt đầu, lịch hiện *09:00–10:30*, và nếu chưa ước tính thời lượng thì lấy luôn độ dài khung giờ. Dời hạn (vuốt hoãn, kéo trên lịch…) thì khung giờ dời theo.
 5. **⏱ Thời lượng ước tính** — 15 phút … 3 giờ, hoặc **✨ AI gợi ý** (AI ước tính dựa trên những việc bạn từng đặt thời lượng). Giúp AI xếp lịch trong ngày đúng độ dài.
-6. **🏷️ Danh mục** — chọn hoặc tạo danh mục mới (tối đa 50 ký tự).
-7. **🔁 Lặp lại** — xem [mục 7](#7-việc-lặp-lại).
-8. **🔔 Lời nhắc** — việc có giờ: đúng giờ / trước 5, 10, 30 phút, 1 giờ, 1 ngày. Việc cả ngày: buổi sáng của ngày đến hạn (giờ đặt trong Thiết lập) hoặc trước 1 ngày.
-9. **✅ Các bước con** — checklist có thanh tiến độ. **✨ Nhờ AI chia nhỏ việc này**: AI gợi ý các bước (dựa trên tiêu đề + mô tả đang gõ), bạn bỏ chọn bước không cần rồi bấm **Thêm**; nếu chưa đặt thời lượng, có thể áp luôn thời lượng AI ước tính. Cần mạng.
+6. **🏷️ Danh sách** — chọn hoặc tạo danh sách mới (tối đa 50 ký tự); nếu danh sách có mục thì chọn thêm **Mục**.
+7. **🔖 Nhãn** — gắn nhiều nhãn (bấm nhãn để bỏ); gợi ý các nhãn bạn hay dùng.
+8. **🔁 Lặp lại** — xem [mục 7](#7-việc-lặp-lại).
+9. **🔔 Lời nhắc** — **chọn được nhiều lời nhắc** (tối đa 5), vd *trước 1 ngày* + *trước 30 phút* + *đúng giờ*. Việc có giờ: đúng giờ / trước 5, 10, 30 phút, 1 giờ, 1 ngày. Việc cả ngày: buổi sáng của ngày đến hạn (giờ đặt trong Thiết lập) hoặc trước 1 ngày.
+10. **🍅 Đã tập trung** — số phiên Pomodoro và tổng thời gian đã làm việc này (so với ước tính).
+11. **✅ Các bước con** — checklist có thanh tiến độ. Mỗi bước có thể có **hạn riêng** (bấm 📅 cạnh bước; nhấn giữ ngày để bỏ) — bước đến hạn / quá hạn sẽ được **gợi ý ở tab Hôm nay**. **✨ Nhờ AI chia nhỏ việc này**: AI gợi ý các bước (dựa trên tiêu đề + mô tả đang gõ), bạn bỏ chọn bước không cần rồi bấm **Thêm**; nếu chưa đặt thời lượng, có thể áp luôn thời lượng AI ước tính. Cần mạng.
 
 Trên thanh tiêu đề (việc đã có): **⏱** bắt đầu tập trung; **⋮ → Bỏ qua lần này** (việc lặp) · **Nhân bản** (tạo bản sao gồm cả bước con, rồi mở bản sao) · **Xóa**.
 
@@ -177,6 +195,7 @@ Trên thanh tiêu đề (việc đã có): **⏱** bắt đầu tập trung; **�
 - Một phiên **25 phút** tập trung → nghỉ **5 phút**. 🍅 đếm số phiên đã xong cho việc đó.
 - Đóng app vẫn đếm đúng; hết giờ có thông báo (kèm nút **Việc đã xong**). Khi đang chạy, tab Hôm nay hiện thanh đếm ngược nhỏ.
 - **✓ Việc đã xong**: hoàn thành việc và kết thúc phiên.
+- Mỗi phiên tập trung xong (hoặc dừng sớm sau ít nhất 5 phút) được **lưu vào lịch sử** và đồng bộ theo tài khoản: xem ở **Tôi → 🍅 Tập trung** (phút hôm nay, 7 ngày, việc tập trung nhiều nhất) và trong chi tiết từng việc.
 
 ---
 
@@ -194,10 +213,19 @@ Ba cách xem (nút chuyển ở đầu màn):
 ## 10. Tab Tôi: mục tiêu, thống kê, tổng kết tuần
 
 - **Thẻ mục tiêu**: tiến độ hôm nay, 🔥 chuỗi ngày, kỷ lục. Bấm để sửa mục tiêu.
-- **Lối tắt**: 📅 Tổng kết tuần · 🤖 AI Coach · ✅ Đã hoàn thành · 🗑️ Thùng rác. Nút **⚙** góc trên mở Thiết lập.
+- **Lối tắt**: 🌱 Thói quen · 🗂️ Danh sách · 📅 Tổng kết tuần · 🤖 AI Coach · ✅ Đã hoàn thành · 🗑️ Thùng rác. Nút **⚙** góc trên mở Thiết lập.
 - **📊 Thống kê**: số việc Hoàn thành / Đang chờ / **Ngày đạt mục tiêu** trong năm; bản đồ nhiệt cả năm; phân bố việc đang chờ theo danh mục.
 - **📈 Biểu đồ**: số việc hoàn thành 7 ngày qua.
+- **🍅 Tập trung**: số phút tập trung hôm nay và 7 ngày, biểu đồ theo ngày, 3 việc bạn tập trung nhiều nhất.
 - **🧠 Trí nhớ AI**: các thói quen AI quan sát được; **Phân tích thói quen bằng AI** để cập nhật, xóa được từng mục.
+
+### Thói quen
+Việc lặp lại **không có hạn chót** (uống nước, đọc sách 20 phút, chạy bộ) — mở từ **Tôi → 🌱 Thói quen** hoặc **Tất cả** ở tab Hôm nay.
+- **+** tạo thói quen: tên, biểu tượng, màu, **tần suất** — *Mỗi ngày* · *Các thứ* (vd T2, T4, T6) · *Số lần/tuần* (vd 3 lần, ngày nào cũng được) — và **giờ nhắc** (chỉ nhắc vào ngày còn cần làm và chưa đánh dấu; thông báo có nút **Đã làm**).
+- Mỗi thẻ có **7 ô của 7 ngày gần nhất**: bấm để đánh dấu / bỏ đánh dấu (kể cả ngày đã qua). 🔥 **chuỗi** tính theo ngày cần làm (ngày không cần làm không làm đứt chuỗi); thói quen *Số lần/tuần* tính chuỗi theo **tuần đạt đủ**. Hôm nay chưa làm thì chưa tính là đứt.
+- Hiện **tỉ lệ 30 ngày qua** và tiến độ tuần.
+- Bấm vào thẻ để sửa; **Lưu trữ** để tạm dừng (ẩn khỏi Hôm nay, giữ lịch sử); **Xóa** có Hoàn tác.
+- Thói quen và các lần đánh dấu được đồng bộ theo tài khoản, dùng được khi offline.
 
 ### Tổng kết tuần
 Xem lại 7 ngày gần nhất: số việc xong và **so với tuần trước (▲/▼ %)**, biểu đồ từng ngày, **ngày năng suất nhất**, số ngày đạt mục tiêu, số việc **xong trễ hạn**, số việc **đang quá hạn**, việc đã làm theo danh mục, và danh mục **đang tồn nhiều nhất**. Nút **Nhờ AI Coach lập kế hoạch tuần tới** mở AI Coach với câu hỏi đã soạn sẵn từ số liệu tuần này.

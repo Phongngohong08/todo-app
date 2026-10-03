@@ -1,6 +1,6 @@
-# Backend cho Ứng dụng Quản lý Công việc Hỗ trợ bởi AI (AI-Powered To-Do List)
+# Backend cho Ứng dụng Quản lý Công việc Cá nhân Hỗ trợ bởi AI (TaskFlow AI)
 
-Đây là dịch vụ backend viết bằng ngôn ngữ Golang cho ứng dụng Quản lý Công việc (To-Do List) tích hợp trí tuệ nhân tạo. Dự án được xây dựng theo mô hình **Clean Architecture** và các mô hình thiết kế hướng tên miền **Domain-Driven Design (DDD)**, kết hợp cơ sở dữ liệu quan hệ (PostgreSQL), cơ sở dữ liệu vector (Qdrant) và Google Gemini API nhằm cung cấp thời gian biểu cá nhân hóa và trợ lý AI Coach có bộ nhớ dài hạn.
+Đây là dịch vụ backend viết bằng ngôn ngữ Golang cho ứng dụng Quản lý Công việc cá nhân tích hợp trí tuệ nhân tạo — công việc (danh sách, mục, nhãn, khung giờ, việc lặp), thói quen, lịch sử tập trung, mục tiêu & thống kê, lập lịch AI và AI Coach, đồng bộ offline-first đa thiết bị. Dự án được xây dựng theo mô hình **Clean Architecture** và các mô hình thiết kế hướng tên miền **Domain-Driven Design (DDD)**, kết hợp cơ sở dữ liệu quan hệ (PostgreSQL), cơ sở dữ liệu vector (Qdrant) và Google Gemini API nhằm cung cấp thời gian biểu cá nhân hóa và trợ lý AI Coach có bộ nhớ dài hạn.
 
 ---
 
@@ -17,7 +17,9 @@
 9. **Thống kê (Statistics)**: Cung cấp báo cáo gọn: số việc **đã hoàn thành**, số việc **đang chờ**, phân bố việc đang chờ **theo danh mục**, và số việc hoàn thành mỗi ngày trong **7 ngày gần nhất**.
 10. **Mục tiêu hằng ngày**: `daily_goal` (số việc/ngày) và `days_off` (ngày nghỉ, vd `"SAT,SUN"`) trong `/preferences` — app dùng để tính chuỗi ngày đạt mục tiêu.
 11. **Hạn "cả ngày"**: `due_all_day = true` nghĩa là hạn chỉ có ngày (app lưu hạn ở 23:59 giờ địa phương để phép so sánh "quá hạn" vẫn đúng).
-12. **Trợ lý AI cho từng việc**: `POST /ai/breakdown` chia một việc thành các bước con + ước tính tổng thời lượng; `POST /ai/estimate` gợi ý thời lượng dựa trên các việc người dùng từng ước tính. Cả hai chỉ trả gợi ý (app cho xem trước rồi mới lưu) và tính vào giới hạn lượt AI.
+. **Sắp xếp cá nhân (migration 000009)**: task có **nhãn** (`tags`), **mục** trong danh sách (`section`, dùng cho bảng Kanban), **khung giờ** (`start_at` → `due_date`), **nhiều lời nhắc** (`extra_reminders`) và **hạn cho từng bước con**. Lần lặp kế tiếp chép nhãn / mục / lời nhắc và dời khung giờ theo hạn mới. Mỗi danh sách (kể cả mặc định) có cài đặt hiển thị: màu, emoji, các mục (`list_settings`).
+14. **Thói quen (Habits)**: việc lặp không có hạn — mỗi ngày / các thứ cố định / N lần mỗi tuần, có giờ nhắc; đánh dấu theo ngày (`habit_checkins`, bỏ đánh dấu được lưu thành `done=false` để đồng bộ). Đồng bộ giống task: id do app sinh, `PUT` idempotent, `GET /habits/sync?since`.
+15. **Lịch sử tập trung**: mỗi phiên Pomodoro đã xong được lưu (`focus_sessions`, chỉ thêm) để xem thống kê trên mọi thiết bị.
 
 > **Phía ứng dụng Android** còn có **Nhắc nhở local (Reminders)** qua WorkManager: tự gửi thông báo khi task đến hạn `due_date` — tính năng client-side, không phụ thuộc backend/FCM.
 
@@ -31,7 +33,7 @@
     /api              # Điểm khởi chạy API Gateway RESTful (bao gồm cả scheduler chạy ngầm)
   /internal
     /domain           # Định nghĩa thực thể (Entities), giá trị (Value Objects) và giao diện lưu trữ (Repository Interfaces)
-    /usecase          # Hiện thực hóa các nghiệp vụ chính (Auth, Task, Plan, Coach, Memory, QuickAdd)
+    /usecase          # Hiện thực hóa các nghiệp vụ chính (Auth, Task, Category, Habit, Focus, Plan, Coach, Memory, QuickAdd, Assist)
     /infrastructure   # Triển khai thư viện bên thứ ba, database driver và cấu hình hệ thống
       /db             # Kết nối PostgreSQL và các truy vấn SQL Repository
       /qdrant         # Kết nối Qdrant và các API lưu trữ/tìm kiếm Vector
@@ -116,9 +118,21 @@ Tất cả endpoint dưới đây (trừ nhóm `/auth`) yêu cầu header `Autho
 | `GET` | `/api/v1/tasks` | Liệt kê task. Query: `status` (`TODO`/`COMPLETED`), `due_date_before`, **`q`** (tìm trong tiêu đề/mô tả), **`category`** (lọc theo danh mục) |
 | `GET` | `/api/v1/tasks/sync?since=<server_time>` | **Đồng bộ offline**: trả `{ tasks, deleted_ids, server_time }` — task thay đổi (và bị xóa) sau mốc `since`; bỏ `since` = tải toàn bộ. Client lưu `server_time` làm `since` cho lần sau |
 | `GET` | `/api/v1/tasks/{id}` | Chi tiết một task |
-| `PUT` | `/api/v1/tasks/{id}` | Ghi **toàn bộ** trạng thái task, **tạo mới nếu id chưa có** (idempotent — id do app sinh khi offline). Body như POST, thêm `status` (`TODO`/`COMPLETED` — chuyển về `TODO` = mở lại), `completed_at`, `sort_order`, `subtasks` (`[{id,title,done,position}]`), `spawned_from`. Trường mới (migration 000008): `due_all_day`, `my_day` (`"yyyy-MM-dd"`), `estimated_minutes`, `recurrence_interval`, `recurrence_mode`, `recurrence_until` (RFC3339) — với `my_day` / `recurrence_until`, chuỗi rỗng `""` nghĩa là **xóa**. Trường bỏ trống giữ nguyên giá trị cũ |
+| `PUT` | `/api/v1/tasks/{id}` | Ghi **toàn bộ** trạng thái task, **tạo mới nếu id chưa có** (idempotent — id do app sinh khi offline). Body như POST, thêm `status` (`TODO`/`COMPLETED` — chuyển về `TODO` = mở lại), `completed_at`, `sort_order`, `subtasks` (`[{id,title,done,position}]`), `spawned_from`. Trường mới (migration 000008): `due_all_day`, `my_day` (`"yyyy-MM-dd"`), `estimated_minutes`, `recurrence_interval`, `recurrence_mode`, `recurrence_until` (RFC3339) — với `my_day` / `recurrence_until`, chuỗi rỗng `""` nghĩa là **xóa**. Trường mới (migration 000009): `tags` (mảng nhãn, server chuẩn hóa: chữ thường, khoảng trắng → `-`, tối đa 10), `section` (mục trong danh sách), `start_at` (RFC3339, phải trước `due_date`; `""` = xóa; bỏ hạn thì tự xóa), `extra_reminders` (mảng số phút nhắc trước, 0–10080, tối đa 5); mỗi bước con có thể có `due_date` (`"yyyy-MM-dd"`). Trường bỏ trống giữ nguyên giá trị cũ |
 | `DELETE` | `/api/v1/tasks/{id}` | Xóa **mềm** (để thiết bị khác biết khi đồng bộ); xóa lại lần nữa vẫn trả thành công |
 | `POST` | `/api/v1/tasks/{id}/complete` | Đánh dấu hoàn thành. Task lặp (có `due_date`) sinh lần kế tiếp với **id tất định** `UUIDv3(namespace, id cha)` và hạn luôn ở tương lai — app tính giống hệt nên lần lặp tạo lúc offline không bị nhân đôi |
+
+### Danh sách, thói quen & tập trung (migration 000009)
+
+| Phương thức | Endpoint | Mô tả |
+| :--- | :--- | :--- |
+| `GET` · `PUT` | `/api/v1/categories` | Như trước (`{ "categories": [...] }`), thêm trường tùy chọn **`lists`**: `[{ "name", "color": "#RRGGBB", "emoji", "sections": [...] }]` — cài đặt hiển thị của từng danh sách (kể cả `PERSONAL`/`WORK`/`OTHER`). PUT không gửi `lists` thì giữ nguyên; danh sách không có gì khác mặc định không được lưu. Tối đa 20 mục, mỗi mục 50 ký tự |
+| `GET` | `/api/v1/habits/sync?since=<server_time>` | `{ habits, deleted_ids, checkins: [{habit_id, date, done}], server_time }`; bỏ `since` = mọi thói quen còn sống + các ngày đã đánh dấu |
+| `PUT` | `/api/v1/habits/{id}` | Ghi toàn bộ thói quen, tạo mới nếu chưa có. Body: `name` (bắt buộc), `emoji`, `color`, `frequency` (`DAILY`/`WEEKDAYS`/`WEEKLY`), `weekdays` (`"MON,WED"` khi `WEEKDAYS`), `target_per_week` (1–7 khi `WEEKLY`), `reminder_time` (`"HH:mm"` hoặc `""`), `position`, `archived`. Ghi lại thói quen đã xóa = khôi phục |
+| `DELETE` | `/api/v1/habits/{id}` | Xóa mềm (idempotent) |
+| `PUT` | `/api/v1/habits/{id}/checkins/{yyyy-MM-dd}` | Body `{ "done": true|false }` — đánh dấu / bỏ đánh dấu một ngày (không quá ngày mai theo giờ server) |
+| `GET` | `/api/v1/focus-sessions/sync?since=<server_time>` | `{ sessions, server_time }` — các phiên tập trung server nhận được sau mốc `since` (lần đầu: 2000 phiên gần nhất) |
+| `PUT` | `/api/v1/focus-sessions/{id}` | Ghi một phiên đã xong: `task_id` (tùy chọn), `task_title`, `started_at` (RFC3339, không ở tương lai), `minutes` (1–240). Gửi lại cùng id không tạo bản thứ hai |
 
 ### AI
 

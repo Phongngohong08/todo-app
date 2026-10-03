@@ -493,7 +493,7 @@ fun SettingsScreen(
                         Text("TaskFlow AI", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurface)
                         Text("Phiên bản 1.0", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp, bottom = 8.dp))
                         Text(
-                            "Ứng dụng quản lý công việc tích hợp AI: thêm nhanh bằng ngôn ngữ tự nhiên, lịch trình AI hàng ngày, AI Coach và trí nhớ dài hạn.",
+                            "Ứng dụng quản lý công việc cá nhân tích hợp AI: công việc theo danh sách, mục / Kanban và nhãn; lịch tháng / tuần; thói quen; tập trung Pomodoro; mục tiêu & thống kê; lịch trình AI hằng ngày và AI Coach có trí nhớ dài hạn. Dùng được khi offline, đồng bộ giữa các máy.",
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontSize = 12.sp,
                             lineHeight = 18.sp
@@ -502,7 +502,8 @@ fun SettingsScreen(
                         Text("Hỏi đáp nhanh", fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface)
                         Text(
                             "• Không nhận thông báo? Hãy cấp quyền thông báo và đặt hạn chót cho việc.\n" +
-                                "• Thêm danh mục mới? Ngay tại mục Danh mục ở trên, hoặc trong màn chi tiết công việc.\n" +
+                                "• Thêm danh sách mới? Ngay tại mục Danh mục ở trên, ở Tôi → Danh sách, hoặc trong màn chi tiết công việc.\n" +
+                                "• Chia việc theo giai đoạn? Mở một danh sách → thêm mục → kéo thẻ giữa các cột Kanban.\n" +
                                 "• AI hiểu sai khi thêm nhanh? Mô tả rõ thời gian/độ ưu tiên hơn, rồi chỉnh tay trước khi lưu.",
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontSize = 12.sp,

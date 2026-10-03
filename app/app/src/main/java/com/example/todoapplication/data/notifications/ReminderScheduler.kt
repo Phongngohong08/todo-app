@@ -49,9 +49,11 @@ object ReminderScheduler {
             return
         }
 
-        // Nhắc trước hạn theo reminderOffsetMinutes (0 = đúng giờ)
+        // Nhắc trước hạn theo reminderOffsetMinutes (0 = đúng giờ); các lời nhắc thêm là job riêng
         val prefs = ServiceLocator.localPrefs
-        val fireAt = reminderTime(task, due, prefs.allDayReminderTime.value) - task.reminderOffsetMinutes * 60_000L
+        val base = reminderTime(task, due, prefs.allDayReminderTime.value)
+        scheduleExtras(context, task, base)
+        val fireAt = base - task.reminderOffsetMinutes * 60_000L
         val delay = fireAt - System.currentTimeMillis()
         if (delay <= 0) {
             // Đã quá thời điểm nhắc -> không nhắc lại theo hạn, nhưng GIỮ lượt hoãn / nhắc dai nếu có
@@ -81,7 +83,8 @@ object ReminderScheduler {
      * mặc định [allDayTime] ("HH:mm") của chính ngày đó, vì nhắc lúc 23:59 thì đã muộn.
      */
     fun reminderTime(task: Task, due: Long, allDayTime: String, zone: ZoneId = ZoneId.systemDefault()): Long {
-        if (!task.dueAllDay) return due
+        // Việc có khung giờ (09:00–10:30): nhắc theo giờ BẮT ĐẦU
+        if (!task.dueAllDay) return task.startAt?.takeIf { it <= due } ?: due
         val time = runCatching { LocalTime.parse(allDayTime) }.getOrDefault(LocalTime.of(8, 0))
         return Instant.ofEpochMilli(due).atZone(zone).toLocalDate().atTime(time).atZone(zone).toInstant().toEpochMilli()
     }
@@ -118,8 +121,29 @@ object ReminderScheduler {
         wm.cancelUniqueWork(snoozeName(taskId))
         wm.cancelUniqueWork(nagName(taskId))
         wm.cancelUniqueWork(quietName(taskId))
+        wm.cancelAllWorkByTag(extraTag(taskId))
         AlarmScheduler.cancel(context, taskId)
     }
+
+    /**
+     * Lời nhắc thêm ("reminder_<id>_<phút>", tag riêng của task): hủy hết rồi hẹn lại theo danh sách hiện tại,
+     * nên bỏ bớt lời nhắc trong màn chi tiết thì job cũ cũng mất theo.
+     */
+    private fun scheduleExtras(context: Context, task: Task, base: Long) {
+        workManager(context).cancelAllWorkByTag(extraTag(task.id))
+        val now = System.currentTimeMillis()
+        task.extraReminders.filter { it != task.reminderOffsetMinutes }.distinct().forEach { offset ->
+            val delay = base - offset * 60_000L - now
+            if (delay > 0) {
+                enqueue(
+                    context, uniqueName(task.id) + "_" + offset, task.id, task.title, delay, attempt = 0,
+                    ExistingWorkPolicy.REPLACE, extraTag(task.id)
+                )
+            }
+        }
+    }
+
+    private fun extraTag(taskId: String) = "reminder_extra_$taskId"
 
     private fun enqueue(
         context: Context,
@@ -128,7 +152,8 @@ object ReminderScheduler {
         title: String,
         delayMillis: Long,
         attempt: Int,
-        policy: ExistingWorkPolicy
+        policy: ExistingWorkPolicy,
+        extraTag: String? = null
     ) {
         val work = OneTimeWorkRequestBuilder<ReminderWorker>()
             .setInitialDelay(delayMillis, TimeUnit.MILLISECONDS)
@@ -140,6 +165,7 @@ object ReminderScheduler {
                 )
             )
             .addTag(TAG)
+            .apply { extraTag?.let { addTag(it) } }
             .build()
         workManager(context).enqueueUniqueWork(name, policy, work)
     }

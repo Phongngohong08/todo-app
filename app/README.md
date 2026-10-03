@@ -1,6 +1,6 @@
-# Ứng dụng Android — Todo List hỗ trợ bởi AI
+# Ứng dụng Android — Quản lý công việc cá nhân hỗ trợ bởi AI (TaskFlow AI)
 
-Ứng dụng Android (Jetpack Compose) cho hệ thống Quản lý Công việc tích hợp AI, xây theo kiến trúc **offline-first**: mọi thao tác ghi vào database trên máy (Room) trước nên phản hồi tức thì và dùng được khi mất mạng; một bộ đồng bộ chạy nền (WorkManager) đẩy/kéo thay đổi với [backend Go](../backend/README.md).
+Ứng dụng Android (Jetpack Compose) cho hệ thống Quản lý Công việc tích hợp AI — gồm công việc (danh sách, mục/Kanban, nhãn, khung giờ, nhiều lời nhắc), lịch tháng/tuần/lịch trình, thói quen, tập trung (Pomodoro + lịch sử), mục tiêu & thống kê, AI Coach —, xây theo kiến trúc **offline-first**: mọi thao tác ghi vào database trên máy (Room) trước nên phản hồi tức thì và dùng được khi mất mạng; một bộ đồng bộ chạy nền (WorkManager) đẩy/kéo thay đổi với [backend Go](../backend/README.md).
 
 ---
 
@@ -73,6 +73,8 @@ Ba dạng dữ liệu tách biệt theo tầng, chuyển đổi trong [`Mappers.
 | Nhiều thao tác liên tiếp | `SyncScheduler.requestSync()` = unique work + REPLACE + trễ 1 giây → gộp thành một lần đồng bộ |
 | Khi nào đồng bộ | Sau mỗi thay đổi, khi app trở lại màn hình (`ON_START`), khi có mạng trở lại, định kỳ 30 phút, kéo-để-làm-mới |
 | Đăng xuất khi còn thay đổi chưa gửi | Thử đồng bộ trước; không được (offline) thì hỏi lại người dùng thay vì âm thầm làm mất dữ liệu |
+| Thói quen, check-in, phiên tập trung | Cùng cơ chế: thói quen có cờ dirty + `localVersion` + bia mộ; check-in theo (thói quen, ngày) với `done=false` khi bỏ đánh dấu; phiên tập trung chỉ thêm (`isSynced`). Server cũ chưa có các API này (404) → phần đó được bỏ qua, thay đổi giữ trên máy, việc đồng bộ task không bị ảnh hưởng |
+| Màu / emoji / mục của danh sách | Gửi cùng danh mục (`PUT /categories` có thêm `lists`), cùng cờ `categoriesDirty` |
 
 **Việc lặp lại khi offline:** hoàn thành một việc lặp sẽ tạo ngay lần kế tiếp trên máy với **id tất định** `UUIDv3(namespace, id cha)`. Server dùng đúng thuật toán này (test chéo bằng cùng một vector ở cả Kotlin và Go) nên khi đồng bộ chỉ còn một bản. Hạn của lần kế tiếp luôn ở tương lai kể cả khi hoàn thành trễ; mở lại việc đã xong sẽ thu hồi lần lặp chưa làm.
 
@@ -93,16 +95,19 @@ app/src/main/java/com/example/todoapplication/
     PlanLogic.kt                 # Chỉnh lịch trình AI (dồn khung), phát hiện lịch đã cũ
     SnoozeOptions.kt             # Các mốc "Hoãn…"
     Scheduling.kt                # Giờ yên lặng, dời việc sang ngày khác (giữ giờ), các mốc "Hoãn sang…", ma trận Eisenhower
+    HabitLogic.kt                # Thói quen: hôm nay có cần làm không, chuỗi (theo ngày / theo tuần), tiến độ tuần, tỉ lệ 30 ngày
+    TagRules.kt                  # Chuẩn hóa nhãn + lời nhắc thêm (giống hệt backend)
+    BoardLogic.kt · FocusStats.kt # Cột Kanban theo mục · thống kê tập trung 7 ngày
     SortOrder.kt                 # Fractional indexing cho kéo-thả
     StatsCalculator.kt           # Biểu đồ tuần / bản đồ nhiệt theo ngày lịch
   data/
     api/                         # ApiService (Retrofit) + NetworkClient (token, tự refresh)
     model/Models.kt              # DTO JSON (TaskDto, TaskInputDto, TaskChangesDto, ...)
-    local/                       # Room — database version 6
+    local/                       # Room — database version 7
       Entities.kt                # tasks, subtasks (FK CASCADE), categories, chat_messages, sync_state
       Daos.kt                    # Truy vấn (Flow) — kể cả thống kê, lịch, widget
       AppDatabase.kt             # RoomDatabase singleton
-      Migrations.kt              # MIGRATION_4_5, MIGRATION_5_6 (giữ dữ liệu cũ)
+      Migrations.kt              # MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7 (giữ dữ liệu cũ)
       Mappers.kt                 # DTO ↔ Entity ↔ Domain
     sync/                        # SyncEngine, SyncWorker, SyncScheduler, SyncController, ConnectivityObserver
     repository/
@@ -122,7 +127,7 @@ app/src/main/java/com/example/todoapplication/
     screens/                     # Màn hình Compose + TaskComponents (thẻ việc, thanh tạo nhanh dùng chung) + SnoozeActivity, AlarmActivity, AppLock (khóa ứng dụng)
     components/DragDrop.kt       # Kéo-thả giữa các vùng (lịch tuần, ma trận) theo tọa độ gốc màn hình
     components/, theme/, navigation/, utils/
-app/schemas/                     # Schema Room đã export (4.json, 5.json, 6.json) — dùng cho MigrationTest
+app/schemas/                     # Schema Room đã export (4.json … 7.json) — dùng cho MigrationTest
 ```
 
 ---
@@ -139,6 +144,8 @@ app/schemas/                     # Schema Room đã export (4.json, 5.json, 6.js
 | `FocusScreen` | Hẹn giờ tập trung 25'/5' cho một việc; lưu mốc kết thúc nên đóng app vẫn đúng, hết giờ có thông báo |
 | `CalendarScreen` | **Tháng / Tuần / Lịch trình (30 ngày)**; ở chế độ Tuần **nhấn giữ rồi kéo việc sang ngày khác** để dời hạn (giữ giờ, Hoàn tác); lần lặp **dự kiến** hiển thị mờ, không kéo được |
 | `MatrixScreen` | **Ma trận Eisenhower** (Quan trọng × Gấp): kéo việc giữa 4 ô → đổi ưu tiên / hạn tương ứng (`Eisenhower.move`), có Hoàn tác |
+| `ListsScreen` · `ListBoardScreen` | Danh sách có **màu / emoji / mục**; một danh sách xem dạng **Kanban** (mỗi mục một cột, nhấn giữ kéo thẻ giữa các cột, thêm nhanh việc vào cột, đổi tên / sắp xếp / xóa mục) hoặc dạng danh sách |
+| `HabitsScreen` | **Thói quen**: mỗi ngày / các thứ / N lần mỗi tuần, đánh dấu 7 ngày gần nhất, 🔥 chuỗi, tỉ lệ 30 ngày, nhắc theo giờ (`HabitReminderWorker`, nút "Đã làm"), lưu trữ |
 | `AICoachScreen` | Chat với AI Coach — lịch sử lưu trên server; **thẻ hành động đề xuất** (dời hạn, chia bước con, tạo việc, đổi ưu tiên, thêm vào Ngày của tôi) chỉ áp dụng khi bấm "Áp dụng" (`CoachActionApplier`) |
 | `StatsScreen` | Tab "Tôi": mục tiêu + chuỗi ngày, lối tắt, thống kê/biểu đồ/bản đồ nhiệt **tính từ Room** (xem được khi offline), Trí nhớ AI |
 | `WeeklyReviewScreen` · `HistoryScreen` · `TrashScreen` | Tổng kết 7 ngày so với tuần trước (+ nhờ AI lập kế hoạch tuần tới) · việc đã xong theo ngày · thùng rác 30 ngày |

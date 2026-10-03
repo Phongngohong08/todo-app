@@ -3,7 +3,9 @@ package com.example.todoapplication.ui.screens
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.items
@@ -58,6 +60,7 @@ fun TodayScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val focus by FocusSession.state.collectAsStateWithLifecycle()
+    val habits by viewModel.habitsToday.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val askNotificationPermission = rememberNotificationPermissionRequest()
@@ -167,6 +170,25 @@ fun TodayScreen(
                         onComplete = { viewModel.toggleComplete(task) },
                         onPostpone = { postponeTarget = task }
                     ) { card() }
+                }
+            }
+
+            // ── Thói quen hôm nay ──
+            if (habits.isNotEmpty()) {
+                item(key = "habits-header") {
+                    SectionHeader("🌱 Thói quen hôm nay", habits.count { !it.doneToday }, action = {
+                        TextButton(onClick = { navController.navigate(Screen.Habits.route) }) {
+                            Text("Tất cả", color = MaterialTheme.colorScheme.primary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                        }
+                    })
+                }
+                item(key = "habits-row") {
+                    Row(
+                        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        habits.forEach { s -> key(s.habit.id) { HabitTodayChip(s) { viewModel.toggleHabit(s.habit.id) } } }
+                    }
                 }
             }
 

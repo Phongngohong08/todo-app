@@ -142,6 +142,12 @@ class MainActivity : FragmentActivity() {
                         composable(Screen.Settings.route) { SettingsScreen(navController) }
                         composable(Screen.Templates.route) { TemplatesScreen(navController) }
                         composable(Screen.Matrix.route) { MatrixScreen(navController) }
+                        composable(Screen.Habits.route) { HabitsScreen(navController) }
+                        composable(Screen.Lists.route) { ListsScreen(navController) }
+                        composable(
+                            route = Screen.ListBoard.route,
+                            arguments = listOf(navArgument("name") { type = NavType.StringType })
+                        ) { entry -> ListBoardScreen(navController, entry.arguments?.getString("name").orEmpty()) }
                     }
 
                     // Che toàn bộ app khi đang khóa (NavHost vẫn giữ nguyên trạng thái bên dưới)
@@ -186,6 +192,7 @@ class MainActivity : FragmentActivity() {
                 }
                 AppIntents.OPEN_REVIEW -> nav.navigate(Screen.WeeklyReview.route) { launchSingleTop = true }
                 AppIntents.OPEN_FOCUS -> nav.navigate(Screen.Focus.createRoute()) { launchSingleTop = true }
+                AppIntents.OPEN_HABITS -> nav.navigate(Screen.Habits.route) { launchSingleTop = true }
                 else -> AppIntents.taskIdOf(target)?.let { nav.navigate(Screen.TaskDetail.createRoute(it)) }
             }
         }

@@ -5,6 +5,9 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.example.todoapplication.data.local.AppDatabase
 import com.example.todoapplication.data.local.CategoryEntity
+import com.example.todoapplication.data.local.HabitCheckinEntity
+import com.example.todoapplication.data.local.HabitEntity
+import com.example.todoapplication.data.model.HabitInputDto
 import com.example.todoapplication.data.repository.TaskRepository
 import com.example.todoapplication.domain.RecurrenceRules
 import com.example.todoapplication.domain.model.Recurrence
@@ -188,5 +191,41 @@ class SyncEngineTest {
 
         assertEquals(listOf("Học tập"), server.categories)
         assertFalse(db.syncStateDao().get()!!.categoriesDirty)
+    }
+
+    private fun habit(id: String, name: String) = HabitEntity(
+        id = id, name = name, emoji = "", color = "", frequency = "DAILY", weekdays = "", targetPerWeek = 7,
+        reminderTime = "", position = 0.0, archived = false, createdAt = 1, updatedAt = 1, isDirty = true, localVersion = 1
+    )
+
+    @Test
+    fun habitsAndCheckinsAreSyncedBothWays() = runBlocking {
+        val dao = db.habitDao()
+        dao.upsert(habit("h1", "Uống nước"))
+        dao.upsertCheckin(HabitCheckinEntity("h1", "2026-10-02", done = true, isDirty = true))
+
+        assertEquals(SyncResult.Success, engine.sync())
+
+        assertEquals("Uống nước", server.habits["h1"]?.name)
+        assertTrue("h1|2026-10-02" in server.doneCheckins)
+        assertTrue(dao.getDirty().isEmpty())
+        assertTrue(dao.getDirtyCheckins().isEmpty())
+
+        // Thiết bị khác thêm thói quen → lần đồng bộ sau kéo về
+        server.saveHabit("h2", HabitInputDto("Đọc sách", "", "", "DAILY", "", 7, "", 0.0, false))
+        engine.sync()
+        assertEquals("Đọc sách", dao.getById("h2")?.name)
+    }
+
+    @Test
+    fun legacyServerWithoutHabitsApiStillSyncsTasks() = runBlocking {
+        server.legacy = true
+        db.habitDao().upsert(habit("h1", "Thiền"))
+        val task = repo.create(TaskDraft(title = "Việc thường"))
+
+        assertEquals(SyncResult.Success, engine.sync())
+
+        assertEquals("Việc thường", server.tasks[task.id]?.title)
+        assertTrue("thói quen giữ nguyên để gửi khi server hỗ trợ", db.habitDao().getById("h1")!!.isDirty)
     }
 }

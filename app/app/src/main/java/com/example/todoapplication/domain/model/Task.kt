@@ -53,11 +53,25 @@ data class Task(
     val recurrenceInterval: Int = 1,
     val recurrenceMode: String = RecurrenceMode.SCHEDULE,
     val recurrenceUntil: Long? = null,
+    /** Nhãn (đã chuẩn hóa: chữ thường, không khoảng trắng). */
+    val tags: List<String> = emptyList(),
+    /** Mục trong danh sách (cột Kanban), "" = chưa phân mục. */
+    val section: String = "",
+    /** Giờ bắt đầu — cùng [dueAt] tạo khung thời gian (09:00–10:30). */
+    val startAt: Long? = null,
+    /** Lời nhắc thêm (phút trước mốc nhắc), ngoài [reminderOffsetMinutes]. */
+    val extraReminders: List<Int> = emptyList(),
+    /** Bước con chưa xong có hạn sớm nhất ("yyyy-MM-dd") — chỉ có khi đọc qua observeTasks. */
+    val nextStepDue: String? = null,
+    val nextStepTitle: String? = null,
     /** Thời điểm bị xóa (chỉ có ý nghĩa với việc trong Thùng rác). */
     val deletedAt: Long? = null
 ) {
     val isCompleted: Boolean get() = status == TaskStatus.COMPLETED
     val isRecurring: Boolean get() = recurrence != Recurrence.NONE
+
+    /** Mọi lời nhắc (phút trước mốc nhắc), không trùng, tăng dần. */
+    val reminderOffsets: List<Int> get() = (listOf(reminderOffsetMinutes) + extraReminders).distinct().sorted()
 
     /** Việc nằm trong "Ngày của tôi" của ngày [today] ("yyyy-MM-dd"). */
     fun isInMyDay(today: String): Boolean = myDay == today
@@ -67,7 +81,9 @@ data class Subtask(
     val id: String,
     val title: String,
     val isDone: Boolean,
-    val position: Int
+    val position: Int,
+    /** Hạn của riêng bước này ("yyyy-MM-dd"). */
+    val dueDate: String? = null
 )
 
 /** Phần nội dung người dùng nhập trong form (không gồm trạng thái hay thông tin đồng bộ). */
@@ -84,7 +100,11 @@ data class TaskDraft(
     val estimatedMinutes: Int = 0,
     val recurrenceInterval: Int = 1,
     val recurrenceMode: String = RecurrenceMode.SCHEDULE,
-    val recurrenceUntil: Long? = null
+    val recurrenceUntil: Long? = null,
+    val tags: List<String> = emptyList(),
+    val section: String = "",
+    val startAt: Long? = null,
+    val extraReminders: List<Int> = emptyList()
 )
 
 /** Số liệu tổng hợp cho màn Thống kê (tính từ Room). */

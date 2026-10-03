@@ -6,10 +6,13 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.example.todoapplication.data.model.MemoryItem
 import com.example.todoapplication.data.repository.AiRepository
+import com.example.todoapplication.data.repository.FocusHistoryRepository
 import com.example.todoapplication.data.repository.StatsRepository
 import com.example.todoapplication.data.repository.aiFailureMessage
 import com.example.todoapplication.data.repository.LocalPrefs
 import com.example.todoapplication.di.ServiceLocator
+import com.example.todoapplication.domain.FocusCalculator
+import com.example.todoapplication.domain.FocusStats
 import com.example.todoapplication.domain.GoalCalculator
 import com.example.todoapplication.domain.GoalProgress
 import com.example.todoapplication.domain.RecurrenceRules
@@ -24,6 +27,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -57,7 +61,8 @@ class StatsViewModel(
     repo: StatsRepository,
     private val aiRepository: AiRepository,
     localPrefs: LocalPrefs,
-    private val zone: () -> ZoneId = ZoneId::systemDefault
+    private val zone: () -> ZoneId = ZoneId::systemDefault,
+    focusRepository: FocusHistoryRepository? = null
 ) : ViewModel() {
 
     private data class ChartData(val weekly: List<Int>, val yearly: Map<String, Int>, val goal: GoalProgress)
@@ -100,6 +105,14 @@ class StatsViewModel(
             isExtracting = memory.isExtracting
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), StatsUiState())
+
+    /** Thống kê tập trung 7 ngày (null repo trong test cũ → rỗng). */
+    val focusStats: StateFlow<FocusStats> = (focusRepository?.observeSince(
+        today.minusDays(6).atStartOfDay(zone()).toInstant().toEpochMilli()
+    ) ?: flowOf(emptyList()))
+        .map { FocusCalculator.compute(it, today, zone()) }
+        .flowOn(Dispatchers.Default)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), FocusStats())
 
     private val _events = MutableSharedFlow<String>()
     val events: SharedFlow<String> = _events.asSharedFlow()
@@ -149,7 +162,10 @@ class StatsViewModel(
 
     companion object {
         val Factory = viewModelFactory {
-            initializer { StatsViewModel(ServiceLocator.statsRepository, ServiceLocator.aiRepository, ServiceLocator.localPrefs) }
+            initializer { StatsViewModel(
+                    ServiceLocator.statsRepository, ServiceLocator.aiRepository, ServiceLocator.localPrefs,
+                    focusRepository = ServiceLocator.focusHistoryRepository
+                ) }
         }
     }
 }

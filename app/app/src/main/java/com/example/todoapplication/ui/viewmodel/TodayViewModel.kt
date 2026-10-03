@@ -7,6 +7,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.example.todoapplication.data.model.DailyPlan
 import com.example.todoapplication.data.model.PlanSlot
 import com.example.todoapplication.data.repository.CategoryRepository
+import com.example.todoapplication.data.repository.HabitRepository
 import com.example.todoapplication.data.repository.LocalPrefs
 import com.example.todoapplication.data.repository.PlanRepository
 import com.example.todoapplication.data.repository.SessionManager
@@ -17,6 +18,9 @@ import com.example.todoapplication.data.sync.SyncController
 import com.example.todoapplication.di.ServiceLocator
 import com.example.todoapplication.domain.GoalCalculator
 import com.example.todoapplication.domain.GoalProgress
+import com.example.todoapplication.domain.HabitLogic
+import com.example.todoapplication.domain.HabitSummary
+import com.example.todoapplication.domain.summarize
 import com.example.todoapplication.domain.MyDaySuggestion
 import com.example.todoapplication.domain.PlanLogic
 import com.example.todoapplication.domain.RecurrenceRules
@@ -34,6 +38,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -96,7 +101,9 @@ class TodayViewModel(
     sessionManager: SessionManager,
     private val clock: () -> Long = System::currentTimeMillis,
     private val zone: () -> ZoneId = ZoneId::systemDefault,
-    computeDispatcher: CoroutineDispatcher = Dispatchers.Default
+    computeDispatcher: CoroutineDispatcher = Dispatchers.Default,
+    /** null trong test cũ: không có phần thói quen. */
+    private val habitRepository: HabitRepository? = null
 ) : ViewModel() {
 
     private val userName = sessionManager.getUserName().ifBlank { "bạn" }
@@ -157,6 +164,22 @@ class TodayViewModel(
             pendingSyncCount = pending
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), TodayUiState(userName = userName))
+
+    /** Thói quen cần làm / đã làm hôm nay (đã làm vẫn hiện để bỏ đánh dấu được). */
+    val habitsToday: StateFlow<List<HabitSummary>> = (habitRepository?.let { repo ->
+        combine(repo.observeHabits(), repo.observeCheckins(today().minusDays(HABIT_HISTORY_DAYS).toString())) { habits, checkins ->
+            val day = today()
+            habits.filter { HabitLogic.showToday(it, checkins[it.id].orEmpty(), day) }.map { h ->
+                val created = Instant.ofEpochMilli(h.createdAt).atZone(zone()).toLocalDate()
+                HabitLogic.summarize(h, checkins[h.id].orEmpty(), day, created)
+            }.sortedBy { it.doneToday }
+        }.flowOn(computeDispatcher)
+    } ?: flowOf(emptyList())).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    fun toggleHabit(habitId: String) {
+        val repo = habitRepository ?: return
+        viewModelScope.launch { repo.toggle(habitId, today().toString()) }
+    }
 
     private val _events = MutableSharedFlow<TodayEvent>()
     val events: SharedFlow<TodayEvent> = _events.asSharedFlow()
@@ -290,6 +313,8 @@ class TodayViewModel(
     }
 
     companion object {
+        private const val HABIT_HISTORY_DAYS = 400L
+
         val Factory = viewModelFactory {
             initializer {
                 TodayViewModel(
@@ -299,7 +324,8 @@ class TodayViewModel(
                     ServiceLocator.statsRepository,
                     ServiceLocator.syncController,
                     ServiceLocator.localPrefs,
-                    ServiceLocator.sessionManager
+                    ServiceLocator.sessionManager,
+                    habitRepository = ServiceLocator.habitRepository
                 )
             }
         }

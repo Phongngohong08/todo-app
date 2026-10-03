@@ -98,6 +98,11 @@
             android:name=".data.notifications.NotificationActionReceiver"
             android:exported="false" />
 
+        <!-- Nút "Đã làm" trên thông báo nhắc thói quen -->
+        <receiver
+            android:name=".data.notifications.HabitActionReceiver"
+            android:exported="false" />
+
         <!-- Widget màn hình chính: danh sách việc cần làm -->
         <receiver
             android:name=".widget.TasksWidgetProvider"

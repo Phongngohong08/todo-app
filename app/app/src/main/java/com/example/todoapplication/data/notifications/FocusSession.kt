@@ -11,7 +11,12 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.example.todoapplication.R
+import com.example.todoapplication.di.ServiceLocator
 import com.example.todoapplication.ui.navigation.AppIntents
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -42,6 +47,8 @@ object FocusSession {
 
     const val FOCUS_MINUTES = 25
     const val BREAK_MINUTES = 5
+    /** Phiên dừng sớm ngắn hơn chừng này thì không tính vào lịch sử. */
+    const val MIN_RECORD_MINUTES = 5
     private const val PREFS = "focus_session"
     private const val WORK_NAME = "focus_timer"
 
@@ -82,12 +89,33 @@ object FocusSession {
         if (current.phase == Phase.FOCUS) save(context, current.copy(completedFocus = current.completedFocus + 1))
     }
 
-    fun stop(context: Context) {
+    /**
+     * Dừng phiên. [recordPartial]: phiên tập trung dừng sớm mà đã làm ít nhất [MIN_RECORD_MINUTES] phút thì vẫn
+     * ghi vào lịch sử (bấm "Việc đã xong" giữa chừng). Đăng xuất thì không ghi.
+     */
+    fun stop(context: Context, recordPartial: Boolean = true) {
+        val current = _state.value
+        val now = System.currentTimeMillis()
+        if (recordPartial && current != null && current.phase == Phase.FOCUS && now < current.endAt) {
+            val minutes = ((now - current.startedAt) / 60_000L).toInt()
+            if (minutes >= MIN_RECORD_MINUTES) record(current, minutes)
+        }
         _state.value = null
         context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().clear().apply()
         WorkManager.getInstance(context.applicationContext).cancelUniqueWork(WORK_NAME)
         NotificationManagerCompat.from(context.applicationContext).cancel(Notifications.ID_FOCUS)
     }
+
+    /** Ghi phiên vào lịch sử tập trung (Room → đồng bộ lên server). */
+    fun record(s: State, minutes: Int) {
+        recordScope.launch {
+            runCatching {
+                ServiceLocator.focusHistoryRepository.record(s.taskId, s.title, s.startedAt, minutes)
+            }
+        }
+    }
+
+    private val recordScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     private fun save(context: Context, s: State) {
         _state.value = s
@@ -116,6 +144,9 @@ class FocusWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
         FocusSession.init(ctx)
         val s = FocusSession.state.value ?: return Result.success()
         FocusSession.onFinished(ctx)
+        if (s.phase == FocusSession.Phase.FOCUS) {
+            FocusSession.record(s, ((s.endAt - s.startedAt) / 60_000L).toInt())
+        }
 
         Notifications.ensureChannels(ctx)
         if (!Notifications.canPost(ctx)) return Result.success()

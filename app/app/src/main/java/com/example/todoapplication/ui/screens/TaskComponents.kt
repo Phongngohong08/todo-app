@@ -48,6 +48,7 @@ import com.example.todoapplication.ui.theme.*
 import com.example.todoapplication.ui.utils.categoryLabel
 import com.example.todoapplication.ui.utils.formatDueLabel
 import com.example.todoapplication.ui.utils.formatDuration
+import com.example.todoapplication.ui.utils.formatTime
 import com.example.todoapplication.ui.utils.priorityLabel
 import com.example.todoapplication.ui.utils.recurrenceDescription
 import java.time.LocalDate
@@ -232,11 +233,16 @@ fun TaskCard(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    MetaChip(categoryLabel(task.category), MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.primaryContainer)
+                    MetaChip(
+                        categoryLabel(task.category) + if (task.section.isNotEmpty()) " › " + task.section else "",
+                        MaterialTheme.colorScheme.primary,
+                        MaterialTheme.colorScheme.primaryContainer
+                    )
                     task.dueAt?.let { due ->
                         val color = if (isOverdue) StateOverdue else MaterialTheme.colorScheme.onSurfaceVariant
                         MetaChip(
-                            formatDueLabel(due, task.dueAllDay, today),
+                            formatDueLabel(due, task.dueAllDay, today) +
+                                (task.startAt?.takeIf { !task.dueAllDay }?.let { " (từ " + formatTime(it) + ")" } ?: ""),
                             color,
                             if (isOverdue) StateOverdue.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceVariant,
                             icon = Icons.Default.DateRange
@@ -252,6 +258,9 @@ fun TaskCard(
                             if (allDone) StateCompleted else MaterialTheme.colorScheme.onSurfaceVariant,
                             if (allDone) StateCompleted.copy(alpha = 0.13f) else MaterialTheme.colorScheme.surfaceVariant
                         )
+                    }
+                    task.tags.forEach { tag ->
+                        MetaChip("@" + tag, MaterialTheme.colorScheme.secondary, MaterialTheme.colorScheme.secondary.copy(alpha = 0.1f))
                     }
                     if (task.isRecurring && (task.recurrenceInterval > 1 || task.recurrenceMode == "COMPLETION")) {
                         MetaChip(
@@ -668,7 +677,11 @@ fun QuickCreateSheet(
     var addToMyDay by remember { mutableStateOf(defaultAddToMyDay) }
     val focus = remember { FocusRequester() }
 
-    val options = remember(categories) { categories.map { QuickAddParser.CategoryOption(it, categoryLabel(it)) } }
+    val options = remember(categories) {
+        categories.map { QuickAddParser.CategoryOption(it, categoryLabel(it)) } +
+            // Tên cũ / tiếng Anh của Hộp thư đến vẫn gõ được
+            listOf(QuickAddParser.CategoryOption("OTHER", "Khác"), QuickAddParser.CategoryOption("OTHER", "Inbox"))
+    }
     val parsed = remember(text, options) { QuickAddParser.parse(text, LocalDateTime.now(), categories = options) }
     val highlight = MaterialTheme.colorScheme.primary
     val transformation = remember(parsed, highlight) { TokenHighlight(parsed.tokens, highlight) }
@@ -689,7 +702,8 @@ fun QuickCreateSheet(
             dueAllDay = if (parsed.dueAt != null) parsed.allDay else presetDue != null,
             category = finalCategory,
             recurrence = parsed.recurrence ?: "NONE",
-            recurrenceDays = parsed.recurrenceDays
+            recurrenceDays = parsed.recurrenceDays,
+            tags = parsed.tags
         )
         val isNew = finalCategory !in categories
         return QuickCreateResult(draft, addToMyDay, if (isNew) finalCategory else null)
@@ -712,7 +726,7 @@ fun QuickCreateSheet(
             OutlinedTextField(
                 value = text,
                 onValueChange = { text = it },
-                placeholder = { Text("VD: Nộp báo cáo mai 3h chiều !cao #Công việc", color = MaterialTheme.colorScheme.onSurfaceVariant) },
+                placeholder = { Text("VD: Nộp báo cáo mai 3h chiều !cao #Công việc @gấp", color = MaterialTheme.colorScheme.onSurfaceVariant) },
                 modifier = Modifier.fillMaxWidth().focusRequester(focus),
                 shape = RoundedCornerShape(16.dp),
                 visualTransformation = transformation,
@@ -743,6 +757,7 @@ fun QuickCreateSheet(
                     parsed.recurrence?.let { PreviewChip("🔁 " + recurrenceDescription(it, parsed.recurrenceDays, 1, "SCHEDULE")) }
                     parsed.priority?.let { PreviewChip("🚩 " + priorityLabel(it)) }
                     parsed.category?.let { PreviewChip("🏷 " + categoryLabel(it) + if (it !in categories) " (mới)" else "") }
+                    parsed.tags.forEach { PreviewChip("@" + it) }
                 }
             } else if (text.isBlank()) {
                 Row(

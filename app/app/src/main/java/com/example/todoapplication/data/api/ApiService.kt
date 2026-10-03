@@ -55,6 +55,30 @@ interface ApiService {
     @PUT("categories")
     suspend fun replaceCategories(@Body input: CategoriesDto): Response<CategoriesDto>
 
+    // ── Thói quen (đồng bộ giống task: PUT idempotent, id do app sinh) ──
+    @GET("habits/sync")
+    suspend fun syncHabits(@Query("since") since: String?): Response<HabitChangesDto>
+
+    @PUT("habits/{id}")
+    suspend fun saveHabit(@Path("id") id: String, @Body input: HabitInputDto): Response<HabitDto>
+
+    @DELETE("habits/{id}")
+    suspend fun deleteHabit(@Path("id") id: String): Response<Unit>
+
+    @PUT("habits/{id}/checkins/{date}")
+    suspend fun setHabitCheckin(
+        @Path("id") id: String,
+        @Path("date") date: String,
+        @Body input: CheckinInputDto
+    ): Response<CheckinDto>
+
+    // ── Lịch sử tập trung (chỉ thêm) ──
+    @GET("focus-sessions/sync")
+    suspend fun syncFocusSessions(@Query("since") since: String?): Response<FocusChangesDto>
+
+    @PUT("focus-sessions/{id}")
+    suspend fun recordFocusSession(@Path("id") id: String, @Body input: FocusSessionInputDto): Response<FocusSessionDto>
+
     // Daily Plans
     @GET("plans/daily")
     suspend fun getDailyPlan(

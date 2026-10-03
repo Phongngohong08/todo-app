@@ -16,6 +16,8 @@ import androidx.room.RoomDatabase
  *        thêm categories, chat_messages, sync_state. Nâng cấp bằng [MIGRATION_4_5], giữ nguyên dữ liệu.
  *  - v6: task có thêm "cả ngày", "Ngày của tôi", thời lượng ước tính, lặp mỗi N / theo ngày hoàn thành /
  *        ngày kết thúc lặp. Nâng cấp bằng [MIGRATION_5_6] (chỉ thêm cột có giá trị mặc định).
+ *  - v7: nhãn, mục (Kanban), khung giờ, nhiều lời nhắc, hạn của bước con; bảng list_meta, habits,
+ *        habit_checkins, focus_sessions; con trỏ đồng bộ thói quen / tập trung. Nâng cấp bằng [MIGRATION_6_7].
  */
 @Database(
     entities = [
@@ -23,9 +25,13 @@ import androidx.room.RoomDatabase
         SubtaskEntity::class,
         CategoryEntity::class,
         ChatMessageEntity::class,
-        SyncStateEntity::class
+        SyncStateEntity::class,
+        ListMetaEntity::class,
+        HabitEntity::class,
+        HabitCheckinEntity::class,
+        FocusSessionEntity::class
     ],
-    version = 6,
+    version = 7,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -34,6 +40,9 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun categoryDao(): CategoryDao
     abstract fun chatDao(): ChatDao
     abstract fun syncStateDao(): SyncStateDao
+    abstract fun listMetaDao(): ListMetaDao
+    abstract fun habitDao(): HabitDao
+    abstract fun focusDao(): FocusDao
 
     companion object {
         const val NAME = "todo_local.db"
@@ -44,7 +53,7 @@ abstract class AppDatabase : RoomDatabase() {
         fun get(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 INSTANCE ?: Room.databaseBuilder(context.applicationContext, AppDatabase::class.java, NAME)
-                    .addMigrations(MIGRATION_4_5, MIGRATION_5_6)
+                    .addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
                     // Chỉ các schema cũ (1-3, trước khi export schema) mới được xóa-tạo lại.
                     .fallbackToDestructiveMigrationFrom(true, 1, 2, 3)
                     .fallbackToDestructiveMigrationOnDowngrade(true)

@@ -1,6 +1,7 @@
 package com.example.todoapplication.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
@@ -80,6 +81,9 @@ fun TaskListScreen(
     var postponeTarget by remember { mutableStateOf<Task?>(null) }
     var showBulkPostpone by remember { mutableStateOf(false) }
     val selectedIds by taskListViewModel.selectedIds.collectAsStateWithLifecycle()
+    val savedFilters by taskListViewModel.savedFilters.collectAsStateWithLifecycle()
+    var showSaveFilter by remember { mutableStateOf(false) }
+    var deletingFilter by remember { mutableStateOf<String?>(null) }
     val selectionMode = selectedIds.isNotEmpty()
     BackHandler(enabled = selectionMode) { taskListViewModel.clearSelection() }
 
@@ -198,7 +202,8 @@ fun TaskListScreen(
                             if (!sortMode) taskListViewModel.endSortMode()
                         },
                         onAiAdd = { showAiAdd = true },
-                        onMatrix = { navController.navigate(Screen.Matrix.route) }
+                        onMatrix = { navController.navigate(Screen.Matrix.route) },
+                        onLists = { navController.navigate(Screen.Lists.route) }
                     )
                 }
 
@@ -218,6 +223,32 @@ fun TaskListScreen(
 
                 item(key = "filters", contentType = "filters") {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        // Bộ lọc đã lưu (giữ để xóa) + nút lưu bộ lọc hiện tại
+                        if (savedFilters.isNotEmpty() || state.hasFilter) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                savedFilters.forEach { f ->
+                                    SavedFilterChip(
+                                        name = f.name,
+                                        onClick = { searchText = taskListViewModel.applySavedFilter(f) },
+                                        onLongClick = { deletingFilter = f.name }
+                                    )
+                                }
+                                if (state.hasFilter) {
+                                    AssistChip(
+                                        onClick = { showSaveFilter = true },
+                                        label = { Text("💾 Lưu bộ lọc") }
+                                    )
+                                    AssistChip(
+                                        onClick = { taskListViewModel.clearFilters(); searchText = "" },
+                                        label = { Text("✕ Bỏ lọc") }
+                                    )
+                                }
+                            }
+                        }
                         // Bộ lọc thông minh
                         Row(
                             modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
@@ -238,10 +269,24 @@ fun TaskListScreen(
                         ) {
                             (listOf(ALL_CATEGORIES) + state.categories).forEach { filterName ->
                                 StatusFilterChip(
-                                    text = if (filterName == ALL_CATEGORIES) "Mọi danh mục" else categoryLabel(filterName),
+                                    text = if (filterName == ALL_CATEGORIES) "Mọi danh sách" else categoryLabel(filterName),
                                     selected = state.selectedCategory == filterName,
                                     onClick = { taskListViewModel.setCategory(filterName) }
                                 )
+                            }
+                        }
+                        // Nhãn
+                        if (state.availableTags.isNotEmpty() || state.selectedTag != null) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                StatusFilterChip(text = "Mọi nhãn", selected = state.selectedTag == null, onClick = { taskListViewModel.setTag(null) })
+                                (listOfNotNull(state.selectedTag) + state.availableTags).distinct().forEach { t ->
+                                    StatusFilterChip(text = "@$t", selected = state.selectedTag == t, onClick = {
+                                        taskListViewModel.setTag(if (state.selectedTag == t) null else t)
+                                    })
+                                }
                             }
                         }
                     }
@@ -333,6 +378,25 @@ fun TaskListScreen(
                 val nowRfc = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", Locale.US).format(Date())
                 taskListViewModel.parseQuickAdd(aiText, nowRfc)
             }
+        )
+    }
+
+    if (showSaveFilter) {
+        TextPromptDialog("Lưu bộ lọc", "VD: Việc nhà gấp", "", onDismiss = { showSaveFilter = false }) {
+            taskListViewModel.saveCurrentFilter(it)
+            showSaveFilter = false
+        }
+    }
+    deletingFilter?.let { name ->
+        AlertDialog(
+            onDismissRequest = { deletingFilter = null },
+            title = { Text("Xóa bộ lọc \"$name\"?") },
+            confirmButton = {
+                TextButton(onClick = { taskListViewModel.deleteSavedFilter(name); deletingFilter = null }) {
+                    Text("Xóa", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = { TextButton(onClick = { deletingFilter = null }) { Text("Hủy") } }
         )
     }
 
@@ -539,7 +603,8 @@ private fun ListHeroCard(
     sortMode: Boolean,
     onSortToggle: () -> Unit,
     onAiAdd: () -> Unit,
-    onMatrix: () -> Unit
+    onMatrix: () -> Unit,
+    onLists: () -> Unit
 ) {
     val primary = MaterialTheme.colorScheme.primary
     Box(
@@ -559,6 +624,9 @@ private fun ListHeroCard(
                         fontSize = 13.sp,
                         modifier = Modifier.padding(top = 4.dp)
                     )
+                }
+                IconButton(onClick = onLists, modifier = Modifier.size(38.dp)) {
+                    Icon(Icons.Default.Folder, contentDescription = "Danh sách", modifier = Modifier.size(20.dp), tint = Color.White)
                 }
                 IconButton(onClick = onMatrix, modifier = Modifier.size(38.dp)) {
                     Icon(Icons.Default.GridView, contentDescription = "Ma trận Eisenhower", modifier = Modifier.size(20.dp), tint = Color.White)
@@ -604,5 +672,26 @@ fun HeroStatChip(value: String, label: String, valueColor: Color) {
             Text(value, color = valueColor, fontWeight = FontWeight.ExtraBold, fontSize = 20.sp)
             Text(label, color = Color.White.copy(alpha = 0.8f), fontSize = 10.sp)
         }
+    }
+}
+
+/** Chip bộ lọc đã lưu: bấm để áp dụng, nhấn giữ để xóa. */
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+@Composable
+private fun SavedFilterChip(name: String, onClick: () -> Unit, onLongClick: () -> Unit) {
+    Surface(
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.12f),
+        modifier = Modifier
+            .clip(RoundedCornerShape(20.dp))
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
+    ) {
+        Text(
+            "⭐ $name",
+            color = MaterialTheme.colorScheme.tertiary,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp)
+        )
     }
 }

@@ -20,6 +20,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import com.example.todoapplication.ui.utils.formatDuration
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -51,6 +52,7 @@ fun StatsScreen(
 ) {
     val context = LocalContext.current
     val state by statsViewModel.uiState.collectAsStateWithLifecycle()
+    val focusStats by statsViewModel.focusStats.collectAsStateWithLifecycle()
 
     var selectedTab by remember { mutableStateOf(0) }   // tab đang chọn (0/1/2) — state cục bộ của màn
     val tabTitles = listOf("📊 Thống kê", "📈 Biểu đồ", "🧠 Trí nhớ AI")
@@ -202,11 +204,18 @@ fun StatsScreen(
                             // Lối tắt: nhìn lại & trợ lý
                             item {
                                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    ShortcutRow("🌱", "Thói quen", "Đánh dấu mỗi ngày, giữ chuỗi") { navController.navigate(Screen.Habits.route) }
+                                    ShortcutRow("🗂️", "Danh sách", "Màu, biểu tượng, mục & bảng Kanban") { navController.navigate(Screen.Lists.route) }
                                     ShortcutRow("📅", "Tổng kết tuần", "So với tuần trước, lập kế hoạch tuần tới") { navController.navigate(Screen.WeeklyReview.route) }
                                     ShortcutRow("🤖", "AI Coach", "Hỏi cách sắp xếp, vượt trì hoãn") { navController.navigate(Screen.AICoach.createRoute()) }
                                     ShortcutRow("✅", "Đã hoàn thành", "Lịch sử việc đã xong") { navController.navigate(Screen.History.route) }
                                     ShortcutRow("🗑️", "Thùng rác", "Khôi phục việc đã xóa trong 30 ngày") { navController.navigate(Screen.Trash.route) }
                                 }
+                            }
+
+                            // Tập trung 7 ngày (Pomodoro)
+                            if (!focusStats.isEmpty) {
+                                item { FocusStatsCard(focusStats) }
                             }
 
                             // Big metric card — Hoàn thành / Đang chờ / Ngày đạt mục tiêu
@@ -810,6 +819,54 @@ private fun ShortcutRow(emoji: String, title: String, subtitle: String, onClick:
                 Text(subtitle, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Text("›", fontSize = 22.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+/** Thẻ "Tập trung": phút hôm nay / 7 ngày, biểu đồ cột nhỏ, việc được tập trung nhiều nhất. */
+@Composable
+private fun FocusStatsCard(stats: com.example.todoapplication.domain.FocusStats) {
+    val accent = MaterialTheme.colorScheme.tertiary
+    Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surface, shadowElevation = 2.dp, modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp)) {
+            Text("🍅 Tập trung", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurface)
+            Text(
+                "Hôm nay ${if (stats.todayMinutes > 0) formatDuration(stats.todayMinutes) else "0 phút"} · " +
+                    "7 ngày ${formatDuration(stats.weekMinutes)} (${stats.weekSessions} phiên)",
+                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 2.dp, bottom = 12.dp)
+            )
+            val max = (stats.last7.maxOrNull() ?: 0).coerceAtLeast(1)
+            val today = java.time.LocalDate.now()
+            Row(Modifier.fillMaxWidth().height(80.dp), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.Bottom) {
+                stats.last7.forEachIndexed { i, minutes ->
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Bottom, modifier = Modifier.fillMaxHeight()) {
+                        Box(
+                            Modifier
+                                .width(18.dp)
+                                .fillMaxHeight(0.75f * minutes / max + 0.02f)
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(if (i == 6) accent else accent.copy(alpha = 0.4f))
+                        )
+                        Text(
+                            com.example.todoapplication.ui.utils.weekdayShort(today.minusDays(6L - i)),
+                            fontSize = 10.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 4.dp)
+                        )
+                    }
+                }
+            }
+            if (stats.topTasks.isNotEmpty()) {
+                Spacer(Modifier.height(10.dp))
+                stats.topTasks.forEach { (title, minutes) ->
+                    Row(Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
+                        Text(title, fontSize = 13.sp, maxLines = 1, modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.onSurface)
+                        Text(formatDuration(minutes), fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = accent)
+                    }
+                }
+            }
         }
     }
 }

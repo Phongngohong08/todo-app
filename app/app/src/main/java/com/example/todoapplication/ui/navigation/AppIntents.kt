@@ -15,6 +15,7 @@ object AppIntents {
     const val OPEN_ADD = "add"
     const val OPEN_REVIEW = "review"
     const val OPEN_FOCUS = "focus"
+    const val OPEN_HABITS = "habits"
     private const val OPEN_TASK_PREFIX = "task:"
 
     /** Nội dung chia sẻ từ app khác (ACTION_SEND) → điền sẵn thanh tạo nhanh. */

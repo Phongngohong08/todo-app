@@ -30,7 +30,7 @@ fun categoryLabel(category: String): String = when (category) {
     "ALL" -> "Tất cả"
     "PERSONAL" -> "Cá nhân"
     "WORK" -> "Công việc"
-    "OTHER" -> "Khác"
+    "OTHER" -> "Hộp thư đến"
     else -> category
 }
 

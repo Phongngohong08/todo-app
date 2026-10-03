@@ -403,7 +403,7 @@ private fun TaskChip(entry: CalendarEntry, modifier: Modifier, onClick: () -> Un
         Row(Modifier.padding(horizontal = 8.dp, vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(6.dp).clip(CircleShape).background(priorityColor(task.priority)))
             Spacer(Modifier.width(5.dp))
-            val time = task.dueAt?.takeIf { !task.dueAllDay }?.let { formatTime(it) }
+            val time = task.dueAt?.takeIf { !task.dueAllDay }?.let { (task.startAt?.let { s -> formatTime(s) + "–" } ?: "") + formatTime(it) }
             Text(
                 listOfNotNull(time, task.title).joinToString(" ") + if (entry.isProjected) " · dự kiến" else "",
                 fontSize = 12.sp,
@@ -490,7 +490,7 @@ private fun EntryRow(entry: CalendarEntry, onClick: () -> Unit, onToggle: (() ->
                     color = MaterialTheme.colorScheme.onSurface,
                     textDecoration = if (task.isCompleted) TextDecoration.LineThrough else null
                 )
-                val time = task.dueAt?.takeIf { !task.dueAllDay }?.let { formatTime(it) }
+                val time = task.dueAt?.takeIf { !task.dueAllDay }?.let { (task.startAt?.let { s -> formatTime(s) + "–" } ?: "") + formatTime(it) }
                 val meta = listOfNotNull(time ?: "Cả ngày", if (entry.isProjected) "Lần lặp dự kiến" else null)
                 Text(meta.joinToString(" · "), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }

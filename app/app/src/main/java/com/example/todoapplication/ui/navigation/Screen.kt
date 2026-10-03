@@ -38,4 +38,12 @@ sealed class Screen(val route: String) {
     object Templates : Screen("templates")
     /** Ma trận Eisenhower: Quan trọng × Gấp, kéo thả việc giữa 4 ô. */
     object Matrix : Screen("matrix")
+    /** Thói quen: đánh dấu theo ngày, chuỗi, tiến độ tuần. */
+    object Habits : Screen("habits")
+    /** Các danh sách (danh mục) — màu, emoji, mục. */
+    object Lists : Screen("lists")
+    /** Một danh sách dạng Danh sách / Kanban theo mục. */
+    object ListBoard : Screen("list/{name}") {
+        fun createRoute(name: String) = "list/" + android.net.Uri.encode(name)
+    }
 }

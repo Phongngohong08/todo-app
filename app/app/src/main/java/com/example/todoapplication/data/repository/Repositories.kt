@@ -5,7 +5,9 @@ import com.example.todoapplication.data.api.ApiService
 import com.example.todoapplication.data.local.AppDatabase
 import com.example.todoapplication.data.local.CategoryEntity
 import com.example.todoapplication.data.local.ChatMessageEntity
+import com.example.todoapplication.data.local.toDomain
 import com.example.todoapplication.data.local.toEntity
+import com.example.todoapplication.domain.model.ListInfo
 import com.example.todoapplication.data.model.AssistInput
 import com.example.todoapplication.data.model.AuthResponse
 import com.example.todoapplication.data.model.BreakdownResponse
@@ -147,6 +149,32 @@ class CategoryRepository(
 
     fun observeAll(): Flow<List<String>> = categoryDao.observeNames().map { DEFAULTS + it }
 
+    private val listMetaDao = db.listMetaDao()
+
+    /** Mọi danh sách kèm cài đặt hiển thị (màu, emoji, các mục). */
+    fun observeLists(): Flow<List<ListInfo>> =
+        combine(observeAll(), listMetaDao.observeAll()) { names, metas ->
+            val byName = metas.associateBy { it.name }
+            names.map { byName[it]?.toDomain() ?: ListInfo(it) }
+        }
+
+    suspend fun getList(name: String): ListInfo = listMetaDao.get(name)?.toDomain() ?: ListInfo(name)
+
+    /** Lưu màu / emoji / các mục của danh sách (đồng bộ cùng danh mục). */
+    suspend fun saveListInfo(info: ListInfo) {
+        val clean = info.copy(
+            color = info.color.trim(),
+            emoji = info.emoji.trim(),
+            sections = info.sections.map { it.trim().take(MAX_LENGTH) }.filter { it.isNotEmpty() }
+                .distinctBy { it.lowercase() }.take(MAX_SECTIONS)
+        )
+        db.withTransaction {
+            listMetaDao.upsert(clean.toEntity())
+            syncStateDao.markCategoriesDirty()
+        }
+        sync.requestSync(delayMillis = 1_000)
+    }
+
     /** Thêm danh mục; trả về tên đã chuẩn hoá (rỗng nếu không hợp lệ). */
     suspend fun add(name: String): String {
         val clean = name.trim().take(MAX_LENGTH).trim()
@@ -167,6 +195,7 @@ class CategoryRepository(
         if (DEFAULTS.contains(name)) return
         db.withTransaction {
             categoryDao.delete(name)
+            listMetaDao.delete(name)
             syncStateDao.markCategoriesDirty()
         }
         sync.requestSync(delayMillis = 1_000)
@@ -178,6 +207,9 @@ class CategoryRepository(
 
         /** Khớp giới hạn của backend (cột tasks.category VARCHAR(50)). */
         const val MAX_LENGTH = 50
+
+        /** Khớp giới hạn của backend (list_settings). */
+        const val MAX_SECTIONS = 20
     }
 }
 

@@ -212,9 +212,13 @@ fun myDaySuggestions(
     val end = endOfToday(zone, today)
     val candidates = tasks.filter { !it.isCompleted && it.myDay != todayKey }
 
+    // Bước con có hạn riêng tới hôm nay (vd "nộp bản nháp" trước hạn của cả việc)
+    fun stepDue(t: Task): Boolean = t.nextStepDue != null && t.nextStepDue <= todayKey
+
     fun reasonFor(t: Task): Pair<Int, String>? = when {
         t.isOverdue(now) -> 0 to "Quá hạn"
         t.dueAt != null && t.dueAt <= end -> 1 to "Đến hạn hôm nay"
+        stepDue(t) -> 1 to (if (t.nextStepDue!! < todayKey) "Bước quá hạn: " else "Bước đến hạn: ") + t.nextStepTitle.orEmpty()
         t.myDay == yesterdayKey -> 2 to "Hôm qua chưa xong"
         t.dueAt == null && t.priority == "HIGH" -> 3 to "Ưu tiên cao, chưa có hạn"
         else -> null
@@ -245,3 +249,44 @@ fun allDayDueInDays(days: Int, zone: ZoneId = ZoneId.systemDefault(), today: Loc
 /** Số ngày tới Chủ nhật gần nhất (>=0). */
 fun daysUntilSunday(today: LocalDate = LocalDate.now()): Int =
     (today.with(TemporalAdjusters.nextOrSame(DayOfWeek.SUNDAY)).toEpochDay() - today.toEpochDay()).toInt()
+
+// ── Bộ lọc đã lưu ────────────────────────────────────────────────────────────
+
+/**
+ * Một tổ hợp bộ lọc người dùng đặt tên để dùng lại (như "Việc nhà gấp" = danh sách Cá nhân + @gấp).
+ * Lưu theo thiết bị (LocalPrefs) bằng [SavedFilterCodec].
+ */
+data class SavedFilter(
+    val name: String,
+    val smart: SmartFilter = SmartFilter.NONE,
+    /** Mã danh sách, "ALL" = mọi danh sách. */
+    val category: String = "ALL",
+    /** null = mọi nhãn. */
+    val tag: String? = null,
+    val query: String = ""
+)
+
+/** Mã hóa danh sách bộ lọc thành một chuỗi (ký tự phân cách điều khiển — không xuất hiện trong chữ người dùng gõ). */
+object SavedFilterCodec {
+    private const val FIELD = '\u001F'
+    private const val RECORD = '\u001E'
+    const val MAX_FILTERS = 20
+
+    fun encode(filters: List<SavedFilter>): String = filters.joinToString(RECORD.toString()) { f ->
+        listOf(f.name, f.smart.name, f.category, f.tag.orEmpty(), f.query).joinToString(FIELD.toString()) {
+            it.replace(FIELD, ' ').replace(RECORD, ' ')
+        }
+    }
+
+    fun decode(stored: String): List<SavedFilter> = stored.split(RECORD).mapNotNull { record ->
+        val p = record.split(FIELD)
+        if (p.size < 5 || p[0].isBlank()) return@mapNotNull null
+        SavedFilter(
+            name = p[0],
+            smart = runCatching { SmartFilter.valueOf(p[1]) }.getOrDefault(SmartFilter.NONE),
+            category = p[2].ifBlank { "ALL" },
+            tag = p[3].ifBlank { null },
+            query = p[4]
+        )
+    }
+}

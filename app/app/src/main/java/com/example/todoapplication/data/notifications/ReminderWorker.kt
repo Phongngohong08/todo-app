@@ -47,8 +47,13 @@ class ReminderWorker(context: Context, params: WorkerParameters) : CoroutineWork
         showNotification(applicationContext, taskId, name, attempt)
 
         // Nhắc dai: hẹn lần kế tiếp — dừng khi việc xong (TaskEffects hủy job) hoặc đủ số lần tối đa
+        // Chỉ bắt đầu nhắc dai từ lời nhắc sát giờ nhất trở đi (lời nhắc sớm "trước 1 ngày" không kéo theo nhắc dai)
         val nagMinutes = prefs.nagMinutes.value
-        if (nagMinutes > 0 && attempt < LocalPrefs.MAX_NAGS && (!prefs.nagHighOnly.value || task.priority == "HIGH")) {
+        val due = task.dueAt
+        val nearDue = due != null &&
+            System.currentTimeMillis() >= ReminderScheduler.reminderTime(task, due, prefs.allDayReminderTime.value) -
+            task.reminderOffsets.first() * 60_000L - NAG_GRACE_MS
+        if (nearDue && nagMinutes > 0 && attempt < LocalPrefs.MAX_NAGS && (!prefs.nagHighOnly.value || task.priority == "HIGH")) {
             ReminderScheduler.scheduleNag(applicationContext, taskId, name, nagMinutes, attempt + 1)
         }
         return Result.success()
@@ -62,6 +67,8 @@ class ReminderWorker(context: Context, params: WorkerParameters) : CoroutineWork
         const val KEY_TASK_ID = "task_id"
         /** 0 = lần nhắc đầu; > 0 = lần nhắc dai thứ mấy. */
         const val KEY_ATTEMPT = "attempt"
+        /** Sai lệch cho phép của WorkManager khi so "đã tới lời nhắc sát giờ nhất chưa". */
+        private const val NAG_GRACE_MS = 2 * 60_000L
 
         private fun showNotification(context: Context, taskId: String, title: String, attempt: Int) {
             Notifications.ensureChannels(context)

@@ -99,3 +99,46 @@ val MIGRATION_5_6: Migration = object : Migration(5, 6) {
         db.execSQL("ALTER TABLE `tasks` ADD COLUMN `recurrenceUntil` INTEGER")
     }
 }
+
+/**
+ * v6 → v7 (Giai đoạn 2 — sắp xếp công việc cá nhân): nhãn, mục, khung giờ, nhiều lời nhắc cho task; hạn của
+ * bước con; bảng mới cho cài đặt danh sách, thói quen, lịch sử tập trung. Chỉ thêm cột / thêm bảng.
+ * Câu lệnh phải khớp schema Room sinh ra (app/schemas/.../7.json) — MigrationTest kiểm tra.
+ */
+val MIGRATION_6_7: Migration = object : Migration(6, 7) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE `tasks` ADD COLUMN `tags` TEXT NOT NULL DEFAULT ''")
+        db.execSQL("ALTER TABLE `tasks` ADD COLUMN `section` TEXT NOT NULL DEFAULT ''")
+        db.execSQL("ALTER TABLE `tasks` ADD COLUMN `startAt` INTEGER")
+        db.execSQL("ALTER TABLE `tasks` ADD COLUMN `extraReminders` TEXT NOT NULL DEFAULT ''")
+        db.execSQL("ALTER TABLE `subtasks` ADD COLUMN `dueDate` TEXT")
+        db.execSQL("ALTER TABLE `sync_state` ADD COLUMN `habitsCursor` TEXT")
+        db.execSQL("ALTER TABLE `sync_state` ADD COLUMN `focusCursor` TEXT")
+
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `list_meta` (`name` TEXT NOT NULL, `color` TEXT NOT NULL, " +
+                "`emoji` TEXT NOT NULL, `sections` TEXT NOT NULL, PRIMARY KEY(`name`))"
+        )
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `habits` (`id` TEXT NOT NULL, `name` TEXT NOT NULL, `emoji` TEXT NOT NULL, " +
+                "`color` TEXT NOT NULL, `frequency` TEXT NOT NULL, `weekdays` TEXT NOT NULL, " +
+                "`targetPerWeek` INTEGER NOT NULL, `reminderTime` TEXT NOT NULL, `position` REAL NOT NULL, " +
+                "`archived` INTEGER NOT NULL, `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, " +
+                "`isDirty` INTEGER NOT NULL, `isDeleted` INTEGER NOT NULL, `localVersion` INTEGER NOT NULL, " +
+                "PRIMARY KEY(`id`))"
+        )
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_habits_isDeleted_position` ON `habits` (`isDeleted`, `position`)")
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `habit_checkins` (`habitId` TEXT NOT NULL, `date` TEXT NOT NULL, " +
+                "`done` INTEGER NOT NULL, `isDirty` INTEGER NOT NULL, PRIMARY KEY(`habitId`, `date`), " +
+                "FOREIGN KEY(`habitId`) REFERENCES `habits`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )"
+        )
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_habit_checkins_date` ON `habit_checkins` (`date`)")
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `focus_sessions` (`id` TEXT NOT NULL, `taskId` TEXT, " +
+                "`taskTitle` TEXT NOT NULL, `startedAt` INTEGER NOT NULL, `minutes` INTEGER NOT NULL, " +
+                "`isSynced` INTEGER NOT NULL, PRIMARY KEY(`id`))"
+        )
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_focus_sessions_startedAt` ON `focus_sessions` (`startedAt`)")
+    }
+}

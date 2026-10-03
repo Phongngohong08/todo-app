@@ -4,10 +4,13 @@ import android.util.Log
 import androidx.room.withTransaction
 import com.example.todoapplication.data.api.ApiService
 import com.example.todoapplication.data.local.AppDatabase
+import com.example.todoapplication.data.local.HabitCheckinEntity
 import com.example.todoapplication.data.local.TaskEntity
 import com.example.todoapplication.data.local.subtaskEntities
 import com.example.todoapplication.data.local.toEntity
 import com.example.todoapplication.data.local.toInputDto
+import com.example.todoapplication.data.local.toDto
+import com.example.todoapplication.data.model.CheckinInputDto
 import com.example.todoapplication.data.model.CategoriesDto
 import com.example.todoapplication.data.repository.TaskRepository
 import kotlinx.coroutines.CancellationException
@@ -49,6 +52,8 @@ class SyncEngine(
     private val api: ApiService,
     private val currentUserId: () -> String?,
     private val listener: TaskChangeListener,
+    /** Gọi sau khi thói quen thay đổi từ server (đặt lại nhắc thói quen). */
+    private val onHabitsChanged: suspend () -> Unit = {},
     private val clock: () -> Long = System::currentTimeMillis
 ) {
     private val mutex = Mutex()
@@ -56,6 +61,9 @@ class SyncEngine(
     private val subtaskDao = db.subtaskDao()
     private val categoryDao = db.categoryDao()
     private val syncStateDao = db.syncStateDao()
+    private val listMetaDao = db.listMetaDao()
+    private val habitDao = db.habitDao()
+    private val focusDao = db.focusDao()
 
     /** Chạy [block] khi không có lần đồng bộ nào đang chạy (vd xóa dữ liệu lúc đăng xuất). */
     suspend fun <T> exclusive(block: suspend () -> T): T = mutex.withLock { block() }
@@ -65,8 +73,12 @@ class SyncEngine(
         try {
             val forceFullPull = pushTasks()
             pushCategories()
+            val habitsSupported = pushHabits() && pushCheckins()
+            val focusSupported = pushFocusSessions()
             pullTasks(userId, forceFullPull)
             pullCategories(userId)
+            if (habitsSupported) pullHabits(userId)
+            if (focusSupported) pullFocusSessions(userId)
             taskDao.purgeTombstones(before = clock() - TOMBSTONE_TTL_MS)
             syncStateDao.update { it.copy(lastSyncedAt = clock()) }
             SyncResult.Success
@@ -134,7 +146,9 @@ class SyncEngine(
     private suspend fun pushCategories() {
         val state = syncStateDao.get() ?: return
         if (!state.categoriesDirty) return
-        val resp = api.replaceCategories(CategoriesDto(categoryDao.getNames()))
+        val resp = api.replaceCategories(
+            CategoriesDto(categoryDao.getNames(), lists = listMetaDao.getAll().map { it.toDto() })
+        )
         if (resp.isSuccessful || resp.code() in PERMANENT_REJECTIONS) {
             syncStateDao.markCategoriesSynced(state.categoriesVersion)
         } else {
@@ -195,6 +209,122 @@ class SyncEngine(
             if (currentUserId() != userId) return@withTransaction
             if (syncStateDao.get()?.categoriesDirty == true) return@withTransaction
             categoryDao.replaceAll(body.categories)
+            // Server cũ không có cài đặt danh sách (null) → giữ bản trên máy
+            body.lists?.let { lists -> listMetaDao.replaceAll(lists.map { it.toEntity() }) }
+        }
+    }
+
+    // ── Thói quen ────────────────────────────────────────────────────────────
+    // Server cũ chưa có API thói quen trả 404 cho mọi đường dẫn /habits → dừng phần này, giữ thay đổi trên máy,
+    // KHÔNG làm hỏng cả lần đồng bộ (task vẫn đồng bộ bình thường).
+
+    /** Trả false nếu server chưa hỗ trợ thói quen. */
+    private suspend fun pushHabits(): Boolean {
+        repeat(MAX_PUSH_ROUNDS) {
+            val dirty = habitDao.getDirty()
+            if (dirty.isEmpty()) return true
+            for (habit in dirty) {
+                if (habit.isDeleted) {
+                    val resp = api.deleteHabit(habit.id)
+                    when {
+                        // 404 ở đây cũng có thể là "server chưa từng có" (tạo rồi xóa khi offline)
+                        resp.isSuccessful || resp.code() == 404 -> habitDao.deleteByIds(listOf(habit.id))
+                        else -> throw failure(resp)
+                    }
+                    continue
+                }
+                val resp = api.saveHabit(habit.id, habit.toInputDto())
+                val body = resp.body()
+                when {
+                    resp.isSuccessful && body != null -> db.withTransaction {
+                        val current = habitDao.getById(habit.id)
+                        if (current != null && current.localVersion == habit.localVersion && !current.isDeleted) {
+                            habitDao.upsert(body.toEntity().copy(localVersion = current.localVersion))
+                        }
+                    }
+                    resp.code() == 404 -> return false
+                    resp.code() in PERMANENT_REJECTIONS -> {
+                        Log.w(TAG, "Server rejected habit ${habit.id}: HTTP ${resp.code()}")
+                        habitDao.markSynced(habit.id, habit.localVersion)
+                    }
+                    else -> throw failure(resp)
+                }
+            }
+        }
+        return true
+    }
+
+    private suspend fun pushCheckins(): Boolean {
+        for (checkin in habitDao.getDirtyCheckins()) {
+            val habit = habitDao.getById(checkin.habitId)
+            if (habit == null || habit.isDirty) continue // chờ thói quen được tạo trên server trước
+            val resp = api.setHabitCheckin(checkin.habitId, checkin.date, CheckinInputDto(checkin.done))
+            when {
+                resp.isSuccessful || resp.code() in PERMANENT_REJECTIONS ->
+                    habitDao.markCheckinSynced(checkin.habitId, checkin.date, checkin.done)
+                resp.code() == 404 -> return false
+                else -> throw failure(resp)
+            }
+        }
+        return true
+    }
+
+    private suspend fun pullHabits(userId: String) {
+        val cursor = syncStateDao.get()?.habitsCursor
+        val resp = api.syncHabits(cursor)
+        if (resp.code() == 404) return
+        val body = resp.body() ?: throw failure(resp)
+
+        var changed = false
+        db.withTransaction {
+            if (currentUserId() != userId) return@withTransaction
+            val dirty = habitDao.getDirtyIds().toHashSet()
+
+            val incoming = body.habits.orEmpty().filter { it.id !in dirty }
+            if (incoming.isNotEmpty()) habitDao.upsertAll(incoming.map { it.toEntity() })
+
+            val removed = body.deletedIds.orEmpty().filter { it !in dirty }.toMutableList()
+            if (cursor == null) {
+                val onServer = body.habits.orEmpty().mapTo(HashSet()) { it.id }
+                removed += habitDao.getCleanIds().filter { it !in onServer }
+            }
+            removed.chunked(SQL_BATCH).forEach { habitDao.deleteByIds(it) }
+
+            val dirtyCheckins = habitDao.getDirtyCheckinKeys().toHashSet()
+            val checkins = body.checkins.orEmpty()
+                .filter { "${it.habitId}|${it.date}" !in dirtyCheckins && habitDao.getById(it.habitId) != null }
+                .map { HabitCheckinEntity(it.habitId, it.date, it.done) }
+            if (checkins.isNotEmpty()) habitDao.upsertCheckins(checkins)
+
+            syncStateDao.update { it.copy(habitsCursor = body.serverTime) }
+            changed = incoming.isNotEmpty() || removed.isNotEmpty()
+        }
+        if (changed) onHabitsChanged()
+    }
+
+    // ── Lịch sử tập trung (chỉ thêm) ─────────────────────────────────────────
+
+    private suspend fun pushFocusSessions(): Boolean {
+        for (session in focusDao.getUnsynced()) {
+            val resp = api.recordFocusSession(session.id, session.toInputDto())
+            when {
+                resp.isSuccessful || resp.code() in PERMANENT_REJECTIONS -> focusDao.markSynced(session.id)
+                resp.code() == 404 -> return false
+                else -> throw failure(resp)
+            }
+        }
+        return true
+    }
+
+    private suspend fun pullFocusSessions(userId: String) {
+        val cursor = syncStateDao.get()?.focusCursor
+        val resp = api.syncFocusSessions(cursor)
+        if (resp.code() == 404) return
+        val body = resp.body() ?: throw failure(resp)
+        db.withTransaction {
+            if (currentUserId() != userId) return@withTransaction
+            focusDao.insertAll(body.sessions.orEmpty().map { it.toEntity() })
+            syncStateDao.update { it.copy(focusCursor = body.serverTime) }
         }
     }
 

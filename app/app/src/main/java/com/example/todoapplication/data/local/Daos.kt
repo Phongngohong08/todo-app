@@ -23,7 +23,11 @@ interface TaskDao {
         """
         SELECT t.*,
             (SELECT COUNT(*) FROM subtasks s WHERE s.taskId = t.id AND s.isDone = 1) AS subtaskDone,
-            (SELECT COUNT(*) FROM subtasks s WHERE s.taskId = t.id) AS subtaskTotal
+            (SELECT COUNT(*) FROM subtasks s WHERE s.taskId = t.id) AS subtaskTotal,
+            (SELECT s.dueDate FROM subtasks s WHERE s.taskId = t.id AND s.isDone = 0 AND s.dueDate IS NOT NULL
+                ORDER BY s.dueDate LIMIT 1) AS nextStepDue,
+            (SELECT s.title FROM subtasks s WHERE s.taskId = t.id AND s.isDone = 0 AND s.dueDate IS NOT NULL
+                ORDER BY s.dueDate LIMIT 1) AS nextStepTitle
         FROM tasks t
         WHERE t.isDeleted = 0
             AND (:category IS NULL OR t.category = :category)
@@ -176,6 +180,9 @@ interface TaskDao {
 
     @Query("SELECT id FROM tasks")
     suspend fun getAllIds(): List<String>
+
+    @Query("SELECT id FROM tasks WHERE isDeleted = 0 AND category = :category AND section = :section")
+    suspend fun getIdsInSection(category: String, section: String): List<String>
 }
 
 @Dao
@@ -275,4 +282,131 @@ interface SyncStateDao {
 
     @Query("UPDATE sync_state SET categoriesDirty = 0 WHERE id = 0 AND categoriesVersion = :version")
     suspend fun markCategoriesSynced(version: Int)
+}
+
+@Dao
+interface ListMetaDao {
+    @Query("SELECT * FROM list_meta")
+    fun observeAll(): Flow<List<ListMetaEntity>>
+
+    @Query("SELECT * FROM list_meta")
+    suspend fun getAll(): List<ListMetaEntity>
+
+    @Query("SELECT * FROM list_meta WHERE name = :name")
+    suspend fun get(name: String): ListMetaEntity?
+
+    @Upsert
+    suspend fun upsert(meta: ListMetaEntity)
+
+    @Query("DELETE FROM list_meta WHERE name = :name")
+    suspend fun delete(name: String)
+
+    @Query("DELETE FROM list_meta")
+    suspend fun deleteAll()
+
+    @Transaction
+    suspend fun replaceAll(items: List<ListMetaEntity>) {
+        deleteAll()
+        items.forEach { upsert(it) }
+    }
+}
+
+@Dao
+interface HabitDao {
+    @Query("SELECT * FROM habits WHERE isDeleted = 0 ORDER BY position ASC, createdAt ASC")
+    fun observeAll(): Flow<List<HabitEntity>>
+
+    @Query("SELECT * FROM habits WHERE isDeleted = 0 AND archived = 0")
+    suspend fun getActive(): List<HabitEntity>
+
+    @Query("SELECT * FROM habits WHERE id = :id")
+    suspend fun getById(id: String): HabitEntity?
+
+    @Upsert
+    suspend fun upsert(habit: HabitEntity)
+
+    @Upsert
+    suspend fun upsertAll(habits: List<HabitEntity>)
+
+    @Query("SELECT * FROM habits WHERE isDirty = 1")
+    suspend fun getDirty(): List<HabitEntity>
+
+    @Query("SELECT id FROM habits WHERE isDirty = 1")
+    suspend fun getDirtyIds(): List<String>
+
+    @Query("UPDATE habits SET isDirty = 0 WHERE id = :id AND localVersion = :version")
+    suspend fun markSynced(id: String, version: Int): Int
+
+    @Query("DELETE FROM habits WHERE id IN (:ids)")
+    suspend fun deleteByIds(ids: List<String>)
+
+    @Query("SELECT id FROM habits WHERE isDirty = 0")
+    suspend fun getCleanIds(): List<String>
+
+    @Query("DELETE FROM habits")
+    suspend fun deleteAll()
+
+    // ── Đánh dấu theo ngày ──
+
+    /** Các ngày đã đánh dấu từ [since] ("yyyy-MM-dd") của mọi thói quen còn sống. */
+    @Query(
+        """
+        SELECT c.* FROM habit_checkins c JOIN habits h ON h.id = c.habitId
+        WHERE h.isDeleted = 0 AND c.done = 1 AND c.date >= :since
+        """
+    )
+    fun observeCheckinsSince(since: String): Flow<List<HabitCheckinEntity>>
+
+    @Query("SELECT * FROM habit_checkins WHERE habitId = :habitId AND date = :date")
+    suspend fun getCheckin(habitId: String, date: String): HabitCheckinEntity?
+
+    @Upsert
+    suspend fun upsertCheckin(checkin: HabitCheckinEntity)
+
+    @Upsert
+    suspend fun upsertCheckins(checkins: List<HabitCheckinEntity>)
+
+    @Query("SELECT * FROM habit_checkins WHERE isDirty = 1")
+    suspend fun getDirtyCheckins(): List<HabitCheckinEntity>
+
+    @Query("UPDATE habit_checkins SET isDirty = 0 WHERE habitId = :habitId AND date = :date AND done = :done")
+    suspend fun markCheckinSynced(habitId: String, date: String, done: Boolean)
+
+    @Query("SELECT habitId || '|' || date FROM habit_checkins WHERE isDirty = 1")
+    suspend fun getDirtyCheckinKeys(): List<String>
+
+    @Query("DELETE FROM habit_checkins WHERE habitId = :habitId AND date = :date")
+    suspend fun deleteCheckin(habitId: String, date: String)
+
+    /** Đã đánh dấu thói quen này hôm nay chưa (cho nhắc thói quen). */
+    @Query("SELECT COUNT(*) FROM habit_checkins WHERE habitId = :habitId AND date = :date AND done = 1")
+    suspend fun isDone(habitId: String, date: String): Int
+
+    /** Số lần đã làm trong khoảng ngày [from, to] (cho thói quen "N lần/tuần"). */
+    @Query("SELECT COUNT(*) FROM habit_checkins WHERE habitId = :habitId AND done = 1 AND date >= :from AND date <= :to")
+    suspend fun countDone(habitId: String, from: String, to: String): Int
+}
+
+@Dao
+interface FocusDao {
+    @Query("SELECT * FROM focus_sessions WHERE startedAt >= :since ORDER BY startedAt DESC")
+    fun observeSince(since: Long): Flow<List<FocusSessionEntity>>
+
+    @Query("SELECT * FROM focus_sessions WHERE taskId = :taskId ORDER BY startedAt DESC")
+    fun observeForTask(taskId: String): Flow<List<FocusSessionEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertAll(sessions: List<FocusSessionEntity>)
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insert(session: FocusSessionEntity)
+
+    @Query("SELECT * FROM focus_sessions WHERE isSynced = 0")
+    suspend fun getUnsynced(): List<FocusSessionEntity>
+
+    @Query("UPDATE focus_sessions SET isSynced = 1 WHERE id = :id")
+    suspend fun markSynced(id: String)
+
+    @Query("DELETE FROM focus_sessions")
+    suspend fun deleteAll()
 }

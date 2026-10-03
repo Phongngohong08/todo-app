@@ -20,7 +20,7 @@ import java.time.temporal.TemporalAdjusters
  */
 object QuickAddParser {
 
-    enum class Kind { DATE, TIME, PRIORITY, CATEGORY, RECURRENCE }
+    enum class Kind { DATE, TIME, PRIORITY, CATEGORY, RECURRENCE, TAG }
 
     /** Một đoạn được nhận ra trong câu gốc (vị trí để tô màu). */
     data class Token(val range: IntRange, val kind: Kind)
@@ -34,7 +34,9 @@ object QuickAddParser {
         val category: String?,
         val recurrence: String?,
         val recurrenceDays: String,
-        val tokens: List<Token>
+        val tokens: List<Token>,
+        /** Nhãn gõ sau "@" (đã chuẩn hóa). */
+        val tags: List<String> = emptyList()
     ) {
         val hasAnything: Boolean get() = tokens.isNotEmpty()
     }
@@ -61,6 +63,7 @@ object QuickAddParser {
     )
     private val RE_PRIORITY = Regex("""(?:^|\s)(!(?:cao|gap|1|tb|trung\s*binh|vua|2|thap|3)|p[123])(?=\s|$)""")
     private val RE_CATEGORY = Regex("""(?:^|\s)#(\S+)""")
+    private val RE_TAG = Regex("""(?:^|\s)@(\S+)""")
 
     fun parse(
         text: String,
@@ -198,6 +201,17 @@ object QuickAddParser {
             }
         }
 
+        // 7. Nhãn "@nhà @gấp" (nhiều nhãn được)
+        val tags = mutableListOf<String>()
+        RE_TAG.findAll(norm).filter { free(it.range) }.toList().forEach { m ->
+            val word = m.groups[1]!!
+            val tag = TagRules.normalize(text.substring(word.range))
+            if (tag.isNotEmpty()) {
+                tags += tag
+                take(word.range.first - 1..word.range.last, Kind.TAG)
+            }
+        }
+
         // ── Ghép ngày + giờ ──
         var resolvedDate = date
         if (resolvedDate == null && recurrence != null) {
@@ -238,7 +252,8 @@ object QuickAddParser {
             category = category,
             recurrence = recurrence,
             recurrenceDays = recurrenceDays,
-            tokens = tokens.sortedBy { it.range.first }
+            tokens = tokens.sortedBy { it.range.first },
+            tags = TagRules.normalize(tags)
         )
     }
 

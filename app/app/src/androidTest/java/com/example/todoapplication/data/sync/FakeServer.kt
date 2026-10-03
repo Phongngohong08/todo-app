@@ -113,6 +113,85 @@ class FakeServer : ApiService {
         return Response.success(input)
     }
 
+    // ── Thói quen & lịch sử tập trung (Giai đoạn 2) ──
+
+    /** true → giả server cũ chưa có API thói quen / tập trung (trả 404). */
+    var legacy = false
+
+    private data class HabitRow(val dto: HabitDto, val updatedAt: Long, val deleted: Boolean = false)
+    private data class CheckinRow(val dto: CheckinDto, val updatedAt: Long)
+
+    private val habitRows = linkedMapOf<String, HabitRow>()
+    private val checkinRows = linkedMapOf<String, CheckinRow>()
+    private val focusRows = linkedMapOf<String, Pair<FocusSessionDto, Long>>()
+
+    val habits: Map<String, HabitDto> get() = habitRows.filterValues { !it.deleted }.mapValues { it.value.dto }
+    val doneCheckins: Set<String> get() = checkinRows.values.filter { it.dto.done }.map { "${it.dto.habitId}|${it.dto.date}" }.toSet()
+    val focusSessions: Map<String, FocusSessionDto> get() = focusRows.mapValues { it.value.first }
+
+    private fun <T> notFound(): Response<T> = Response.error(404, "".toResponseBody(null))
+
+    override suspend fun syncHabits(since: String?): Response<HabitChangesDto> {
+        checkOnline()
+        if (legacy) return notFound()
+        val from = since?.let { Instant.parse(it).toEpochMilli() }
+        val changed = habitRows.values.filter { if (from == null) !it.deleted else it.updatedAt > from }
+        val checkins = checkinRows.values.filter { if (from == null) it.dto.done else it.updatedAt > from }
+        return Response.success(
+            HabitChangesDto(
+                habits = changed.filter { !it.deleted }.map { it.dto },
+                deletedIds = changed.filter { it.deleted }.map { it.dto.id },
+                checkins = checkins.map { it.dto },
+                serverTime = iso(tick())
+            )
+        )
+    }
+
+    override suspend fun saveHabit(id: String, input: HabitInputDto): Response<HabitDto> {
+        checkOnline()
+        if (legacy) return notFound()
+        val now = tick()
+        val created = habitRows[id]?.dto?.createdAt ?: iso(now)
+        val dto = HabitDto(
+            id, input.name, input.emoji, input.color, input.frequency, input.weekdays, input.targetPerWeek,
+            input.reminderTime, input.position, input.archived, created, iso(now)
+        )
+        habitRows[id] = HabitRow(dto, now)
+        return Response.success(dto)
+    }
+
+    override suspend fun deleteHabit(id: String): Response<Unit> {
+        checkOnline()
+        if (legacy) return notFound()
+        val row = habitRows[id] ?: return notFound()
+        habitRows[id] = row.copy(updatedAt = tick(), deleted = true)
+        return Response.success(Unit)
+    }
+
+    override suspend fun setHabitCheckin(id: String, date: String, input: CheckinInputDto): Response<CheckinDto> {
+        checkOnline()
+        if (legacy || habitRows[id]?.deleted != false) return notFound()
+        val dto = CheckinDto(id, date, input.done)
+        checkinRows["$id|$date"] = CheckinRow(dto, tick())
+        return Response.success(dto)
+    }
+
+    override suspend fun syncFocusSessions(since: String?): Response<FocusChangesDto> {
+        checkOnline()
+        if (legacy) return notFound()
+        val from = since?.let { Instant.parse(it).toEpochMilli() }
+        val sessions = focusRows.values.filter { from == null || it.second > from }.map { it.first }
+        return Response.success(FocusChangesDto(sessions, iso(tick())))
+    }
+
+    override suspend fun recordFocusSession(id: String, input: FocusSessionInputDto): Response<FocusSessionDto> {
+        checkOnline()
+        if (legacy) return notFound()
+        val dto = FocusSessionDto(id, input.taskId, input.taskTitle, input.startedAt, input.minutes)
+        if (id !in focusRows) focusRows[id] = dto to tick()
+        return Response.success(dto)
+    }
+
     // ── Không dùng trong test đồng bộ ──
     override suspend fun register(input: RegisterInput): Response<User> = unsupported()
     override suspend fun login(input: LoginInput): Response<AuthResponse> = unsupported()

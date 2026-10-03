@@ -1,6 +1,6 @@
 # Công nghệ & Kỹ thuật Android sử dụng
 
-Tài liệu liệt kê đầy đủ các công nghệ, thư viện và **kỹ thuật lập trình Android** được áp dụng trong ứng dụng Todo List tích hợp AI. Trọng tâm là kỹ thuật xây dựng phần mềm Android phía client, đặc biệt là kiến trúc **offline-first** (Room là nguồn dữ liệu duy nhất + đồng bộ nền bằng WorkManager).
+Tài liệu liệt kê đầy đủ các công nghệ, thư viện và **kỹ thuật lập trình Android** được áp dụng trong ứng dụng quản lý công việc cá nhân tích hợp AI (TaskFlow AI). Trọng tâm là kỹ thuật xây dựng phần mềm Android phía client, đặc biệt là kiến trúc **offline-first** (Room là nguồn dữ liệu duy nhất + đồng bộ nền bằng WorkManager).
 
 ---
 

@@ -168,7 +168,9 @@ data class SubtaskDto(
     val id: String,
     val title: String,
     val done: Boolean,
-    val position: Int
+    val position: Int,
+    /** "yyyy-MM-dd"; null = không có hạn riêng (Gson bỏ trường null khi gửi). */
+    @SerializedName("due_date") val dueDate: String? = null
 )
 
 /** Task như server trả về. Thời gian là chuỗi RFC3339; mapper đổi sang epoch millis cho Room. */
@@ -196,7 +198,12 @@ data class TaskDto(
     @SerializedName("estimated_minutes") val estimatedMinutes: Int? = null,
     @SerializedName("recurrence_interval") val recurrenceInterval: Int? = null,
     @SerializedName("recurrence_mode") val recurrenceMode: String? = null,
-    @SerializedName("recurrence_until") val recurrenceUntil: String? = null
+    @SerializedName("recurrence_until") val recurrenceUntil: String? = null,
+    // Thêm ở migration 000009
+    val tags: List<String>? = null,
+    val section: String? = null,
+    @SerializedName("start_at") val startAt: String? = null,
+    @SerializedName("extra_reminders") val extraReminders: List<Int>? = null
 )
 
 /** Toàn bộ trạng thái task gửi lên bằng PUT /tasks/{id} (server tạo mới nếu chưa có — idempotent). */
@@ -222,7 +229,12 @@ data class TaskInputDto(
     @SerializedName("recurrence_interval") val recurrenceInterval: Int,
     @SerializedName("recurrence_mode") val recurrenceMode: String,
     /** "" = lặp mãi. */
-    @SerializedName("recurrence_until") val recurrenceUntil: String
+    @SerializedName("recurrence_until") val recurrenceUntil: String,
+    val tags: List<String>,
+    val section: String,
+    /** "" = không có giờ bắt đầu. */
+    @SerializedName("start_at") val startAt: String,
+    @SerializedName("extra_reminders") val extraReminders: List<Int>
 )
 
 /** Kết quả GET /tasks/sync?since=... */
@@ -233,5 +245,80 @@ data class TaskChangesDto(
 )
 
 data class CategoriesDto(
-    val categories: List<String>
+    val categories: List<String>,
+    /** Cài đặt hiển thị từng danh sách. null = server cũ / không gửi (giữ nguyên). */
+    val lists: List<ListSettingsDto>? = null
+)
+
+data class ListSettingsDto(
+    val name: String,
+    val color: String = "",
+    val emoji: String = "",
+    val sections: List<String>? = null
+)
+
+// ── Thói quen ──
+
+data class HabitDto(
+    val id: String,
+    val name: String,
+    val emoji: String?,
+    val color: String?,
+    val frequency: String?,
+    val weekdays: String?,
+    @SerializedName("target_per_week") val targetPerWeek: Int?,
+    @SerializedName("reminder_time") val reminderTime: String?,
+    val position: Double?,
+    val archived: Boolean?,
+    @SerializedName("created_at") val createdAt: String,
+    @SerializedName("updated_at") val updatedAt: String
+)
+
+data class HabitInputDto(
+    val name: String,
+    val emoji: String,
+    val color: String,
+    val frequency: String,
+    val weekdays: String,
+    @SerializedName("target_per_week") val targetPerWeek: Int,
+    @SerializedName("reminder_time") val reminderTime: String,
+    val position: Double,
+    val archived: Boolean
+)
+
+data class CheckinDto(
+    @SerializedName("habit_id") val habitId: String,
+    val date: String,
+    val done: Boolean
+)
+
+data class CheckinInputDto(val done: Boolean)
+
+data class HabitChangesDto(
+    val habits: List<HabitDto>?,
+    @SerializedName("deleted_ids") val deletedIds: List<String>?,
+    val checkins: List<CheckinDto>?,
+    @SerializedName("server_time") val serverTime: String
+)
+
+// ── Lịch sử tập trung ──
+
+data class FocusSessionDto(
+    val id: String,
+    @SerializedName("task_id") val taskId: String?,
+    @SerializedName("task_title") val taskTitle: String?,
+    @SerializedName("started_at") val startedAt: String,
+    val minutes: Int
+)
+
+data class FocusSessionInputDto(
+    @SerializedName("task_id") val taskId: String?,
+    @SerializedName("task_title") val taskTitle: String,
+    @SerializedName("started_at") val startedAt: String,
+    val minutes: Int
+)
+
+data class FocusChangesDto(
+    val sessions: List<FocusSessionDto>?,
+    @SerializedName("server_time") val serverTime: String
 )

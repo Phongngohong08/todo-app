@@ -4,6 +4,7 @@ import android.app.Application
 import com.example.todoapplication.data.repository.ThemeController
 import com.example.todoapplication.data.notifications.DigestScheduler
 import com.example.todoapplication.data.notifications.FocusSession
+import com.example.todoapplication.data.notifications.HabitReminderScheduler
 import com.example.todoapplication.data.notifications.Notifications
 import com.example.todoapplication.di.ServiceLocator
 import kotlinx.coroutines.CoroutineScope
@@ -33,6 +34,7 @@ class TodoApplication : Application() {
 
         if (ServiceLocator.sessionManager.isLoggedIn()) {
             ServiceLocator.syncController.start()
+            HabitReminderScheduler.rescheduleAll(this)
         }
 
         // Có mạng trở lại → đồng bộ ngay các thay đổi làm lúc offline (bỏ giá trị đầu: trạng thái lúc khởi động)

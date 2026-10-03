@@ -5,6 +5,7 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.work.WorkManager
 import com.example.todoapplication.data.local.AppDatabase
 import com.example.todoapplication.data.notifications.FocusSession
+import com.example.todoapplication.data.notifications.HabitReminderScheduler
 import com.example.todoapplication.data.notifications.ReminderScheduler
 import com.example.todoapplication.data.sync.SyncScheduler
 import com.example.todoapplication.di.ServiceLocator
@@ -28,9 +29,10 @@ object UserDataCleaner {
         val workManager = WorkManager.getInstance(app)
         workManager.cancelAllWorkByTag(SyncScheduler.TAG)
         workManager.cancelAllWorkByTag(ReminderScheduler.TAG)
+        workManager.cancelAllWorkByTag(HabitReminderScheduler.TAG)
         NotificationManagerCompat.from(app).cancelAll()
         ServiceLocator.localPrefs.clearAccountData()
-        FocusSession.stop(app)
+        FocusSession.stop(app, recordPartial = false)
 
         scope.launch {
             // Chờ lần đồng bộ đang chạy (nếu có) kết thúc để nó không ghi dữ liệu cũ vào DB vừa xóa

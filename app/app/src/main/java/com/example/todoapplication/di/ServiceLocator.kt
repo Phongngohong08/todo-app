@@ -9,6 +9,9 @@ import com.example.todoapplication.data.repository.AuthRepository
 import com.example.todoapplication.data.repository.CategoryRepository
 import com.example.todoapplication.data.repository.LocalPrefs
 import com.example.todoapplication.data.repository.ChatRepository
+import com.example.todoapplication.data.repository.FocusHistoryRepository
+import com.example.todoapplication.data.repository.HabitRepository
+import com.example.todoapplication.data.notifications.HabitReminderScheduler
 import com.example.todoapplication.data.repository.PlanRepository
 import com.example.todoapplication.data.repository.PreferencesRepository
 import com.example.todoapplication.data.repository.SessionManager
@@ -53,7 +56,8 @@ object ServiceLocator {
     private val syncScheduler: SyncScheduler by lazy { SyncScheduler(appContext) }
     private val taskEffects: TaskEffects by lazy { TaskEffects(appContext, database, syncScheduler) }
     val syncEngine: SyncEngine by lazy {
-        SyncEngine(database, apiService, currentUserId = { sessionManager.getUserId() }, listener = taskEffects)
+        SyncEngine(database, apiService, currentUserId = { sessionManager.getUserId() }, listener = taskEffects,
+            onHabitsChanged = { HabitReminderScheduler.rescheduleAll(appContext) })
     }
     val syncController: SyncController by lazy {
         SyncController(syncEngine, syncScheduler, connectivityObserver, database.syncStateDao())
@@ -69,4 +73,8 @@ object ServiceLocator {
     val preferencesRepository: PreferencesRepository by lazy { PreferencesRepository(apiService, localPrefs) }
     val planRepository: PlanRepository by lazy { PlanRepository(apiService) }
     val aiRepository: AiRepository by lazy { AiRepository(apiService) }
+    val habitRepository: HabitRepository by lazy {
+        HabitRepository(database, syncController, rescheduleReminders = { HabitReminderScheduler.rescheduleAll(appContext) })
+    }
+    val focusHistoryRepository: FocusHistoryRepository by lazy { FocusHistoryRepository(database, syncController) }
 }

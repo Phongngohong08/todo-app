@@ -7,12 +7,14 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.example.todoapplication.data.model.ParsedTask
 import com.example.todoapplication.data.repository.AiRepository
 import com.example.todoapplication.data.repository.CategoryRepository
+import com.example.todoapplication.data.repository.LocalPrefs
 import com.example.todoapplication.data.repository.SessionManager
 import com.example.todoapplication.data.repository.TaskRepository
 import com.example.todoapplication.data.repository.aiFailureMessage
 import com.example.todoapplication.data.sync.SyncController
 import com.example.todoapplication.data.sync.SyncResult
 import com.example.todoapplication.di.ServiceLocator
+import com.example.todoapplication.domain.SavedFilter
 import com.example.todoapplication.domain.SmartFilter
 import com.example.todoapplication.domain.TaskSections
 import com.example.todoapplication.domain.allDayDueInDays
@@ -67,10 +69,14 @@ data class TaskListUiState(
     val isRefreshing: Boolean = false,
     val quickAddLoading: Boolean = false,
     /** "yyyy-MM-dd" hôm nay — để biết thẻ nào đang trong "Ngày của tôi". */
-    val today: String = ""
+    val today: String = "",
+    /** Nhãn đang dùng trong các việc hiển thị (nhiều việc dùng nhất trước). */
+    val availableTags: List<String> = emptyList(),
+    /** null = mọi nhãn. */
+    val selectedTag: String? = null
 ) {
     val hasFilter: Boolean
-        get() = query.isNotBlank() || selectedCategory != ALL_CATEGORIES || smartFilter != SmartFilter.NONE
+        get() = query.isNotBlank() || selectedCategory != ALL_CATEGORIES || smartFilter != SmartFilter.NONE || selectedTag != null
 }
 
 /** Sự kiện DÙNG-MỘT-LẦN (Snackbar / điều hướng) — khác state, không lặp lại khi màn vẽ lại. */
@@ -106,7 +112,9 @@ class TaskListViewModel(
     private val clock: () -> Long = System::currentTimeMillis,
     private val zone: () -> ZoneId = ZoneId::systemDefault,
     // Luồng tính nhóm/sắp xếp — test truyền dispatcher của test để chạy tất định
-    private val computeDispatcher: CoroutineDispatcher = Dispatchers.Default
+    private val computeDispatcher: CoroutineDispatcher = Dispatchers.Default,
+    /** Nơi lưu bộ lọc đã đặt tên (null trong test cũ). */
+    private val localPrefs: LocalPrefs? = null
 ) : ViewModel() {
 
     /** Tên người dùng để hiển thị lời chào — đọc một lần từ phiên đăng nhập. */
@@ -116,6 +124,7 @@ class TaskListViewModel(
     private val smartFilter = MutableStateFlow(SmartFilter.NONE)
     private val query = MutableStateFlow("")
     private val sortBy = MutableStateFlow("DEFAULT")
+    private val tag = MutableStateFlow<String?>(null)
     /** Thứ tự tạm trong lúc kéo-thả (id), null khi không ở chế độ sắp xếp. */
     private val dragOrder = MutableStateFlow<List<String>?>(null)
     private var draggedId: String? = null
@@ -131,12 +140,13 @@ class TaskListViewModel(
         val completed: Int,
         val overdue: Int,
         val recommendations: Map<String, String>,
-        val today: String
+        val today: String,
+        val tags: List<String>
     )
 
     private data class SyncInfo(val isOnline: Boolean, val pendingCount: Int, val hasSyncedOnce: Boolean)
 
-    private data class Filters(val category: String, val smart: SmartFilter, val query: String, val sortBy: String)
+    private data class Filters(val category: String, val smart: SmartFilter, val query: String, val sortBy: String, val tag: String?)
 
     // Gõ tìm kiếm: chờ người dùng ngừng gõ 250ms mới truy vấn. Đổi danh mục: truy vấn ngay.
     // flatMapLatest hủy truy vấn cũ khi bộ lọc đổi → không bao giờ hiện kết quả của bộ lọc trước.
@@ -145,10 +155,11 @@ class TaskListViewModel(
             .flatMapLatest { (c, q) -> repo.observeTasks(c.takeUnless { it == ALL_CATEGORIES }, q) }
 
     // Nhóm/sắp xếp/gợi ý tính trên Dispatchers.Default — không chiếm luồng UI, cuộn mượt với danh sách dài.
-    private val listState: Flow<ListState> = combine(tasks, sortBy, dragOrder, smartFilter) { all, sort, order, smart ->
+    private val listState: Flow<ListState> = combine(tasks, sortBy, dragOrder, smartFilter, tag) { all, sort, order, smart, t ->
         val now = clock()
         val z = zone()
-        val list = if (smart == SmartFilter.NONE) all else all.filter { !it.isCompleted && smart.matches(it, now) }
+        val bySmart = if (smart == SmartFilter.NONE) all else all.filter { !it.isCompleted && smart.matches(it, now) }
+        val list = if (t == null) bySmart else bySmart.filter { t in it.tags }
         val pending = list.filter { !it.isCompleted }
         ListState(
             tasks = list,
@@ -158,7 +169,8 @@ class TaskListViewModel(
             completed = list.size - pending.size,
             overdue = pending.count { it.isOverdue(now) },
             recommendations = recommendations(list, now, z),
-            today = Instant.ofEpochMilli(now).atZone(z).toLocalDate().toString()
+            today = Instant.ofEpochMilli(now).atZone(z).toLocalDate().toString(),
+            tags = all.flatMap { it.tags }.groupingBy { it }.eachCount().entries.sortedByDescending { it.value }.map { it.key }
         )
     }.flowOn(computeDispatcher)
 
@@ -166,14 +178,14 @@ class TaskListViewModel(
         combine(sync.isOnline, repo.observePendingSyncCount(), sync.hasSyncedOnce, ::SyncInfo)
 
     private val filters: Flow<Filters> =
-        combine(category, smartFilter, query, sortBy) { c, f, q, s -> Filters(c, f, q, s) }
+        combine(category, smartFilter, query, sortBy, tag) { c, f, q, s, t -> Filters(c, f, q, s, t) }
 
     val uiState: StateFlow<TaskListUiState> = combine(
         listState, categoryRepository.observeAll(), syncInfo, transient, filters
     ) { list, categories, syncInfo, transient, f ->
         // Lần đầu đăng nhập: Room còn trống trong lúc tải từ server → hiện "đang tải" thay vì "chưa có việc"
         val waitingFirstSync = list.tasks.isEmpty() && !syncInfo.hasSyncedOnce && syncInfo.isOnline &&
-            f.category == ALL_CATEGORIES && f.query.isBlank() && f.smart == SmartFilter.NONE
+            f.category == ALL_CATEGORIES && f.query.isBlank() && f.smart == SmartFilter.NONE && f.tag == null
         TaskListUiState(
             isLoading = waitingFirstSync,
             sections = list.sections,
@@ -191,7 +203,9 @@ class TaskListViewModel(
             pendingSyncCount = syncInfo.pendingCount,
             isRefreshing = transient.isRefreshing,
             quickAddLoading = transient.quickAddLoading,
-            today = list.today
+            today = list.today,
+            availableTags = list.tags,
+            selectedTag = f.tag
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), TaskListUiState())
 
@@ -203,6 +217,42 @@ class TaskListViewModel(
     fun setSmartFilter(value: SmartFilter) { smartFilter.value = value }
     fun setQuery(value: String) { query.value = value }
     fun setSortBy(value: String) { sortBy.value = value }
+    fun setTag(value: String?) { tag.value = value }
+
+    // ── Bộ lọc đã lưu ──
+    val savedFilters: StateFlow<List<SavedFilter>> = localPrefs?.savedFilters ?: MutableStateFlow(emptyList())
+
+    /** Lưu tổ hợp bộ lọc hiện tại với tên [name] (trùng tên thì ghi đè). */
+    fun saveCurrentFilter(name: String) {
+        val prefs = localPrefs ?: return
+        val clean = name.trim().take(40)
+        if (clean.isEmpty()) return
+        val f = SavedFilter(clean, smartFilter.value, category.value, tag.value, query.value)
+        prefs.setSavedFilters(listOf(f) + prefs.savedFilters.value.filter { !it.name.equals(clean, ignoreCase = true) })
+        viewModelScope.launch { emit(TaskListEvent.Message("Đã lưu bộ lọc \"$clean\"")) }
+    }
+
+    /** Áp dụng bộ lọc đã lưu. Trả về từ khóa để màn đổ vào ô tìm kiếm. */
+    fun applySavedFilter(f: SavedFilter): String {
+        smartFilter.value = f.smart
+        category.value = f.category
+        tag.value = f.tag
+        query.value = f.query
+        return f.query
+    }
+
+    fun deleteSavedFilter(name: String) {
+        val prefs = localPrefs ?: return
+        prefs.setSavedFilters(prefs.savedFilters.value.filter { it.name != name })
+    }
+
+    /** Bỏ mọi bộ lọc. */
+    fun clearFilters() {
+        smartFilter.value = SmartFilter.NONE
+        category.value = ALL_CATEGORIES
+        tag.value = null
+        query.value = ""
+    }
 
     /** Kéo-để-làm-mới: đồng bộ ngay với server và báo kết quả. */
     fun refresh() {
@@ -450,7 +500,8 @@ class TaskListViewModel(
                     ServiceLocator.categoryRepository,
                     ServiceLocator.syncController,
                     ServiceLocator.aiRepository,
-                    ServiceLocator.sessionManager
+                    ServiceLocator.sessionManager,
+                    localPrefs = ServiceLocator.localPrefs
                 )
             }
         }

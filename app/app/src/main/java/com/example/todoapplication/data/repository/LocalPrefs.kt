@@ -2,6 +2,8 @@ package com.example.todoapplication.data.repository
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.example.todoapplication.domain.SavedFilter
+import com.example.todoapplication.domain.SavedFilterCodec
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -75,6 +77,16 @@ class LocalPrefs(context: Context) {
     fun setAlarmHighPriority(v: Boolean) { _alarmHighPriority.value = v; prefs.edit().putBoolean(KEY_ALARM_HIGH, v).apply() }
     fun setAppLockEnabled(v: Boolean) { _appLockEnabled.value = v; prefs.edit().putBoolean(KEY_APP_LOCK, v).apply() }
 
+    private val _savedFilters = MutableStateFlow(SavedFilterCodec.decode(prefs.getString(KEY_SAVED_FILTERS, "").orEmpty()))
+    /** Bộ lọc người dùng đã lưu ở tab Việc làm (theo thiết bị). */
+    val savedFilters: StateFlow<List<SavedFilter>> = _savedFilters.asStateFlow()
+
+    fun setSavedFilters(filters: List<SavedFilter>) {
+        val list = filters.take(SavedFilterCodec.MAX_FILTERS)
+        _savedFilters.value = list
+        prefs.edit().putString(KEY_SAVED_FILTERS, SavedFilterCodec.encode(list)).apply()
+    }
+
     var notificationPermissionAsked: Boolean
         get() = prefs.getBoolean(KEY_NOTIF_ASKED, false)
         set(value) = prefs.edit().putBoolean(KEY_NOTIF_ASKED, value).apply()
@@ -133,6 +145,7 @@ class LocalPrefs(context: Context) {
         private const val KEY_NAG_HIGH_ONLY = "nag_high_only"
         private const val KEY_ALARM_HIGH = "alarm_high_priority"
         private const val KEY_APP_LOCK = "app_lock"
+        private const val KEY_SAVED_FILTERS = "saved_filters"
 
         const val DEFAULT_QUIET_START = "22:00"
         const val DEFAULT_QUIET_END = "07:00"

@@ -3,6 +3,8 @@ package com.example.todoapplication.ui.screens
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -30,9 +32,12 @@ import androidx.navigation.NavController
 import com.example.todoapplication.data.repository.QuickAddDraft
 import com.example.todoapplication.domain.ALL_DAY_TIME
 import com.example.todoapplication.domain.RecurrenceRules
+import com.example.todoapplication.domain.ReminderRules
+import com.example.todoapplication.domain.TagRules
 import com.example.todoapplication.domain.allDayDue
 import com.example.todoapplication.domain.daysUntilSunday
 import com.example.todoapplication.domain.model.RecurrenceMode
+import com.example.todoapplication.domain.model.Subtask
 import com.example.todoapplication.domain.model.TaskDraft
 import com.example.todoapplication.ui.components.rememberNotificationPermissionRequest
 import com.example.todoapplication.ui.navigation.Screen
@@ -42,6 +47,7 @@ import com.example.todoapplication.ui.utils.WEEKDAY_SHORT
 import com.example.todoapplication.ui.utils.categoryLabel
 import com.example.todoapplication.ui.utils.formatDueLabel
 import com.example.todoapplication.ui.utils.formatDuration
+import com.example.todoapplication.ui.utils.formatTime
 import com.example.todoapplication.ui.utils.priorityLabel
 import com.example.todoapplication.ui.utils.recurrenceDescription
 import com.example.todoapplication.ui.utils.recurrenceLabel
@@ -58,7 +64,7 @@ import java.time.ZoneOffset
  * Hạn chót tách NGÀY và GIỜ (việc "cả ngày" không bị quá hạn giữa ngày), thời lượng ước tính cho lịch AI,
  * lặp mỗi N / theo ngày hoàn thành / ngày kết thúc, "Bỏ qua lần này", "Ngày của tôi" và nút tập trung.
  */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun TaskDetailScreen(
     navController: NavController,
@@ -85,6 +91,15 @@ fun TaskDetailScreen(
     var recurrenceUntil by rememberSaveable { mutableStateOf<Long?>(null) }
     var reminderOffset by rememberSaveable { mutableIntStateOf(0) }
     var estimatedMinutes by rememberSaveable { mutableIntStateOf(0) }
+    // Giai đoạn 2 — lưu dạng chuỗi để rememberSaveable giữ được qua xoay màn
+    var tagsText by rememberSaveable { mutableStateOf("") }
+    var section by rememberSaveable { mutableStateOf("") }
+    var startAt by rememberSaveable { mutableStateOf<Long?>(null) }
+    var remindersText by rememberSaveable { mutableStateOf("0") }
+    var showStartPicker by remember { mutableStateOf(false) }
+    var subtaskDuePicker by remember { mutableStateOf<Subtask?>(null) }
+    val tags = TagRules.decode(tagsText)
+    val reminders = ReminderRules.decode(remindersText).toSet()
     var inMyDay by rememberSaveable { mutableStateOf(false) }
     var isCompleted by rememberSaveable { mutableStateOf(false) }
     var subtaskInput by rememberSaveable { mutableStateOf("") }
@@ -95,6 +110,9 @@ fun TaskDetailScreen(
     val subtasks by taskDetailViewModel.subtasks.collectAsStateWithLifecycle()
     val categories by taskDetailViewModel.categories.collectAsStateWithLifecycle()
     val aiWorking by taskDetailViewModel.aiWorking.collectAsStateWithLifecycle()
+    val lists by taskDetailViewModel.lists.collectAsStateWithLifecycle()
+    val allTags by taskDetailViewModel.allTags.collectAsStateWithLifecycle()
+    val focusHistory by taskDetailViewModel.focusHistory.collectAsStateWithLifecycle()
     var breakdown by remember { mutableStateOf<TaskDetailEvent.BreakdownReady?>(null) }
 
     val dueDate: LocalDate? = dueAt?.let { Instant.ofEpochMilli(it).atZone(zone).toLocalDate() }
@@ -104,10 +122,17 @@ fun TaskDetailScreen(
         if (date == null) {
             dueAt = null
             dueAllDay = true
+            startAt = null
             return
         }
         dueAllDay = time == null
-        dueAt = date.atTime(time ?: ALL_DAY_TIME).atZone(zone).toInstant().toEpochMilli()
+        val newDue = date.atTime(time ?: ALL_DAY_TIME).atZone(zone).toInstant().toEpochMilli()
+        dueAt = newDue
+        // Khung giờ đi theo ngày của hạn; hết giờ (cả ngày) hoặc bắt đầu sau hạn thì bỏ giờ bắt đầu
+        startAt = startAt?.let { old ->
+            val startTime = Instant.ofEpochMilli(old).atZone(zone).toLocalTime()
+            date.atTime(startTime).atZone(zone).toInstant().toEpochMilli()
+        }?.takeIf { time != null && it < newDue }
     }
 
     LaunchedEffect(Unit) {
@@ -128,6 +153,10 @@ fun TaskDetailScreen(
                     recurrenceUntil = task.recurrenceUntil
                     reminderOffset = task.reminderOffsetMinutes
                     estimatedMinutes = task.estimatedMinutes
+                    tagsText = TagRules.encode(task.tags)
+                    section = task.section
+                    startAt = task.startAt
+                    remindersText = ReminderRules.encode(task.reminderOffsets)
                     inMyDay = task.myDay == taskDetailViewModel.todayKey()
                     isCompleted = task.isCompleted
                     formInitialized = true
@@ -173,6 +202,8 @@ fun TaskDetailScreen(
                 category = draft.category.ifBlank { "OTHER" }
                 recurrence = draft.recurrence
                 recurrenceDays = draft.recurrenceDays
+                tagsText = TagRules.encode(draft.tags)
+                section = draft.section
                 inMyDay = addToMyDay
             }
         }
@@ -239,6 +270,8 @@ fun TaskDetailScreen(
                                 Toast.makeText(context, "Vui lòng đặt hạn chót cho công việc lặp lại", Toast.LENGTH_SHORT).show()
                                 return@clickable
                             }
+                            // Lời nhắc sát giờ nhất là lời nhắc chính (client cũ chỉ hiểu một lời nhắc)
+                            val mainAndExtra = ReminderRules.split(reminders)
                             taskDetailViewModel.save(
                                 TaskDraft(
                                     title = title,
@@ -253,8 +286,12 @@ fun TaskDetailScreen(
                                     estimatedMinutes = estimatedMinutes,
                                     recurrenceInterval = if (recurrence == "NONE") 1 else recurrenceInterval,
                                     recurrenceMode = if (recurrence == "NONE") RecurrenceMode.SCHEDULE else recurrenceMode,
-                                    recurrenceUntil = if (recurrence == "NONE") null else recurrenceUntil
-                                ),
+                                    recurrenceUntil = if (recurrence == "NONE") null else recurrenceUntil,
+                                    tags = tags,
+                                    section = section,
+                                    startAt = startAt,
+                                    extraReminders = mainAndExtra.second
+                                ).copy(reminderOffsetMinutes = mainAndExtra.first),
                                 inMyDay
                             )
                             if (dueAt != null) askNotificationPermission("Bật thông báo để được nhắc khi việc này đến hạn.")
@@ -381,6 +418,18 @@ fun TaskDetailScreen(
                         onClear = if (dueTime != null) ({ setDue(dueDate, null) }) else null
                     )
                 }
+                // Khung giờ: giờ bắt đầu (tùy chọn) khi hạn có giờ — vd họp 09:00–10:30
+                if (dueTime != null) {
+                    Spacer(Modifier.height(10.dp))
+                    PickerField(
+                        icon = Icons.Default.PlayArrow,
+                        text = startAt?.let { "Bắt đầu " + formatTime(it) + " → " + formatTime(dueAt!!) } ?: "Thêm giờ bắt đầu (khung giờ)",
+                        active = startAt != null,
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = { showStartPicker = true },
+                        onClear = if (startAt != null) ({ startAt = null }) else null
+                    )
+                }
                 if (dueAt != null && dueAllDay) {
                     Text(
                         "Việc cả ngày: chỉ quá hạn khi sang ngày hôm sau; nhắc theo giờ mặc định trong Cài đặt.",
@@ -445,6 +494,56 @@ fun TaskDetailScreen(
                     SmallActionButton("Thêm") {
                         taskDetailViewModel.addCategory(newCategory) { added -> category = added }
                         newCategory = ""
+                    }
+                }
+                // Mục (cột Kanban) của danh sách đang chọn
+                val sections = lists.firstOrNull { it.name == category }?.sections.orEmpty()
+                if (sections.isNotEmpty()) {
+                    Text("Mục", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 10.dp, bottom = 6.dp))
+                    Row(modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        StatusFilterChip(text = "Chưa phân mục", selected = section !in sections, onClick = { section = "" })
+                        sections.forEach { s -> StatusFilterChip(text = s, selected = section == s, onClick = { section = s }) }
+                    }
+                }
+            }
+
+            // ── Nhãn ──
+            DetailSection(emoji = "🔖", title = "Nhãn") {
+                if (tags.isNotEmpty()) {
+                    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        tags.forEach { tag ->
+                            InputChip(
+                                selected = true,
+                                onClick = { tagsText = TagRules.encode(tags - tag) },
+                                label = { Text("@$tag") },
+                                trailingIcon = { Icon(Icons.Default.Close, contentDescription = "Bỏ nhãn", modifier = Modifier.size(14.dp)) }
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                }
+                var newTag by remember { mutableStateOf("") }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    OutlinedTextField(
+                        value = newTag,
+                        onValueChange = { newTag = it },
+                        label = { Text("Thêm nhãn (vd: nhà, gấp)") },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = fieldColors(),
+                        singleLine = true
+                    )
+                    SmallActionButton("Thêm") {
+                        tagsText = TagRules.encode(TagRules.normalize(tags + newTag.split(",")))
+                        newTag = ""
+                    }
+                }
+                val suggestions = allTags.filter { it !in tags }.take(8)
+                if (suggestions.isNotEmpty()) {
+                    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        suggestions.forEach { t ->
+                            SuggestionChip(onClick = { tagsText = TagRules.encode(TagRules.normalize(tags + t)) }, label = { Text("@$t", fontSize = 12.sp) })
+                        }
                     }
                 }
             }
@@ -540,11 +639,41 @@ fun TaskDetailScreen(
                 } else {
                     val options = if (dueAllDay) listOf(0 to "Buổi sáng của ngày đến hạn", 24 * 60 to "Trước 1 ngày")
                     else listOf(0 to "Đúng giờ", 5 to "Trước 5 phút", 10 to "Trước 10 phút", 30 to "Trước 30 phút", 60 to "Trước 1 giờ", 24 * 60 to "Trước 1 ngày")
+                    // Chọn được nhiều lời nhắc (tối đa 5); luôn giữ ít nhất một
                     Row(modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         options.forEach { (mins, label) ->
-                            StatusFilterChip(text = label, selected = reminderOffset == mins, onClick = { reminderOffset = mins })
+                            StatusFilterChip(text = label, selected = mins in reminders, onClick = {
+                                val next = if (mins in reminders) reminders - mins else reminders + mins
+                                if (next.isNotEmpty() && next.size <= ReminderRules.MAX_REMINDERS) {
+                                    remindersText = ReminderRules.encode(ReminderRules.normalize(next))
+                                }
+                            })
                         }
                     }
+                    Text(
+                        if (startAt != null && !dueAllDay) "Chọn được nhiều lời nhắc · tính theo giờ bắt đầu" else "Chọn được nhiều lời nhắc",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 6.dp)
+                    )
+                }
+            }
+
+            // ── Lịch sử tập trung ──
+            if (focusHistory.isNotEmpty()) {
+                DetailSection(emoji = "🍅", title = "Đã tập trung") {
+                    val total = focusHistory.sumOf { it.minutes }
+                    Text(
+                        "${focusHistory.size} phiên · ${formatDuration(total)}" +
+                            (if (estimatedMinutes > 0) " / ước tính ${formatDuration(estimatedMinutes)}" else ""),
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        "Gần nhất: " + formatDueLabel(focusHistory.first().startedAt, allDay = false, zone = zone),
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
 
@@ -573,6 +702,30 @@ fun TaskDetailScreen(
                             color = if (sub.isDone) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
                             textDecoration = if (sub.isDone) androidx.compose.ui.text.style.TextDecoration.LineThrough else null
                         )
+                        // Hạn riêng của bước: bấm để chọn ngày, giữ để bỏ hạn
+                        val subDue = sub.dueDate?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
+                        if (subDue != null) {
+                            val late = !sub.isDone && subDue.isBefore(LocalDate.now(zone))
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = (if (late) StateOverdue else primary).copy(alpha = 0.12f),
+                                modifier = Modifier.combinedClickable(
+                                    onClick = { subtaskDuePicker = sub },
+                                    onLongClick = { taskDetailViewModel.setSubtaskDue(sub, null) }
+                                )
+                            ) {
+                                Text(
+                                    formatDueLabel(allDayDue(subDue, zone), allDay = true, zone = zone),
+                                    fontSize = 11.sp,
+                                    color = if (late) StateOverdue else primary,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
+                                )
+                            }
+                        } else {
+                            IconButton(onClick = { subtaskDuePicker = sub }, modifier = Modifier.size(32.dp)) {
+                                Icon(Icons.Default.Event, contentDescription = "Đặt hạn cho bước", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
+                            }
+                        }
                         IconButton(onClick = { taskDetailViewModel.deleteSubtask(sub) }, modifier = Modifier.size(32.dp)) {
                             Icon(Icons.Default.Clear, contentDescription = "Xóa bước", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
                         }
@@ -618,6 +771,31 @@ fun TaskDetailScreen(
             initial = dueTime ?: LocalTime.of(9, 0),
             onDismiss = { showTimePicker = false },
             onPick = { time -> setDue(dueDate ?: LocalDate.now(zone), time); showTimePicker = false }
+        )
+    }
+    if (showStartPicker && dueAt != null && dueTime != null) {
+        TimeDialog(
+            initial = startAt?.let { Instant.ofEpochMilli(it).atZone(zone).toLocalTime() } ?: dueTime.minusHours(1),
+            onDismiss = { showStartPicker = false },
+            onPick = { time ->
+                showStartPicker = false
+                if (!time.isBefore(dueTime)) {
+                    Toast.makeText(context, "Giờ bắt đầu phải trước ${formatTime(dueAt!!)}", Toast.LENGTH_SHORT).show()
+                } else {
+                    startAt = dueDate!!.atTime(time).atZone(zone).toInstant().toEpochMilli()
+                    // Chưa ước tính thời lượng → lấy luôn độ dài khung giờ
+                    if (estimatedMinutes == 0) {
+                        estimatedMinutes = java.time.Duration.between(time, dueTime).toMinutes().toInt().coerceAtMost(1440)
+                    }
+                }
+            }
+        )
+    }
+    subtaskDuePicker?.let { sub ->
+        DateDialog(
+            initial = sub.dueDate?.let { runCatching { LocalDate.parse(it) }.getOrNull() } ?: dueDate ?: LocalDate.now(zone),
+            onDismiss = { subtaskDuePicker = null },
+            onPick = { date -> taskDetailViewModel.setSubtaskDue(sub, date.toString()); subtaskDuePicker = null }
         )
     }
     breakdown?.let { result ->

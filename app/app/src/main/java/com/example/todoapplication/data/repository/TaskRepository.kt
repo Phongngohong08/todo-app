@@ -5,8 +5,10 @@ import com.example.todoapplication.data.local.AppDatabase
 import com.example.todoapplication.data.local.SubtaskEntity
 import com.example.todoapplication.data.local.TaskEntity
 import com.example.todoapplication.data.local.toDomain
+import com.example.todoapplication.domain.ReminderRules
 import com.example.todoapplication.domain.RecurrenceRules
 import com.example.todoapplication.domain.SortOrder
+import com.example.todoapplication.domain.TagRules
 import com.example.todoapplication.domain.model.RecurrenceMode
 import com.example.todoapplication.domain.model.Subtask
 import com.example.todoapplication.domain.model.Task
@@ -106,13 +108,17 @@ class TaskRepository(
             recurrenceInterval = RecurrenceRules.normalizeInterval(draft.recurrenceInterval),
             recurrenceMode = draft.recurrenceMode,
             recurrenceUntil = draft.recurrenceUntil,
+            tags = TagRules.encode(TagRules.normalize(draft.tags)),
+            section = draft.section.trim(),
+            startAt = validStart(draft.startAt, draft.dueAt),
+            extraReminders = ReminderRules.encode(ReminderRules.normalize(draft.extraReminders)),
             isDirty = true,
             localVersion = 1
         )
         db.withTransaction {
             taskDao.upsert(entity)
             subtaskDao.upsertAll(subtasks.mapIndexed { i, s ->
-                SubtaskEntity(id = s.id, taskId = entity.id, title = s.title.trim(), isDone = s.isDone, position = i)
+                SubtaskEntity(id = s.id, taskId = entity.id, title = s.title.trim(), isDone = s.isDone, position = i, dueDate = s.dueDate)
             })
         }
         effects.afterLocalWrite(listOf(entity), emptyList())
@@ -126,7 +132,7 @@ class TaskRepository(
     suspend fun duplicate(id: String): Task? {
         val src = taskDao.getById(id)?.takeUnless { it.isDeleted } ?: return null
         val steps = subtaskDao.getForTask(id).map {
-            Subtask(id = UUID.randomUUID().toString(), title = it.title, isDone = false, position = it.position)
+            Subtask(id = UUID.randomUUID().toString(), title = it.title, isDone = false, position = it.position, dueDate = it.dueDate)
         }
         return create(
             TaskDraft(
@@ -142,7 +148,11 @@ class TaskRepository(
                 estimatedMinutes = src.estimatedMinutes,
                 recurrenceInterval = src.recurrenceInterval,
                 recurrenceMode = src.recurrenceMode,
-                recurrenceUntil = src.recurrenceUntil
+                recurrenceUntil = src.recurrenceUntil,
+                tags = TagRules.decode(src.tags),
+                section = src.section,
+                startAt = src.startAt,
+                extraReminders = ReminderRules.decode(src.extraReminders)
             ),
             steps
         )
@@ -164,7 +174,12 @@ class TaskRepository(
                 estimatedMinutes = draft.estimatedMinutes,
                 recurrenceInterval = RecurrenceRules.normalizeInterval(draft.recurrenceInterval),
                 recurrenceMode = draft.recurrenceMode,
-                recurrenceUntil = draft.recurrenceUntil
+                recurrenceUntil = draft.recurrenceUntil,
+                tags = TagRules.encode(TagRules.normalize(draft.tags)),
+                // Chuyển sang danh sách khác thì mục cũ không còn nghĩa
+                section = if (draft.category == current.category) draft.section.trim() else "",
+                startAt = validStart(draft.startAt, draft.dueAt),
+                extraReminders = ReminderRules.encode(ReminderRules.normalize(draft.extraReminders))
             )
         )
     }
@@ -209,7 +224,11 @@ class TaskRepository(
      */
     suspend fun reschedule(ids: List<String>, dueAt: Long?, allDay: Boolean): Boolean = mutateAll(ids) { current ->
         if (current.status == TaskStatus.COMPLETED) null
-        else current.copy(dueAt = dueAt, dueAllDay = allDay && dueAt != null)
+        else current.copy(
+            dueAt = dueAt,
+            dueAllDay = allDay && dueAt != null,
+            startAt = shiftStart(current, dueAt, allDay)
+        )
     }
 
     /**
@@ -230,7 +249,7 @@ class TaskRepository(
                 emptyList()
             } else {
                 result = SkipResult.SKIPPED
-                listOf(current.copy(dueAt = next))
+                listOf(current.copy(dueAt = next, startAt = shiftStart(current, next, current.dueAllDay)))
             }
         }
         return result
@@ -259,7 +278,7 @@ class TaskRepository(
         if (current.status == TaskStatus.COMPLETED) return@mutateAll null
         val (due, allDay) = com.example.todoapplication.domain.Reschedule.moveToDate(current.dueAt, current.dueAllDay, target, zone())
         if (due == current.dueAt && allDay == current.dueAllDay) null
-        else current.copy(dueAt = due, dueAllDay = allDay)
+        else current.copy(dueAt = due, dueAllDay = allDay, startAt = shiftStart(current, due, allDay))
     }
 
     /**
@@ -326,7 +345,39 @@ class TaskRepository(
         listOf(current)
     }
 
+    /** Đặt / bỏ hạn riêng của một bước con ([date] = "yyyy-MM-dd" hoặc null). */
+    suspend fun setSubtaskDue(taskId: String, subtaskId: String, date: String?): Boolean = mutate(taskId) { current ->
+        val item = subtaskDao.getForTask(taskId).firstOrNull { it.id == subtaskId } ?: return@mutate emptyList()
+        subtaskDao.upsert(item.copy(dueDate = date))
+        listOf(current)
+    }
+
+    // ── Mục (cột Kanban) ──
+
+    /** Chuyển việc sang mục [section] ("" = chưa phân mục) — kéo thả giữa các cột. */
+    suspend fun setSection(ids: List<String>, section: String): Boolean = mutateAll(ids) { current ->
+        if (current.section == section) null else current.copy(section = section)
+    }
+
+    /** Đổi tên mục trong danh sách [category]: mọi việc đang ở mục cũ chuyển theo. "" = bỏ mục (về chưa phân mục). */
+    suspend fun renameSection(category: String, from: String, to: String) {
+        val ids = taskDao.getIdsInSection(category, from)
+        if (ids.isNotEmpty()) setSection(ids, to)
+    }
+
     // ── Nội bộ ───────────────────────────────────────────────────────────────
+
+    /** Dời hạn thì khung giờ dời theo (giữ độ dài); hạn cả ngày / bỏ hạn thì không còn giờ bắt đầu. */
+    private fun shiftStart(current: TaskEntity, newDue: Long?, allDay: Boolean): Long? {
+        val start = current.startAt ?: return null
+        val oldDue = current.dueAt ?: return null
+        if (newDue == null || allDay) return null
+        return newDue - (oldDue - start)
+    }
+
+    /** Giờ bắt đầu chỉ hợp lệ khi có hạn và không sau hạn. */
+    private fun validStart(startAt: Long?, dueAt: Long?): Long? =
+        startAt?.takeIf { dueAt != null && it <= dueAt }
 
     /**
      * Khung chung cho mọi thao tác sửa: đọc task, để [block] trả về các task cần ghi (có thể kèm task khác,
@@ -415,11 +466,16 @@ class TaskRepository(
             recurrenceInterval = parent.recurrenceInterval,
             recurrenceMode = parent.recurrenceMode.ifBlank { RecurrenceMode.SCHEDULE },
             recurrenceUntil = parent.recurrenceUntil,
+            tags = parent.tags,
+            section = parent.section,
+            // Khung giờ dời theo đúng khoảng hạn đã dời (giữ độ dài) — giống server
+            startAt = parent.startAt?.let { nextDue - (due - it) },
+            extraReminders = parent.extraReminders,
             localVersion = existing?.localVersion ?: 0
         )
         taskDao.upsert(child) // phải có task trước khi thêm bước con (khóa ngoại)
         subtaskDao.replaceForTask(childId, subtaskDao.getForTask(parent.id).map {
-            it.copy(id = RecurrenceRules.nextOccurrenceId(it.id), taskId = childId, isDone = false)
+            it.copy(id = RecurrenceRules.nextOccurrenceId(it.id), taskId = childId, isDone = false, dueDate = null)
         })
         return child
     }

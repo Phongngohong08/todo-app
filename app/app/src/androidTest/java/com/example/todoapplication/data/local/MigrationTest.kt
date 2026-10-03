@@ -12,7 +12,7 @@ import org.junit.runner.RunWith
 import java.time.Instant
 
 /**
- * Kiểm tra MIGRATION_4_5 và MIGRATION_5_6 trên SQLite thật của thiết bị: dựng DB cũ từ schema JSON đã export,
+ * Kiểm tra MIGRATION_4_5, MIGRATION_5_6 và MIGRATION_6_7 trên SQLite thật của thiết bị: dựng DB cũ từ schema JSON đã export,
  * thêm dữ liệu, chạy migration, rồi so schema kết quả với file JSON của version đích (runMigrationsAndValidate)
  * và kiểm tra dữ liệu.
  */
@@ -86,7 +86,7 @@ class MigrationTest {
         seedVersion4()
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val db = Room.databaseBuilder(context, AppDatabase::class.java, DB_NAME)
-            .addMigrations(MIGRATION_4_5, MIGRATION_5_6)
+            .addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
             .build()
         try {
             // Mở DB kích hoạt migration + kiểm tra khớp schema của Room
@@ -122,6 +122,38 @@ class MigrationTest {
             assertEquals(1, c.getInt(4))            // lặp mỗi 1 chu kỳ
             assertEquals("SCHEDULE", c.getString(5))
             assertTrue(c.isNull(6))
+        }
+        db.close()
+    }
+
+    @Test
+    fun migrate6To7_addsOrganizerColumnsAndTables() {
+        helper.createDatabase(DB_NAME, 6).apply {
+            execSQL(
+                """
+                INSERT INTO tasks (id, title, description, priority, dueAt, status, category, recurrence, recurrenceDays,
+                    reminderOffsetMinutes, completedAt, sortOrder, spawnedFrom, createdAt, updatedAt, dueAllDay, myDay,
+                    estimatedMinutes, recurrenceInterval, recurrenceMode, recurrenceUntil, isDirty, isDeleted, localVersion)
+                VALUES ('t1', 'Họp', '', 'LOW', 1000, 'TODO', 'WORK', 'NONE', '', 0, NULL, 1.0, NULL, 1, 2,
+                    0, NULL, 0, 1, 'SCHEDULE', NULL, 0, 0, 0)
+                """.trimIndent()
+            )
+            execSQL("INSERT INTO subtasks (id, taskId, title, isDone, position) VALUES ('s1', 't1', 'Slide', 0, 0)")
+            close()
+        }
+
+        val db = helper.runMigrationsAndValidate(DB_NAME, 7, true, MIGRATION_6_7)
+        db.query("SELECT title, tags, section, startAt, extraReminders FROM tasks").use { c ->
+            assertTrue(c.moveToFirst())
+            assertEquals("Họp", c.getString(0))
+            assertEquals("", c.getString(1))
+            assertEquals("", c.getString(2))
+            assertTrue(c.isNull(3))
+            assertEquals("", c.getString(4))
+        }
+        db.query("SELECT dueDate FROM subtasks").use { c ->
+            assertTrue(c.moveToFirst())
+            assertTrue(c.isNull(0))
         }
         db.close()
     }

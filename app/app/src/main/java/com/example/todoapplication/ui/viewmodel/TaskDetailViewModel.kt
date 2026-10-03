@@ -8,10 +8,13 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.example.todoapplication.data.repository.AiRepository
 import com.example.todoapplication.data.repository.CategoryRepository
+import com.example.todoapplication.data.repository.FocusHistoryRepository
 import com.example.todoapplication.data.repository.SkipResult
 import com.example.todoapplication.data.repository.TaskRepository
 import com.example.todoapplication.data.repository.aiFailureMessage
 import com.example.todoapplication.di.ServiceLocator
+import com.example.todoapplication.domain.model.FocusRecord
+import com.example.todoapplication.domain.model.ListInfo
 import com.example.todoapplication.domain.model.Subtask
 import com.example.todoapplication.domain.model.Task
 import com.example.todoapplication.domain.model.TaskDraft
@@ -23,6 +26,8 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -53,7 +58,8 @@ class TaskDetailViewModel(
     savedStateHandle: SavedStateHandle,
     private val repo: TaskRepository,
     private val categoryRepository: CategoryRepository,
-    private val aiRepository: AiRepository
+    private val aiRepository: AiRepository,
+    private val focusRepository: FocusHistoryRepository
 ) : ViewModel() {
 
     val taskId: String = savedStateHandle.get<String>("taskId") ?: NEW_TASK
@@ -67,6 +73,20 @@ class TaskDetailViewModel(
 
     val categories: StateFlow<List<String>> = categoryRepository.observeAll()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), CategoryRepository.DEFAULTS)
+
+    /** Danh sách kèm các mục — để chọn mục (cột Kanban) theo danh sách đang chọn. */
+    val lists: StateFlow<List<ListInfo>> = categoryRepository.observeLists()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** Nhãn đang dùng (nhiều việc dùng nhất trước) — gợi ý khi gắn nhãn. */
+    val allTags: StateFlow<List<String>> = repo.observeTasks(null, null)
+        .map { tasks -> tasks.flatMap { it.tags }.groupingBy { it }.eachCount().entries.sortedByDescending { it.value }.map { it.key } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** Các phiên tập trung đã làm cho việc này. */
+    val focusHistory: StateFlow<List<FocusRecord>> =
+        (if (isNew) flowOf(emptyList()) else focusRepository.observeForTask(taskId))
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     // Task mới chưa có trong database → giữ checklist trong bộ nhớ, lưu cùng lúc với task.
     // Task đã có → đọc thẳng từ Room (Flow), mỗi thao tác ghi ngay và tự hiện lên.
@@ -100,6 +120,15 @@ class TaskDetailViewModel(
             draftSubtasks.update { list -> list.map { if (it.id == item.id) it.copy(isDone = !it.isDone) else it } }
         } else {
             viewModelScope.launch { repo.toggleSubtask(taskId, item.id) }
+        }
+    }
+
+    /** Đặt / bỏ hạn riêng của bước con ("yyyy-MM-dd" hoặc null). */
+    fun setSubtaskDue(item: Subtask, date: String?) {
+        if (isNew) {
+            draftSubtasks.update { list -> list.map { if (it.id == item.id) it.copy(dueDate = date) else it } }
+        } else {
+            viewModelScope.launch { repo.setSubtaskDue(taskId, item.id, date) }
         }
     }
 
@@ -250,7 +279,8 @@ class TaskDetailViewModel(
                     createSavedStateHandle(),
                     ServiceLocator.taskRepository,
                     ServiceLocator.categoryRepository,
-                    ServiceLocator.aiRepository
+                    ServiceLocator.aiRepository,
+                    ServiceLocator.focusHistoryRepository
                 )
             }
         }

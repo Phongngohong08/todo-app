@@ -99,7 +99,7 @@ fun LoginScreen(
                         letterSpacing = 1.sp
                     )
                     Text(
-                        "Làm chủ lịch trình của bạn",
+                        "Quản lý công việc, thời gian và thói quen",
                         color = Color.White.copy(alpha = 0.85f),
                         fontSize = 14.sp,
                         modifier = Modifier.padding(top = 8.dp)

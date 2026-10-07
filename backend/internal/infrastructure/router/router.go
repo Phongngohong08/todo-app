@@ -669,7 +669,18 @@ func (rm *RouteManager) handleGenerateDailyPlan(c *gin.Context) {
 		return
 	}
 
-	plan, ok := rm.generatePlan(c, userID, date, localTime)
+	// Body tùy chọn: { "busy": [{start, end, title}] } — giờ bận từ lịch của máy. Không có body = như cũ.
+	var input GeneratePlanInput
+	if c.Request.ContentLength > 0 && !bindJSON(c, &input) {
+		return
+	}
+	busy, err := cleanBusySlots(input.Busy)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+
+	plan, ok := rm.generatePlan(c, userID, date, localTime, busy...)
 	if !ok {
 		return
 	}
@@ -677,9 +688,32 @@ func (rm *RouteManager) handleGenerateDailyPlan(c *gin.Context) {
 	c.JSON(http.StatusOK, plan)
 }
 
+// GeneratePlanInput: tham số thêm (tùy chọn) khi nhờ AI lập lịch.
+type GeneratePlanInput struct {
+	Busy []domain.BusySlot `json:"busy" binding:"max=30"`
+}
+
+// cleanBusySlots kiểm tra giờ "HH:mm" (bắt đầu trước kết thúc) và cắt tiêu đề cho gọn prompt.
+func cleanBusySlots(in []domain.BusySlot) ([]domain.BusySlot, error) {
+	out := make([]domain.BusySlot, 0, len(in))
+	for _, b := range in {
+		start, err1 := parseClock(b.Start)
+		end, err2 := parseClock(b.End)
+		if err1 != nil || err2 != nil || !end.After(start) {
+			return nil, domain.NewValidationError("busy: giờ dạng HH:mm, kết thúc sau bắt đầu")
+		}
+		title := strings.TrimSpace(b.Title)
+		if r := []rune(title); len(r) > 80 {
+			title = string(r[:80])
+		}
+		out = append(out, domain.BusySlot{Start: start.Format("15:04"), End: end.Format("15:04"), Title: title})
+	}
+	return out, nil
+}
+
 // generatePlan chỉ trừ hạn mức AI khi user còn việc cần xếp (Generate sẽ thực sự gọi AI).
 // Trả false khi đã ghi phản hồi lỗi.
-func (rm *RouteManager) generatePlan(c *gin.Context, userID string, date time.Time, localTime string) (*domain.DailyPlan, bool) {
+func (rm *RouteManager) generatePlan(c *gin.Context, userID string, date time.Time, localTime string, busy ...domain.BusySlot) (*domain.DailyPlan, bool) {
 	ctx := c.Request.Context()
 
 	hasTasks, err := rm.planUC.HasActiveTasks(ctx, userID)
@@ -691,7 +725,7 @@ func (rm *RouteManager) generatePlan(c *gin.Context, userID string, date time.Ti
 		return nil, false
 	}
 
-	plan, err := rm.planUC.Generate(ctx, userID, date, localTime)
+	plan, err := rm.planUC.Generate(ctx, userID, date, localTime, busy...)
 	if err != nil {
 		respondError(c, err)
 		return nil, false

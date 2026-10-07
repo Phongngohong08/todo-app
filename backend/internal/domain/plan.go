@@ -29,3 +29,11 @@ type PlanRepository interface {
 	Save(ctx context.Context, plan *DailyPlan) error
 	GetByDate(ctx context.Context, userID string, date time.Time) (*DailyPlan, error)
 }
+
+// BusySlot là một khoảng bận trong ngày (vd sự kiện trong lịch Google của máy người dùng) mà AI không được
+// xếp việc chồng lên. Giờ "HH:mm" theo lịch của người dùng.
+type BusySlot struct {
+	Start string `json:"start"`
+	End   string `json:"end"`
+	Title string `json:"title"`
+}

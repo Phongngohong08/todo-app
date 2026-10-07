@@ -197,7 +197,7 @@ Return ONLY a JSON object with exactly these keys. No markdown.`
 //
 //	[ {Start:"10:15", End:"11:15", TaskID:"...", Title:"Viết báo cáo"},
 //	  {Start:"11:15", End:"12:15", TaskID:"...", Title:"Tập gym"} ]
-func (c *GeminiClient) GenerateDailyPlan(ctx context.Context, tasks []*domain.Task, prefs *domain.UserPreferences, memories []*domain.MemoryItem, localTime string) ([]domain.PlanSlot, error) {
+func (c *GeminiClient) GenerateDailyPlan(ctx context.Context, tasks []*domain.Task, prefs *domain.UserPreferences, memories []*domain.MemoryItem, localTime string, busy []domain.BusySlot) ([]domain.PlanSlot, error) {
 	if c == nil || c.client == nil {
 		return nil, errNotInitialized
 	}
@@ -217,6 +217,7 @@ Scheduling Rules:
 - IMPORTANT: If the current local time is already at or after the user's evening end time, DO NOT return an empty schedule. Instead, still schedule the tasks starting from the current time into the remaining hours of the day (up to a reasonable late cutoff of 23:59). The user explicitly asked for a plan, so always provide one whenever there is at least one active task and any time left before midnight.
 - Only return an empty array if there are genuinely no active tasks to schedule, or there is truly no time left before midnight.
 - Suggest a logical, realistic daily schedule that avoids overlaps.
+- If "Busy slots" are provided (events from the user's own calendar, e.g. meetings), NEVER place a task block overlapping any busy slot; schedule around them.
 
 Return ONLY a JSON array of slots with this exact structure:
 [
@@ -231,10 +232,16 @@ Return ONLY a JSON array of slots with this exact structure:
 	if localTime != "" {
 		timeContext = fmt.Sprintf("\n- Current Local Time of the User: %s (DO NOT schedule tasks before this time)\n", localTime)
 	}
+	// Giờ bận lấy từ lịch của máy người dùng (cuộc họp...) — AI xếp việc tránh các khoảng này
+	var busyContext string
+	if len(busy) > 0 {
+		busyJSON, _ := json.Marshal(busy)
+		busyContext = fmt.Sprintf("\nBusy slots (do not overlap):\n%s\n", busyJSON)
+	}
 
 	userPrompt := fmt.Sprintf(
-		"Tasks:\n%s\n\nPreferences:\n%s\n\nUser long-term memory/habits:\n%s\n%s\nPlease construct today's daily schedule.",
-		tasksJSON, prefsJSON, memoriesJSON, timeContext,
+		"Tasks:\n%s\n\nPreferences:\n%s\n\nUser long-term memory/habits:\n%s\n%s%s\nPlease construct today's daily schedule.",
+		tasksJSON, prefsJSON, memoriesJSON, timeContext, busyContext,
 	)
 
 	config := &genai.GenerateContentConfig{

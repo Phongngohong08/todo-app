@@ -10,7 +10,7 @@ import (
 )
 
 type PlanningClient interface {
-	GenerateDailyPlan(ctx context.Context, tasks []*domain.Task, prefs *domain.UserPreferences, memories []*domain.MemoryItem, localTime string) ([]domain.PlanSlot, error)
+	GenerateDailyPlan(ctx context.Context, tasks []*domain.Task, prefs *domain.UserPreferences, memories []*domain.MemoryItem, localTime string, busy []domain.BusySlot) ([]domain.PlanSlot, error)
 }
 
 type PlanUseCase struct {
@@ -126,7 +126,7 @@ func (u *PlanUseCase) HasActiveTasks(ctx context.Context, userID string) (bool, 
 // Kết quả trả về:
 //
 //	&domain.DailyPlan{PlanDate: 2026-07-08, PlanData: [ {Start:"10:15",End:"11:15",Title:"Viết báo cáo"}, ... ]}
-func (u *PlanUseCase) Generate(ctx context.Context, userID string, date time.Time, localTime string) (*domain.DailyPlan, error) {
+func (u *PlanUseCase) Generate(ctx context.Context, userID string, date time.Time, localTime string, busy ...domain.BusySlot) (*domain.DailyPlan, error) {
 	// 1. Fetch preferences
 	prefs, err := u.userRepo.GetPreferences(ctx, userID)
 	if err != nil {
@@ -184,7 +184,7 @@ func (u *PlanUseCase) Generate(ctx context.Context, userID string, date time.Tim
 	}
 
 	// 4. Ask OpenAI/Gemini to generate schedule
-	slots, err := u.aiClient.GenerateDailyPlan(ctx, activeTasks, prefs, memories, localTime)
+	slots, err := u.aiClient.GenerateDailyPlan(ctx, activeTasks, prefs, memories, localTime, busy)
 	if err != nil {
 		return nil, err
 	}

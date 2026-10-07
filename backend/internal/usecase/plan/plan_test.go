@@ -43,7 +43,7 @@ type countingAI struct {
 	got   []*domain.Task
 }
 
-func (a *countingAI) GenerateDailyPlan(ctx context.Context, tasks []*domain.Task, prefs *domain.UserPreferences, memories []*domain.MemoryItem, localTime string) ([]domain.PlanSlot, error) {
+func (a *countingAI) GenerateDailyPlan(ctx context.Context, tasks []*domain.Task, prefs *domain.UserPreferences, memories []*domain.MemoryItem, localTime string, busy []domain.BusySlot) ([]domain.PlanSlot, error) {
 	a.calls++
 	a.got = tasks
 	return []domain.PlanSlot{{StartTime: "09:00", EndTime: "10:00", TaskID: tasks[0].ID, Title: tasks[0].Title}}, nil

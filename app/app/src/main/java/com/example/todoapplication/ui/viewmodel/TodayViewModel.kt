@@ -6,8 +6,12 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.example.todoapplication.data.model.DailyPlan
 import com.example.todoapplication.data.model.PlanSlot
+import com.example.todoapplication.data.calendar.DeviceCalendar
+import com.example.todoapplication.data.calendar.DeviceEvent
+import com.example.todoapplication.data.model.BusySlotDto
 import com.example.todoapplication.data.repository.CategoryRepository
 import com.example.todoapplication.data.repository.HabitRepository
+import com.example.todoapplication.data.repository.SentenceTasks
 import com.example.todoapplication.data.repository.LocalPrefs
 import com.example.todoapplication.data.repository.PlanRepository
 import com.example.todoapplication.data.repository.SessionManager
@@ -103,7 +107,8 @@ class TodayViewModel(
     private val zone: () -> ZoneId = ZoneId::systemDefault,
     computeDispatcher: CoroutineDispatcher = Dispatchers.Default,
     /** null trong test cũ: không có phần thói quen. */
-    private val habitRepository: HabitRepository? = null
+    private val habitRepository: HabitRepository? = null,
+    private val sentenceTasks: SentenceTasks? = null
 ) : ViewModel() {
 
     private val userName = sessionManager.getUserName().ifBlank { "bạn" }
@@ -164,6 +169,39 @@ class TodayViewModel(
             pendingSyncCount = pending
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), TodayUiState(userName = userName))
+
+    // ── Lịch của máy (CalendarContract): sự kiện hôm nay + giờ bận gửi cho AI lập lịch ──
+    private val calendarPrefs = localPrefs
+    private val _todayEvents = MutableStateFlow<List<DeviceEvent>>(emptyList())
+    val todayEvents: StateFlow<List<DeviceEvent>> = _todayEvents
+
+    fun reloadDeviceEvents(context: android.content.Context) {
+        if (!calendarPrefs.showDeviceCalendar.value || !DeviceCalendar.hasPermission(context)) {
+            _todayEvents.value = emptyList()
+            return
+        }
+        val app = context.applicationContext
+        viewModelScope.launch {
+            val z = zone()
+            val day = today()
+            val from = day.atStartOfDay(z).toInstant().toEpochMilli()
+            val to = day.plusDays(1).atStartOfDay(z).toInstant().toEpochMilli()
+            _todayEvents.value = DeviceCalendar.events(app, from, to)
+        }
+    }
+
+    /** Sự kiện có giờ của hôm nay → khoảng bận "HH:mm" (cắt trong ngày). */
+    private fun busySlotsToday(): List<BusySlotDto> {
+        val z = zone()
+        val day = today()
+        val start = day.atStartOfDay(z).toInstant().toEpochMilli()
+        val end = day.plusDays(1).atStartOfDay(z).toInstant().toEpochMilli() - 60_000L
+        fun clock(millis: Long) = Instant.ofEpochMilli(millis.coerceIn(start, end)).atZone(z).toLocalTime()
+            .let { "%02d:%02d".format(it.hour, it.minute) }
+        return _todayEvents.value.filter { !it.allDay }
+            .map { BusySlotDto(clock(it.begin), clock(it.end), it.title.take(80)) }
+            .filter { it.end > it.start }
+    }
 
     /** Thói quen cần làm / đã làm hôm nay (đã làm vẫn hiện để bỏ đánh dấu được). */
     val habitsToday: StateFlow<List<HabitSummary>> = (habitRepository?.let { repo ->
@@ -231,6 +269,15 @@ class TodayViewModel(
         }
     }
 
+    /** "Chụp ảnh tạo việc" ở tab Hôm nay: các việc tạo ra vào luôn Ngày của tôi. */
+    fun createFromLines(lines: List<String>) {
+        val creator = sentenceTasks ?: return
+        viewModelScope.launch {
+            val created = creator.create(lines, myDay = today().toString())
+            _events.emit(TodayEvent.Message("Đã thêm ${created.size} việc từ ảnh vào Ngày của tôi 📷"))
+        }
+    }
+
     fun createQuickTask(result: QuickCreateResult) {
         viewModelScope.launch {
             result.newCategory?.let { categoryRepository.add(it) }
@@ -263,7 +310,7 @@ class TodayViewModel(
         viewModelScope.launch {
             // Gửi ngay các thay đổi chưa đồng bộ (vd vừa thêm vào Ngày của tôi) để server xếp đúng danh sách
             runCatching { sync.syncNow() }
-            val result = planRepository.generateDaily(today().toString(), nowLocalClock())
+            val result = planRepository.generateDaily(today().toString(), nowLocalClock(), busySlotsToday())
             planState.update { current ->
                 result.fold(
                     onSuccess = { PlanState(plan = it) },
@@ -325,7 +372,8 @@ class TodayViewModel(
                     ServiceLocator.syncController,
                     ServiceLocator.localPrefs,
                     ServiceLocator.sessionManager,
-                    habitRepository = ServiceLocator.habitRepository
+                    habitRepository = ServiceLocator.habitRepository,
+                    sentenceTasks = ServiceLocator.sentenceTasks
                 )
             }
         }

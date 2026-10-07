@@ -81,6 +81,8 @@ object FocusSession {
         val next = State(taskId, title, phase, now, now + length * 60_000L, done)
         save(context, next)
         schedule(context, next)
+        // Thông báo cố định đếm ngược + Không làm phiền (FocusService); không mở được từ nền thì FocusWorker vẫn báo hết giờ
+        FocusService.start(context.applicationContext)
     }
 
     /** Hết giờ (từ [FocusWorker]) — tăng số phiên nếu vừa xong một phiên tập trung. */
@@ -104,6 +106,8 @@ object FocusSession {
         context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().clear().apply()
         WorkManager.getInstance(context.applicationContext).cancelUniqueWork(WORK_NAME)
         NotificationManagerCompat.from(context.applicationContext).cancel(Notifications.ID_FOCUS)
+        FocusService.stop(context.applicationContext)
+        FocusDnd.restore(context.applicationContext)
     }
 
     /** Ghi phiên vào lịch sử tập trung (Room → đồng bộ lên server). */

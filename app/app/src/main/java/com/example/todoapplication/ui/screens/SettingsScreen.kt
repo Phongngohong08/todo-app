@@ -37,6 +37,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.todoapplication.data.notifications.AlarmScheduler
+import com.example.todoapplication.data.notifications.FocusDnd
+import com.example.todoapplication.data.notifications.QuickAddNotifier
+import com.example.todoapplication.ui.tiles.FocusTileService
+import com.example.todoapplication.ui.tiles.QuickAddTileService
+import com.example.todoapplication.R
 import com.example.todoapplication.data.repository.CategoryRepository
 import com.example.todoapplication.data.repository.LocalPrefs
 import com.example.todoapplication.data.repository.ThemeController
@@ -83,6 +88,9 @@ fun SettingsScreen(
     val quietEnd by settingsViewModel.quietEnd.collectAsStateWithLifecycle()
     val alarmHighPriority by settingsViewModel.alarmHighPriority.collectAsStateWithLifecycle()
     val appLockEnabled by settingsViewModel.appLockEnabled.collectAsStateWithLifecycle()
+    val dailyCapacity by settingsViewModel.dailyCapacityMinutes.collectAsStateWithLifecycle()
+    val focusDnd by settingsViewModel.focusDnd.collectAsStateWithLifecycle()
+    val quickAddNotif by settingsViewModel.quickAddNotification.collectAsStateWithLifecycle()
     val askNotificationPermission = rememberNotificationPermissionRequest()
     var confirmLogout by remember { mutableStateOf<SettingsEvent.ConfirmLogout?>(null) }
 
@@ -403,6 +411,73 @@ fun SettingsScreen(
                         )
                     }
 
+                    // Tiện ích hệ thống Android (theo thiết bị)
+                    SettingsSection(title = "📲 Tiện ích hệ thống") {
+                        SwitchRow(
+                            title = "Bật Không làm phiền khi tập trung",
+                            subtitle = "Tắt thông báo của mọi app trong phiên Pomodoro, tự bật lại khi xong",
+                            checked = focusDnd,
+                            onChange = { enable ->
+                                settingsViewModel.setFocusDnd(enable)
+                                if (enable && !FocusDnd.hasAccess(context)) {
+                                    Toast.makeText(context, "Cho phép TaskFlow quản lý \"Không làm phiền\"", Toast.LENGTH_LONG).show()
+                                    context.startActivity(Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS))
+                                }
+                            }
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        SwitchRow(
+                            title = "Ô \"Thêm việc nhanh\" trên thanh thông báo",
+                            subtitle = "Gõ việc ngay trên thông báo, không cần mở app",
+                            checked = quickAddNotif,
+                            onChange = { enable ->
+                                settingsViewModel.setQuickAddNotification(enable)
+                                if (enable) askNotificationPermission("Bật thông báo để dùng ô thêm việc nhanh.")
+                                QuickAddNotifier.refresh(context)
+                            }
+                        )
+                        if (Build.VERSION.SDK_INT >= 33) {
+                            Spacer(Modifier.height(8.dp))
+                            Text("Ô cài đặt nhanh", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Medium)
+                            Text(
+                                "Thêm ô \"Tập trung\" / \"Thêm việc\" vào bảng kéo xuống từ đỉnh màn hình",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontSize = 11.sp
+                            )
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 6.dp)) {
+                                OutlinedButton(onClick = { requestAddTile(context, FocusTileService::class.java, "Tập trung", R.drawable.ic_shortcut_focus) }) {
+                                    Text("+ Tập trung")
+                                }
+                                OutlinedButton(onClick = { requestAddTile(context, QuickAddTileService::class.java, "Thêm việc", R.drawable.ic_shortcut_add) }) {
+                                    Text("+ Thêm việc")
+                                }
+                            }
+                        }
+                    }
+
+                    // Kế hoạch tuần (theo thiết bị)
+                    SettingsSection(title = "🗓 Kế hoạch") {
+                        Text("Số giờ làm việc mỗi ngày", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Medium)
+                        Text(
+                            "Lịch tuần cộng thời lượng ước tính của từng ngày và tô đỏ ngày vượt mức này.",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = 11.sp
+                        )
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 6.dp)) {
+                            IconButton(onClick = { settingsViewModel.setDailyCapacityMinutes(dailyCapacity - 30) }) {
+                                Icon(Icons.Default.Remove, contentDescription = "Giảm")
+                            }
+                            Text(
+                                "%d giờ%s".format(dailyCapacity / 60, if (dailyCapacity % 60 != 0) " ${dailyCapacity % 60} phút" else ""),
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 16.sp
+                            )
+                            IconButton(onClick = { settingsViewModel.setDailyCapacityMinutes(dailyCapacity + 30) }) {
+                                Icon(Icons.Default.Add, contentDescription = "Tăng")
+                            }
+                        }
+                    }
+
                     // Nhắc hẹn nâng cao (theo thiết bị)
                     SettingsSection(title = "⏰ Nhắc hẹn nâng cao") {
                         Text("Nhắc lại tới khi xong", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Medium)
@@ -469,6 +544,9 @@ fun SettingsScreen(
                             }
                         )
                     }
+
+                    // Sao lưu / xuất / khôi phục (Storage Access Framework)
+                    SettingsSection(title = "💾 Dữ liệu") { BackupSection() }
 
                     // Tài khoản
                     SettingsSection(title = "👤 Tài khoản") {
@@ -631,5 +709,27 @@ fun TimePickerField(
                 )
             }
         }
+    }
+}
+
+/**
+ * Android 13+: hỏi hệ thống thêm ô vào bảng cài đặt nhanh ngay trong app (StatusBarManager.requestAddTileService),
+ * thay vì bắt người dùng tự tìm trong chế độ sửa ô.
+ */
+@androidx.annotation.RequiresApi(33)
+private fun requestAddTile(context: android.content.Context, service: Class<*>, label: String, icon: Int) {
+    val manager = context.getSystemService(android.app.StatusBarManager::class.java) ?: return
+    manager.requestAddTileService(
+        android.content.ComponentName(context, service),
+        label,
+        android.graphics.drawable.Icon.createWithResource(context, icon),
+        context.mainExecutor
+    ) { result ->
+        val msg = when (result) {
+            android.app.StatusBarManager.TILE_ADD_REQUEST_RESULT_TILE_ADDED -> "Đã thêm ô \"$label\""
+            android.app.StatusBarManager.TILE_ADD_REQUEST_RESULT_TILE_ALREADY_ADDED -> "Ô \"$label\" đã có sẵn"
+            else -> null
+        }
+        msg?.let { Toast.makeText(context, it, Toast.LENGTH_SHORT).show() }
     }
 }

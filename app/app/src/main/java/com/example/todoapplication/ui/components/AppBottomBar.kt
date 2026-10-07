@@ -26,6 +26,8 @@ import com.example.todoapplication.ui.navigation.Screen
 /** Thanh điều hướng floating pill — lấy màu từ theme. [activeTab]: 0 Hôm nay · 1 Việc làm · 2 Lịch · 3 Tôi. */
 @Composable
 fun AppBottomBar(navController: NavController, activeTab: Int) {
+    // Màn rộng (ngang / tablet / máy gập): MainActivity đã hiện NavigationRail bên trái → không vẽ thanh dưới
+    if (isWideLayout()) return
     data class NavItem(val route: String, val icon: ImageVector, val label: String)
 
     val items = listOf(

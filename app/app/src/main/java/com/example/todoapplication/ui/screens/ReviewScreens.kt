@@ -16,6 +16,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import androidx.paging.LoadState
+import androidx.paging.compose.collectAsLazyPagingItems
+import androidx.paging.compose.itemContentType
+import androidx.paging.compose.itemKey
+import com.example.todoapplication.ui.viewmodel.HistoryItem
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -220,12 +227,14 @@ private fun ReviewCard(title: String?, content: @Composable ColumnScope.() -> Un
 
 @Composable
 fun HistoryScreen(navController: NavController, viewModel: HistoryViewModel = viewModel(factory = HistoryViewModel.Factory)) {
-    val days by viewModel.days.collectAsStateWithLifecycle()
+    // Paging 3: chỉ đọc từng trang 40 việc khi cuộn tới — lịch sử bao lâu cũng mở nhanh
+    val items = viewModel.history.collectAsLazyPagingItems()
     BackScaffold("Đã hoàn thành", navController) { padding ->
-        val list = days
+        val refresh = items.loadState.refresh
         when {
-            list == null -> Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) { LoadingState() }
-            list.isEmpty() -> Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
+            refresh is LoadState.Loading && items.itemCount == 0 ->
+                Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) { LoadingState() }
+            refresh is LoadState.NotLoading && items.itemCount == 0 -> Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
                 EmptyState(emoji = "📜", title = "Chưa có việc nào hoàn thành", subtitle = "Việc bạn làm xong sẽ được lưu ở đây.")
             }
             else -> LazyColumn(
@@ -233,18 +242,36 @@ fun HistoryScreen(navController: NavController, viewModel: HistoryViewModel = vi
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                list.forEach { (day, tasks) ->
-                    item(key = "d-$day") {
-                        Text(dayTitle(day, tasks.size), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.padding(top = 8.dp))
-                    }
-                    items(tasks, key = { it.id }) { task ->
-                        HistoryRow(
-                            task = task,
-                            trailing = task.completedAt?.let { formatTime(it) }.orEmpty(),
-                            actionIcon = { Icon(Icons.Default.Restore, contentDescription = "Mở lại") },
-                            onAction = { viewModel.reopen(task) },
-                            onClick = { navController.navigate(Screen.TaskDetail.createRoute(task.id)) }
+                items(
+                    count = items.itemCount,
+                    key = items.itemKey { item ->
+                        when (item) {
+                            is HistoryItem.Header -> "d-" + item.day
+                            is HistoryItem.Row -> item.task.id
+                        }
+                    },
+                    contentType = items.itemContentType { if (it is HistoryItem.Header) "header" else "row" }
+                ) { index ->
+                    when (val item = items[index]) {
+                        is HistoryItem.Header -> Text(
+                            dayTitle(item.day), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.padding(top = 8.dp).semantics { heading() }
                         )
+                        is HistoryItem.Row -> HistoryRow(
+                            task = item.task,
+                            trailing = item.task.completedAt?.let { formatTime(it) }.orEmpty(),
+                            actionIcon = { Icon(Icons.Default.Restore, contentDescription = "Mở lại") },
+                            onAction = { viewModel.reopen(item.task) },
+                            onClick = { navController.navigate(Screen.TaskDetail.createRoute(item.task.id)) }
+                        )
+                        null -> Spacer(Modifier.height(56.dp)) // trang chưa tải xong
+                    }
+                }
+                if (items.loadState.append is LoadState.Loading) {
+                    item(key = "loading-more") {
+                        Box(Modifier.fillMaxWidth().padding(12.dp), contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator(Modifier.size(24.dp))
+                        }
                     }
                 }
             }
@@ -252,14 +279,13 @@ fun HistoryScreen(navController: NavController, viewModel: HistoryViewModel = vi
     }
 }
 
-private fun dayTitle(day: LocalDate, count: Int): String {
+private fun dayTitle(day: LocalDate): String {
     val today = LocalDate.now()
-    val label = when (day) {
+    return when (day) {
         today -> "Hôm nay"
         today.minusDays(1) -> "Hôm qua"
         else -> "${weekdayShort(day)} ${day.format(if (day.year == today.year) DAY_MONTH else DateTimeFormatter.ofPattern("dd/MM/yyyy"))}"
     }
-    return "$label · $count việc"
 }
 
 @Composable

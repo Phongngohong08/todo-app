@@ -120,6 +120,16 @@ interface TaskDao {
     )
     fun observeCompleted(limit: Int): Flow<List<TaskEntity>>
 
+    /** Lịch sử dạng phân trang (Paging 3): Room tự sinh PagingSource, chỉ đọc từng trang khi cuộn tới. */
+    @Query(
+        """
+        SELECT * FROM tasks
+        WHERE isDeleted = 0 AND status = 'COMPLETED' AND completedAt IS NOT NULL
+        ORDER BY completedAt DESC
+        """
+    )
+    fun pagingCompleted(): androidx.paging.PagingSource<Int, TaskEntity>
+
     /** Việc chưa xong có hạn tới [until] (quá hạn + hôm nay) — cho thông báo buổi sáng. */
     @Query("SELECT * FROM tasks WHERE isDeleted = 0 AND status != 'COMPLETED' AND dueAt IS NOT NULL AND dueAt <= :until")
     suspend fun getPendingDueBefore(until: Long): List<TaskEntity>
@@ -178,11 +188,29 @@ interface TaskDao {
     )
     suspend fun getForWidget(today: String, limit: Int): List<TaskEntity>
 
+    @Query("SELECT * FROM tasks WHERE isDeleted = 0 AND status != 'COMPLETED' AND myDay = :today ORDER BY sortOrder ASC LIMIT :limit")
+    suspend fun getMyDayForWidget(today: String, limit: Int): List<TaskEntity>
+
+    @Query(
+        """
+        SELECT * FROM tasks WHERE isDeleted = 0 AND status != 'COMPLETED' AND category = :category
+        ORDER BY (myDay = :today) DESC, dueAt IS NULL, dueAt ASC LIMIT :limit
+        """
+    )
+    suspend fun getForWidgetInCategory(today: String, category: String, limit: Int): List<TaskEntity>
+
     @Query("SELECT id FROM tasks")
     suspend fun getAllIds(): List<String>
 
+    /** Sao lưu: mọi việc chưa xóa. */
+    @Query("SELECT * FROM tasks WHERE isDeleted = 0")
+    suspend fun getAllAlive(): List<TaskEntity>
+
     @Query("SELECT id FROM tasks WHERE isDeleted = 0 AND category = :category AND section = :section")
     suspend fun getIdsInSection(category: String, section: String): List<String>
+
+    @Query("SELECT id FROM tasks WHERE isDeleted = 0 AND category = :category")
+    suspend fun getIdsInCategory(category: String): List<String>
 }
 
 @Dao
@@ -192,6 +220,9 @@ interface SubtaskDao {
 
     @Query("SELECT * FROM subtasks WHERE taskId = :taskId ORDER BY position ASC")
     suspend fun getForTask(taskId: String): List<SubtaskEntity>
+
+    @Query("SELECT * FROM subtasks")
+    suspend fun getAll(): List<SubtaskEntity>
 
     @Upsert
     suspend fun upsert(item: SubtaskEntity)
@@ -346,6 +377,12 @@ interface HabitDao {
     @Query("DELETE FROM habits")
     suspend fun deleteAll()
 
+    @Query("SELECT * FROM habits WHERE isDeleted = 0")
+    suspend fun getAllAlive(): List<HabitEntity>
+
+    @Query("SELECT * FROM habit_checkins WHERE done = 1")
+    suspend fun getAllDoneCheckins(): List<HabitCheckinEntity>
+
     // ── Đánh dấu theo ngày ──
 
     /** Các ngày đã đánh dấu từ [since] ("yyyy-MM-dd") của mọi thói quen còn sống. */
@@ -356,6 +393,14 @@ interface HabitDao {
         """
     )
     fun observeCheckinsSince(since: String): Flow<List<HabitCheckinEntity>>
+
+    @Query(
+        """
+        SELECT c.* FROM habit_checkins c JOIN habits h ON h.id = c.habitId
+        WHERE h.isDeleted = 0 AND c.done = 1 AND c.date >= :since
+        """
+    )
+    suspend fun getCheckinsSince(since: String): List<HabitCheckinEntity>
 
     @Query("SELECT * FROM habit_checkins WHERE habitId = :habitId AND date = :date")
     suspend fun getCheckin(habitId: String, date: String): HabitCheckinEntity?
@@ -409,4 +454,58 @@ interface FocusDao {
 
     @Query("DELETE FROM focus_sessions")
     suspend fun deleteAll()
+
+    @Query("SELECT * FROM focus_sessions")
+    suspend fun getAll(): List<FocusSessionEntity>
+}
+
+@Dao
+interface AttachmentDao {
+    @Query("SELECT * FROM attachments WHERE taskId = :taskId ORDER BY createdAt ASC")
+    fun observeForTask(taskId: String): Flow<List<AttachmentEntity>>
+
+    @Query("SELECT * FROM attachments WHERE id = :id")
+    suspend fun get(id: String): AttachmentEntity?
+
+    @Insert
+    suspend fun insert(item: AttachmentEntity)
+
+    @Query("DELETE FROM attachments WHERE id = :id")
+    suspend fun delete(id: String)
+
+    @Query("SELECT fileName FROM attachments")
+    suspend fun allFileNames(): List<String>
+}
+
+@Dao
+interface PlaceDao {
+    @Query("SELECT * FROM places ORDER BY name ASC")
+    fun observeAll(): Flow<List<PlaceEntity>>
+
+    @Upsert
+    suspend fun upsert(place: PlaceEntity)
+
+    @Query("DELETE FROM places WHERE id = :id")
+    suspend fun delete(id: String)
+
+    @Query("SELECT * FROM task_locations WHERE taskId = :taskId")
+    fun observeForTask(taskId: String): Flow<TaskLocationEntity?>
+
+    @Upsert
+    suspend fun setTaskLocation(item: TaskLocationEntity)
+
+    @Query("DELETE FROM task_locations WHERE taskId = :taskId")
+    suspend fun clearTaskLocation(taskId: String)
+
+    /** Nhắc theo địa điểm của các việc còn chờ (để đăng ký geofence và hiện thông báo). */
+    @Query(
+        """
+        SELECT l.taskId, t.title, p.id AS placeId, p.name AS placeName, p.latitude, p.longitude, p.radiusMeters, l.`trigger`
+        FROM task_locations l
+        JOIN tasks t ON t.id = l.taskId
+        JOIN places p ON p.id = l.placeId
+        WHERE t.isDeleted = 0 AND t.status != 'COMPLETED'
+        """
+    )
+    suspend fun activeReminders(): List<LocationReminder>
 }

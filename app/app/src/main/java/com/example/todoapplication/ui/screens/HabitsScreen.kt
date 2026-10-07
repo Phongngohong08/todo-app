@@ -20,6 +20,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -236,6 +238,10 @@ fun HabitCard(summary: HabitSummary, onToggle: (LocalDate) -> Unit, onEdit: () -
                                     }
                                 )
                                 .border(1.dp, color.copy(alpha = if (day.scheduled || day.done) 0.6f else 0.2f), CircleShape)
+                                .semantics {
+                                    contentDescription = weekdayShort(day.date) + " " + day.date.dayOfMonth + "/" + day.date.monthValue +
+                                        if (day.done) ": đã làm" else if (day.scheduled) ": chưa làm" else ": không cần làm"
+                                }
                                 .clickable(enabled = !habit.archived) { onToggle(day.date) },
                             contentAlignment = Alignment.Center
                         ) {

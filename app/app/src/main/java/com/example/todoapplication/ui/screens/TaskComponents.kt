@@ -27,6 +27,11 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -38,6 +43,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.todoapplication.ui.components.sharedTaskBounds
 import com.example.todoapplication.domain.QuickAddParser
 import com.example.todoapplication.domain.allDayDueInDays
 import com.example.todoapplication.domain.daysUntilSunday
@@ -86,6 +92,8 @@ fun TaskCard(
     selectionMode: Boolean = false,
     selected: Boolean = false,
     onLongClick: (() -> Unit)? = null,
+    /** Hoãn (vuốt trái) — thêm làm hành động TalkBack cho người không vuốt được. */
+    onPostpone: (() -> Unit)? = null,
     today: LocalDate = LocalDate.now()
 ) {
     val isCompleted = task.isCompleted
@@ -94,7 +102,19 @@ fun TaskCard(
     val primary = MaterialTheme.colorScheme.primary
 
     Card(
-        modifier = modifier
+        modifier = modifier.sharedTaskBounds(task.id)
+            // Trợ năng: TalkBack đọc gọn cả thẻ và có menu hành động thay cho vuốt / nút nhỏ
+            .semantics(mergeDescendants = true) {
+                stateDescription = if (isCompleted) "Đã xong" else if (isOverdue) "Quá hạn" else "Chưa xong"
+                if (!selectionMode) customActions = buildList {
+                    add(CustomAccessibilityAction(if (isCompleted) "Mở lại" else "Hoàn thành") { onToggleComplete(); true })
+                    onPostpone?.let { add(CustomAccessibilityAction("Hoãn sang ngày khác") { it(); true }) }
+                    onToggleMyDay?.let { add(CustomAccessibilityAction(if (isInMyDay) "Bỏ khỏi Ngày của tôi" else "Thêm vào Ngày của tôi") { it(); true }) }
+                    onFocus?.let { add(CustomAccessibilityAction("Bắt đầu tập trung") { it(); true }) }
+                    onDuplicate?.let { add(CustomAccessibilityAction("Nhân bản") { it(); true }) }
+                    add(CustomAccessibilityAction("Xóa") { onDeleteClick(); true })
+                }
+            }
             .fillMaxWidth()
             .combinedClickable(onClick = onCardClick, onLongClick = onLongClick)
             .then(if (selected) Modifier.border(2.dp, primary, RoundedCornerShape(16.dp)) else Modifier),
@@ -383,7 +403,7 @@ fun SectionHeader(
     action: (@Composable () -> Unit)? = null
 ) {
     Row(modifier = modifier.fillMaxWidth().padding(start = 4.dp, top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text(text = "$title ($count)", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = color, modifier = Modifier.weight(1f))
+        Text(text = "$title ($count)", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = color, modifier = Modifier.weight(1f).semantics { heading() })
         action?.invoke()
     }
 }
@@ -666,6 +686,8 @@ fun QuickCreateSheet(
     onMoreDetails: (QuickCreateResult) -> Unit,
     onAiAdd: (text: String) -> Unit,
     onTemplates: () -> Unit,
+    /** Quét giấy / bảng trắng thành việc (ML Kit); null = ẩn nút. */
+    onScan: (() -> Unit)? = null,
     initialText: String = "",
     defaultAddToMyDay: Boolean = false
 ) {
@@ -825,6 +847,13 @@ fun QuickCreateSheet(
                     Icon(Icons.AutoMirrored.Filled.List, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(Modifier.width(4.dp))
                     Text("Mẫu", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
+                }
+                if (onScan != null) {
+                    TextButton(onClick = onScan, contentPadding = PaddingValues(horizontal = 8.dp)) {
+                        Icon(Icons.Default.DocumentScanner, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Spacer(Modifier.width(4.dp))
+                        Text("Quét", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
+                    }
                 }
                 TextButton(onClick = { onMoreDetails(result()) }, contentPadding = PaddingValues(horizontal = 8.dp)) {
                     Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)

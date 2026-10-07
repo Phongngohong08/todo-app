@@ -88,11 +88,13 @@ interface ApiService {
     ): Response<DailyPlan>
 
     // date = ngày theo lịch của máy, để server không lấy nhầm ngày UTC (0h–7h sáng giờ VN vẫn là "hôm qua" ở UTC)
+    // Body: giờ bận từ lịch của máy (rỗng = như cũ) — AI xếp việc tránh các khoảng này
     @POST("plans/daily/generate")
     suspend fun generateDailyPlan(
         @Query("date") date: String? = null,
         @Query("local_time") localTime: String? = null,
-        @Query("tz") timezone: String? = null
+        @Query("tz") timezone: String? = null,
+        @Body input: GeneratePlanInput = GeneratePlanInput()
     ): Response<DailyPlan>
 
     // Lưu lịch người dùng chỉnh tay (đổi giờ, bỏ khung) — không gọi AI

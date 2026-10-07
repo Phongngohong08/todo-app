@@ -68,6 +68,11 @@ data class LogoutInput(
     @SerializedName("all_devices") val allDevices: Boolean
 )
 
+/** Giờ bận "HH:mm" trong ngày cần lập lịch (sự kiện lịch của máy). */
+data class BusySlotDto(val start: String, val end: String, val title: String)
+
+data class GeneratePlanInput(val busy: List<BusySlotDto> = emptyList())
+
 data class SavePlanInput(
     @SerializedName("plan_data") val planData: List<PlanSlot>
 )

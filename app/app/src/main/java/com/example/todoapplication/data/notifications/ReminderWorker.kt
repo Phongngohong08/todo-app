@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.app.RemoteInput
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.example.todoapplication.R
@@ -70,6 +71,31 @@ class ReminderWorker(context: Context, params: WorkerParameters) : CoroutineWork
         /** Sai lệch cho phép của WorkManager khi so "đã tới lời nhắc sát giờ nhất chưa". */
         private const val NAG_GRACE_MS = 2 * 60_000L
 
+        /**
+         * Nút "Hoãn" dạng trả lời trực tiếp (RemoteInput): chọn nhanh "30 phút / 1 giờ / Tối nay / Sáng mai"
+         * hoặc tự gõ ("mai 9h", "thứ 2") — không cần mở app. PendingIntent phải MUTABLE để hệ thống gắn câu trả lời.
+         */
+        private fun snoozeReplyAction(context: Context, taskId: String, title: String, notifId: Int): NotificationCompat.Action {
+            val remoteInput = RemoteInput.Builder(NotificationActionReceiver.KEY_REPLY)
+                .setLabel("Hoãn tới… (vd: mai 9h)")
+                .setChoices(arrayOf("30 phút", "1 giờ", "Tối nay", "Sáng mai"))
+                .build()
+            val intent = Intent(context, NotificationActionReceiver::class.java).apply {
+                action = NotificationActionReceiver.ACTION_SNOOZE_REPLY
+                putExtra(NotificationActionReceiver.EXTRA_TASK_ID, taskId)
+                putExtra(NotificationActionReceiver.EXTRA_TITLE, title)
+                putExtra(NotificationActionReceiver.EXTRA_NOTIF_ID, notifId)
+            }
+            val pending = PendingIntent.getBroadcast(
+                context, notifId + 2, intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
+            )
+            return NotificationCompat.Action.Builder(android.R.drawable.ic_menu_recent_history, "Hoãn", pending)
+                .addRemoteInput(remoteInput)
+                .setAllowGeneratedReplies(false)
+                .build()
+        }
+
         private fun showNotification(context: Context, taskId: String, title: String, attempt: Int) {
             Notifications.ensureChannels(context)
             if (!Notifications.canPost(context)) return
@@ -109,10 +135,7 @@ class ReminderWorker(context: Context, params: WorkerParameters) : CoroutineWork
                     android.R.drawable.ic_menu_save, "Hoàn thành",
                     actionIntent(NotificationActionReceiver.ACTION_COMPLETE, 1)
                 )
-                .addAction(
-                    android.R.drawable.ic_menu_recent_history, "Hoãn 1 giờ",
-                    actionIntent(NotificationActionReceiver.ACTION_SNOOZE, 2)
-                )
+                .addAction(snoozeReplyAction(context, taskId, title, notifId))
                 .addAction(android.R.drawable.ic_menu_more, "Hoãn…", snoozeOptions)
                 .build()
 

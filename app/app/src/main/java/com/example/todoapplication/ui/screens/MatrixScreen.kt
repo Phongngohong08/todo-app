@@ -16,6 +16,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -162,7 +165,9 @@ private fun QuadrantCell(
                                 color = color,
                                 modifier = Modifier.dragSource(dragState, DragPayload(task.id, task.title)) { target -> onDrop(task, target) },
                                 onOpen = { onOpen(task) },
-                                onComplete = { onComplete(task) }
+                                onComplete = { onComplete(task) },
+                                onMoveTo = { target -> onDrop(task, target) },
+                                current = quadrant
                             )
                         }
                     }
@@ -173,11 +178,26 @@ private fun QuadrantCell(
 }
 
 @Composable
-private fun MatrixTaskRow(task: Task, color: Color, modifier: Modifier, onOpen: () -> Unit, onComplete: () -> Unit) {
+private fun MatrixTaskRow(
+    task: Task,
+    color: Color,
+    modifier: Modifier,
+    onOpen: () -> Unit,
+    onComplete: () -> Unit,
+    onMoveTo: (Eisenhower.Quadrant) -> Unit,
+    current: Eisenhower.Quadrant
+) {
     Surface(
         shape = RoundedCornerShape(10.dp),
         color = MaterialTheme.colorScheme.surface,
         modifier = modifier.fillMaxWidth().clickable(onClick = onOpen)
+            // Trợ năng: chuyển ô bằng menu hành động thay cho kéo thả
+            .semantics(mergeDescendants = true) {
+                customActions = listOf(CustomAccessibilityAction("Hoàn thành") { onComplete(); true }) +
+                    Eisenhower.Quadrant.entries.filter { it != current }.map { q ->
+                        CustomAccessibilityAction("Chuyển sang " + q.title) { onMoveTo(q); true }
+                    }
+            }
     ) {
         Row(Modifier.padding(horizontal = 8.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(

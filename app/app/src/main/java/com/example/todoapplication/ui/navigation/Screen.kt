@@ -28,8 +28,12 @@ sealed class Screen(val route: String) {
         fun createRoute(prompt: String? = null) =
             if (prompt == null) "ai_coach" else "ai_coach?prompt=${android.net.Uri.encode(prompt)}"
     }
-    object Focus : Screen("focus?taskId={taskId}") {
-        fun createRoute(taskId: String? = null) = if (taskId == null) "focus" else "focus?taskId=$taskId"
+    object Focus : Screen("focus?taskId={taskId}&start={start}") {
+        /** [autoStart]: bắt đầu phiên ngay khi mở (từ ô Quick Settings). */
+        fun createRoute(taskId: String? = null, autoStart: Boolean = false): String {
+            val params = listOfNotNull(taskId?.let { "taskId=$it" }, if (autoStart) "start=true" else null)
+            return if (params.isEmpty()) "focus" else "focus?" + params.joinToString("&")
+        }
     }
     object WeeklyReview : Screen("weekly_review")
     object History : Screen("history")

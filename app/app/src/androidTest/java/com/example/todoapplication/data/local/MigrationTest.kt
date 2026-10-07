@@ -86,7 +86,7 @@ class MigrationTest {
         seedVersion4()
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val db = Room.databaseBuilder(context, AppDatabase::class.java, DB_NAME)
-            .addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
+            .addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
             .build()
         try {
             // Mở DB kích hoạt migration + kiểm tra khớp schema của Room
@@ -154,6 +154,17 @@ class MigrationTest {
         db.query("SELECT dueDate FROM subtasks").use { c ->
             assertTrue(c.moveToFirst())
             assertTrue(c.isNull(0))
+        }
+        db.close()
+    }
+
+    @Test
+    fun migrate7To8_addsLocalOnlyTables() {
+        helper.createDatabase(DB_NAME, 7).close()
+        val db = helper.runMigrationsAndValidate(DB_NAME, 8, true, MIGRATION_7_8)
+        db.query("SELECT COUNT(*) FROM sqlite_master WHERE name IN ('attachments', 'places', 'task_locations')").use { c ->
+            c.moveToFirst()
+            assertEquals(3, c.getInt(0))
         }
         db.close()
     }

@@ -52,3 +52,7 @@
 -dontwarn com.google.errorprone.annotations.**
 -dontwarn javax.annotation.**
 -dontwarn org.checkerframework.**
+# ── Sao lưu JSON (Gson đọc / ghi entity Room bằng reflection) ───────────────
+# Giữ tên field để tệp sao lưu đọc được giữa các bản build khác nhau.
+-keepclassmembers class com.example.todoapplication.data.local.** { <fields>; }
+-keep class com.example.todoapplication.data.backup.BackupFile { *; }

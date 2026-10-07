@@ -10,8 +10,14 @@ import com.example.todoapplication.data.repository.CategoryRepository
 import com.example.todoapplication.data.repository.LocalPrefs
 import com.example.todoapplication.data.repository.ChatRepository
 import com.example.todoapplication.data.repository.FocusHistoryRepository
+import com.example.todoapplication.data.repository.AttachmentRepository
+import com.example.todoapplication.data.backup.BackupManager
+import com.example.todoapplication.data.location.LocationReminders
+import com.example.todoapplication.data.location.PlaceRepository
+import com.example.todoapplication.data.repository.SentenceTasks
 import com.example.todoapplication.data.repository.HabitRepository
 import com.example.todoapplication.data.notifications.HabitReminderScheduler
+import com.example.todoapplication.widget.WidgetUpdater
 import com.example.todoapplication.data.repository.PlanRepository
 import com.example.todoapplication.data.repository.PreferencesRepository
 import com.example.todoapplication.data.repository.SessionManager
@@ -74,7 +80,15 @@ object ServiceLocator {
     val planRepository: PlanRepository by lazy { PlanRepository(apiService) }
     val aiRepository: AiRepository by lazy { AiRepository(apiService) }
     val habitRepository: HabitRepository by lazy {
-        HabitRepository(database, syncController, rescheduleReminders = { HabitReminderScheduler.rescheduleAll(appContext) })
+        HabitRepository(
+            database, syncController,
+            rescheduleReminders = { HabitReminderScheduler.rescheduleAll(appContext) },
+            onCheckinChanged = { WidgetUpdater.refresh(appContext) }
+        )
     }
     val focusHistoryRepository: FocusHistoryRepository by lazy { FocusHistoryRepository(database, syncController) }
+    val sentenceTasks: SentenceTasks by lazy { SentenceTasks(taskRepository, categoryRepository) }
+    val attachmentRepository: AttachmentRepository by lazy { AttachmentRepository(appContext, database) }
+    val placeRepository: PlaceRepository by lazy { PlaceRepository(database) { LocationReminders.sync(appContext) } }
+    val backupManager: BackupManager by lazy { BackupManager(appContext, database, syncController) }
 }

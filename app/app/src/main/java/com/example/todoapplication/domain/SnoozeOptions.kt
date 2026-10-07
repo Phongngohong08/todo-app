@@ -33,3 +33,30 @@ object SnoozeOptions {
         return list
     }
 }
+
+/**
+ * Hiểu câu trả lời gõ ngay trên thông báo (RemoteInput) để hoãn nhắc việc:
+ * "30 phút", "2 tiếng", "1h", "tối nay", "sáng mai", "thứ 2 9h", "15/10 8h"...
+ * Số + đơn vị → tính từ bây giờ; còn lại dùng bộ phân tích tạo nhanh. Mốc đã qua / không hiểu → null.
+ */
+object SnoozeText {
+    private val RELATIVE = Regex("""^\s*(\d{1,3})\s*(p|ph|phut|m|min|gio|tieng|h|g)\s*(nua)?\s*$""")
+
+    fun parse(text: String, now: LocalDateTime, zone: ZoneId = ZoneId.systemDefault()): Long? {
+        val plain = java.text.Normalizer.normalize(text.lowercase(), java.text.Normalizer.Form.NFD)
+            .replace(Regex("""\p{M}"""), "").replace('đ', 'd')
+        RELATIVE.find(plain)?.let { m ->
+            val n = m.groupValues[1].toLong()
+            if (n <= 0) return null
+            val at = if (m.groupValues[2] in setOf("p", "ph", "phut", "m", "min")) now.plusMinutes(n) else now.plusHours(n)
+            return at.atZone(zone).toInstant().toEpochMilli()
+        }
+        val parsed = QuickAddParser.parse(text, now, zone)
+        val due = parsed.dueAt ?: return null
+        // Chỉ có ngày ("mai", "thứ 2") → 8 giờ sáng ngày đó
+        val at = if (parsed.allDay) {
+            java.time.Instant.ofEpochMilli(due).atZone(zone).toLocalDate().atTime(LocalTime.of(8, 0)).atZone(zone).toInstant().toEpochMilli()
+        } else due
+        return at.takeIf { it > now.atZone(zone).toInstant().toEpochMilli() }
+    }
+}

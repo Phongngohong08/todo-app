@@ -15,6 +15,8 @@ object AppIntents {
     const val OPEN_ADD = "add"
     const val OPEN_REVIEW = "review"
     const val OPEN_FOCUS = "focus"
+    /** Mở màn Tập trung và tự bắt đầu phiên (ô Quick Settings). */
+    const val OPEN_FOCUS_START = "focus_start"
     const val OPEN_HABITS = "habits"
     private const val OPEN_TASK_PREFIX = "task:"
 

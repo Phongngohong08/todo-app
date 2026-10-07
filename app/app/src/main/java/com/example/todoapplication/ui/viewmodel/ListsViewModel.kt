@@ -33,7 +33,7 @@ data class ListsUiState(val isLoading: Boolean = true, val lists: List<ListOverv
 /** [TẦNG VIEWMODEL] Màn "Danh sách": mọi danh sách kèm số việc đang chờ, tạo / sửa / xóa danh sách. */
 class ListsViewModel(
     private val categories: CategoryRepository,
-    tasks: TaskRepository,
+    private val tasks: TaskRepository,
     private val clock: () -> Long = System::currentTimeMillis
 ) : ViewModel() {
 
@@ -59,6 +59,26 @@ class ListsViewModel(
 
     fun saveAppearance(info: ListInfo) {
         viewModelScope.launch { categories.saveListInfo(info) }
+    }
+
+    private val _messages = MutableSharedFlow<String>()
+    val messages: SharedFlow<String> = _messages.asSharedFlow()
+
+    /** Lưu danh sách đang sửa: đổi tên (nếu khác, các việc chuyển theo) rồi lưu màu / emoji / mục dưới tên mới. */
+    fun saveList(original: ListInfo, edited: ListInfo) {
+        viewModelScope.launch {
+            var name = original.name
+            val wanted = edited.name.trim()
+            if (wanted != original.name) {
+                if (!categories.isNameAvailable(wanted, except = original.name)) {
+                    _messages.emit("Tên \"$wanted\" đã có hoặc không hợp lệ")
+                    return@launch
+                }
+                tasks.renameCategory(original.name, wanted)
+                name = categories.rename(original.name, wanted).ifEmpty { original.name }
+            }
+            categories.saveListInfo(edited.copy(name = name, sections = original.sections))
+        }
     }
 
     fun delete(name: String) {

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Thư mục FileProvider được phép chia sẻ ra ngoài (content://):
+     tệp đính kèm của việc, và tệp xuất / sao lưu tạm trước khi gửi qua bảng Chia sẻ. -->
+<paths>
+    <files-path name="attachments" path="attachments/" />
+    <cache-path name="exports" path="exports/" />
+</paths>

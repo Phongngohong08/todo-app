@@ -9,6 +9,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.example.todoapplication.data.repository.AiRepository
 import com.example.todoapplication.data.repository.CategoryRepository
 import com.example.todoapplication.data.repository.FocusHistoryRepository
+import com.example.todoapplication.data.repository.Attachment
 import com.example.todoapplication.data.repository.SkipResult
 import com.example.todoapplication.data.repository.TaskRepository
 import com.example.todoapplication.data.repository.aiFailureMessage
@@ -82,6 +83,41 @@ class TaskDetailViewModel(
     val allTags: StateFlow<List<String>> = repo.observeTasks(null, null)
         .map { tasks -> tasks.flatMap { it.tags }.groupingBy { it }.eachCount().entries.sortedByDescending { it.value }.map { it.key } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    // ── Nhắc theo địa điểm (chỉ trên máy) ──
+    private val placeRepo = ServiceLocator.placeRepository
+    val places: StateFlow<List<com.example.todoapplication.data.local.PlaceEntity>> = placeRepo.observePlaces()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    val taskLocation: StateFlow<com.example.todoapplication.data.local.TaskLocationEntity?> =
+        (if (isNew) flowOf(null) else placeRepo.observeForTask(taskId))
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    fun setLocation(placeId: String, trigger: String) {
+        if (isNew) return
+        viewModelScope.launch { placeRepo.setTaskLocation(taskId, placeId, trigger) }
+    }
+
+    fun clearLocation() {
+        viewModelScope.launch { placeRepo.clearTaskLocation(taskId) }
+    }
+
+    // ── Đính kèm (chỉ trên máy) ──
+    private val attachmentRepo = ServiceLocator.attachmentRepository
+    val attachments: StateFlow<List<Attachment>> =
+        (if (isNew) flowOf(emptyList()) else attachmentRepo.observe(taskId))
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    fun addAttachments(uris: List<android.net.Uri>) {
+        if (isNew) return
+        viewModelScope.launch {
+            val added = uris.count { attachmentRepo.add(taskId, it) != null }
+            if (added < uris.size) _events.emit(TaskDetailEvent.Error("Không chép được ${uris.size - added} tệp"))
+        }
+    }
+
+    fun deleteAttachment(attachment: Attachment) {
+        viewModelScope.launch { attachmentRepo.delete(attachment.id) }
+    }
 
     /** Các phiên tập trung đã làm cho việc này. */
     val focusHistory: StateFlow<List<FocusRecord>> =

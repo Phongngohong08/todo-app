@@ -4,6 +4,11 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.app.RemoteInput
+import android.widget.Toast
+import com.example.todoapplication.domain.SnoozeText
+import com.example.todoapplication.ui.utils.formatDueLabel
+import java.time.LocalDateTime
 import com.example.todoapplication.di.ServiceLocator
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -41,12 +46,27 @@ class NotificationActionReceiver : BroadcastReceiver() {
                 ReminderScheduler.snooze(appContext, taskId, title, 60)
                 NotificationManagerCompat.from(appContext).cancel(notifId)
             }
+            ACTION_SNOOZE_REPLY -> {
+                // Câu người dùng gõ / chọn ngay trên thông báo: "30 phút", "tối nay", "mai 9h"...
+                val reply = RemoteInput.getResultsFromIntent(intent)?.getCharSequence(KEY_REPLY)?.toString().orEmpty()
+                val at = SnoozeText.parse(reply, LocalDateTime.now())
+                if (at != null) {
+                    ReminderScheduler.snoozeUntil(appContext, taskId, title, at)
+                    Toast.makeText(appContext, "Sẽ nhắc lại lúc " + formatDueLabel(at, allDay = false), Toast.LENGTH_SHORT).show()
+                } else {
+                    ReminderScheduler.snooze(appContext, taskId, title, 60)
+                    Toast.makeText(appContext, "Không hiểu \"" + reply + "\" — hoãn 1 giờ", Toast.LENGTH_SHORT).show()
+                }
+                NotificationManagerCompat.from(appContext).cancel(notifId)
+            }
         }
     }
 
     companion object {
         const val ACTION_COMPLETE = "com.example.todoapplication.action.COMPLETE"
         const val ACTION_SNOOZE = "com.example.todoapplication.action.SNOOZE"
+        const val ACTION_SNOOZE_REPLY = "com.example.todoapplication.action.SNOOZE_REPLY"
+        const val KEY_REPLY = "reply"
         const val EXTRA_TASK_ID = "extra_task_id"
         const val EXTRA_TITLE = "extra_title"
         const val EXTRA_NOTIF_ID = "extra_notif_id"

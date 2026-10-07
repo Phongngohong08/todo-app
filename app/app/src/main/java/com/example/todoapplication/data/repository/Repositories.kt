@@ -10,6 +10,8 @@ import com.example.todoapplication.data.local.toEntity
 import com.example.todoapplication.domain.model.ListInfo
 import com.example.todoapplication.data.model.AssistInput
 import com.example.todoapplication.data.model.AuthResponse
+import com.example.todoapplication.data.model.BusySlotDto
+import com.example.todoapplication.data.model.GeneratePlanInput
 import com.example.todoapplication.data.model.BreakdownResponse
 import com.example.todoapplication.data.model.ChatInput
 import com.example.todoapplication.data.model.ChatResponse
@@ -106,8 +108,8 @@ class PlanRepository(private val api: ApiService) {
     suspend fun getDaily(date: String?, localTime: String?): Result<DailyPlan> =
         safeApiCall { api.getDailyPlan(date, localTime, deviceTimeZoneId()) }
 
-    suspend fun generateDaily(date: String?, localTime: String?): Result<DailyPlan> =
-        safeApiCall { api.generateDailyPlan(date, localTime, deviceTimeZoneId()) }
+    suspend fun generateDaily(date: String?, localTime: String?, busy: List<BusySlotDto> = emptyList()): Result<DailyPlan> =
+        safeApiCall { api.generateDailyPlan(date, localTime, deviceTimeZoneId(), GeneratePlanInput(busy.take(30))) }
 
     /** Lưu lịch người dùng chỉnh tay (đổi giờ / bỏ khung) — không gọi AI. */
     suspend fun saveEdited(date: String, slots: List<PlanSlot>): Result<DailyPlan> =
@@ -199,6 +201,36 @@ class CategoryRepository(
             syncStateDao.markCategoriesDirty()
         }
         sync.requestSync(delayMillis = 1_000)
+    }
+
+    /**
+     * Đổi tên danh sách tự tạo: giữ vị trí và cài đặt hiển thị. Việc trong danh sách do [TaskRepository.renameCategory]
+     * chuyển theo (caller gọi trước). Trả tên mới đã chuẩn hoá, "" nếu không đổi được (trùng tên / danh sách mặc định).
+     */
+    suspend fun rename(from: String, to: String): String {
+        val clean = to.trim().take(MAX_LENGTH).trim()
+        if (clean.isEmpty() || from in DEFAULTS || clean == from) return ""
+        if (DEFAULTS.any { it.equals(clean, true) } ||
+            categoryDao.getNames().any { it.equals(clean, ignoreCase = true) && it != from }
+        ) return ""
+        db.withTransaction {
+            val names = categoryDao.getNames()
+            categoryDao.replaceAll(names.map { if (it == from) clean else it })
+            listMetaDao.get(from)?.let { meta ->
+                listMetaDao.delete(from)
+                listMetaDao.upsert(meta.copy(name = clean))
+            }
+            syncStateDao.markCategoriesDirty()
+        }
+        sync.requestSync(delayMillis = 1_000)
+        return clean
+    }
+
+    /** Tên mới có dùng được không (để màn hình báo lỗi trước khi đổi). */
+    suspend fun isNameAvailable(name: String, except: String? = null): Boolean {
+        val clean = name.trim()
+        if (clean.isEmpty() || DEFAULTS.any { it.equals(clean, true) }) return false
+        return categoryDao.getNames().none { it.equals(clean, ignoreCase = true) && it != except }
     }
 
     companion object {

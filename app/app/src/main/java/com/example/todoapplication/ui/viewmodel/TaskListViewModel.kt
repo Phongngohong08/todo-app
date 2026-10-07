@@ -8,6 +8,7 @@ import com.example.todoapplication.data.model.ParsedTask
 import com.example.todoapplication.data.repository.AiRepository
 import com.example.todoapplication.data.repository.CategoryRepository
 import com.example.todoapplication.data.repository.LocalPrefs
+import com.example.todoapplication.data.repository.SentenceTasks
 import com.example.todoapplication.data.repository.SessionManager
 import com.example.todoapplication.data.repository.TaskRepository
 import com.example.todoapplication.data.repository.aiFailureMessage
@@ -114,7 +115,9 @@ class TaskListViewModel(
     // Luồng tính nhóm/sắp xếp — test truyền dispatcher của test để chạy tất định
     private val computeDispatcher: CoroutineDispatcher = Dispatchers.Default,
     /** Nơi lưu bộ lọc đã đặt tên (null trong test cũ). */
-    private val localPrefs: LocalPrefs? = null
+    private val localPrefs: LocalPrefs? = null,
+    /** Tạo việc từ câu tự nhiên (dòng chữ quét từ ảnh). */
+    private val sentenceTasks: SentenceTasks? = null
 ) : ViewModel() {
 
     /** Tên người dùng để hiển thị lời chào — đọc một lần từ phiên đăng nhập. */
@@ -424,6 +427,15 @@ class TaskListViewModel(
         postpone(tasks, date)
     }
 
+    /** "Chụp ảnh tạo việc": mỗi dòng chữ nhận được thành một việc. */
+    fun createFromLines(lines: List<String>) {
+        val creator = sentenceTasks ?: return
+        viewModelScope.launch {
+            val created = creator.create(lines)
+            emit(TaskListEvent.Message("Đã tạo ${created.size} việc từ ảnh 📷"))
+        }
+    }
+
     /** Tạo nhanh từ thanh nhập (không qua màn chi tiết). Danh mục mới gõ sau "#" được tạo luôn. */
     fun createQuickTask(result: QuickCreateResult) {
         viewModelScope.launch {
@@ -501,7 +513,8 @@ class TaskListViewModel(
                     ServiceLocator.syncController,
                     ServiceLocator.aiRepository,
                     ServiceLocator.sessionManager,
-                    localPrefs = ServiceLocator.localPrefs
+                    localPrefs = ServiceLocator.localPrefs,
+                    sentenceTasks = ServiceLocator.sentenceTasks
                 )
             }
         }

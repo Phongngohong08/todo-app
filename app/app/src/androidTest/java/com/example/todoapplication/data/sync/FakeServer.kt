@@ -200,7 +200,7 @@ class FakeServer : ApiService {
     override suspend fun getPreferences(): Response<UserPreferences> = unsupported()
     override suspend fun updatePreferences(prefs: UserPreferences): Response<UserPreferences> = unsupported()
     override suspend fun getDailyPlan(date: String?, localTime: String?, timezone: String?): Response<DailyPlan> = unsupported()
-    override suspend fun generateDailyPlan(date: String?, localTime: String?, timezone: String?): Response<DailyPlan> = unsupported()
+    override suspend fun generateDailyPlan(date: String?, localTime: String?, timezone: String?, input: GeneratePlanInput): Response<DailyPlan> = unsupported()
     override suspend fun saveDailyPlan(date: String, timezone: String?, input: SavePlanInput): Response<DailyPlan> = unsupported()
     override suspend fun chat(input: ChatInput): Response<ChatResponse> = unsupported()
     override suspend fun chatHistory(limit: Int): Response<List<ChatMessage>> = unsupported()

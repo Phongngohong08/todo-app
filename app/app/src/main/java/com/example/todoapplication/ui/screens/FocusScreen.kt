@@ -28,7 +28,7 @@ import kotlinx.coroutines.launch
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun FocusScreen(navController: NavController, taskId: String?) {
+fun FocusScreen(navController: NavController, taskId: String?, autoStart: Boolean = false) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val session by FocusSession.state.collectAsStateWithLifecycle()
@@ -52,6 +52,19 @@ fun FocusScreen(navController: NavController, taskId: String?) {
     fun start(phase: FocusSession.Phase) {
         FocusSession.start(context, active?.taskId ?: taskId, title, phase)
         askNotificationPermission("Bật thông báo để được báo khi hết phiên tập trung, kể cả khi bạn rời app.")
+    }
+
+    // Úp máy xuống bàn (gia tốc kế) khi chưa có phiên / vừa hết phiên → bắt đầu tập trung, có rung xác nhận
+    val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
+    val idle = active == null || active.remainingMillis(now) == 0L
+    com.example.todoapplication.ui.components.FaceDownEffect(enabled = idle) {
+        haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+        start(FocusSession.Phase.FOCUS)
+    }
+
+    // Mở từ ô Quick Settings "Tập trung": bắt đầu ngay nếu chưa có phiên nào
+    LaunchedEffect(autoStart) {
+        if (autoStart && FocusSession.state.value == null) start(FocusSession.Phase.FOCUS)
     }
 
     Scaffold(
@@ -128,6 +141,10 @@ fun FocusScreen(navController: NavController, taskId: String?) {
                 }) {
                     Text("✓ Việc đã xong", color = StateCompleted, fontWeight = FontWeight.SemiBold)
                 }
+            }
+
+            if (active == null || remaining == 0L) {
+                Text("📱 Úp máy xuống bàn để bắt đầu phiên mới", fontSize = 13.sp, color = MaterialTheme.colorScheme.tertiary)
             }
 
             Text(

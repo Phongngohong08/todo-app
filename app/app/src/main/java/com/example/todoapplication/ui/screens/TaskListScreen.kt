@@ -67,6 +67,10 @@ fun TaskListScreen(
 ) {
     val state by taskListViewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
+    // Lắc máy khi đang có thanh "Hoàn tác" → hoàn tác luôn (gia tốc kế)
+    com.example.todoapplication.ui.components.ShakeEffect {
+        snackbarHostState.currentSnackbarData?.takeIf { it.visuals.actionLabel == "Hoàn tác" }?.performAction()
+    }
     val scope = rememberCoroutineScope()
     val askNotificationPermission = rememberNotificationPermissionRequest()
 
@@ -77,6 +81,14 @@ fun TaskListScreen(
     var showAiAdd by remember { mutableStateOf(false) }
     var aiText by remember { mutableStateOf("") }
     var showQuickCreate by remember { mutableStateOf(false) }
+    // Màn rộng: bấm thẻ → mở ở khung bên phải thay vì sang màn khác
+    val twoPane = com.example.todoapplication.ui.components.isTwoPane()
+    var paneTaskId by rememberSaveable { mutableStateOf<String?>(null) }
+    val openTask: (String) -> Unit = { id ->
+        if (twoPane) paneTaskId = id else navController.navigate(Screen.TaskDetail.createRoute(id))
+    }
+    // "Chụp ảnh tạo việc": quét giấy / bảng trắng → nhận chữ (ML Kit) → chọn dòng → tạo việc
+    val startScan = com.example.todoapplication.ui.components.rememberScanToTasks { lines -> taskListViewModel.createFromLines(lines) }
     // Việc đang chọn ngày hoãn (vuốt trái); showBulkPostpone = dời các việc đang chọn
     var postponeTarget by remember { mutableStateOf<Task?>(null) }
     var showBulkPostpone by remember { mutableStateOf(false) }
@@ -174,10 +186,12 @@ fun TaskListScreen(
             return@Scaffold
         }
 
+        // Tablet / máy gập mở: danh sách | chi tiết cạnh nhau (list-detail)
+        Row(Modifier.fillMaxSize().padding(top = innerPadding.calculateTopPadding())) {
         PullToRefreshBox(
             isRefreshing = state.isRefreshing,
             onRefresh = taskListViewModel::refresh,
-            modifier = Modifier.fillMaxSize().padding(top = innerPadding.calculateTopPadding())
+            modifier = Modifier.weight(1f).fillMaxHeight()
         ) {
             LazyColumn(
                 state = lazyListState,
@@ -330,7 +344,7 @@ fun TaskListScreen(
                                 TaskCard(
                                     task = task,
                                     modifier = Modifier.shadow(elevation, RoundedCornerShape(16.dp)),
-                                    onCardClick = { navController.navigate(Screen.TaskDetail.createRoute(task.id)) },
+                                    onCardClick = { openTask(task.id) },
                                     onToggleComplete = { taskListViewModel.completeTask(task) },
                                     onDeleteClick = { taskListViewModel.deleteTask(task) },
                                     recommendation = state.recommendations[task.id],
@@ -354,17 +368,37 @@ fun TaskListScreen(
                     else -> {
                         val onPostpone: (Task) -> Unit = { postponeTarget = it }
                         taskSection(
-                            "Quá hạn", state.sections.overdue, state, selectedIds, navController, taskListViewModel, onPostpone,
+                            "Quá hạn", state.sections.overdue, state, selectedIds, navController, openTask, taskListViewModel, onPostpone,
                             titleColor = StateOverdue,
                             action = if (selectionMode) null else ({ RescheduleMenu(onPick = taskListViewModel::rescheduleOverdue) })
                         )
-                        taskSection("Hôm nay", state.sections.today, state, selectedIds, navController, taskListViewModel, onPostpone)
-                        taskSection("Sắp tới", state.sections.upcoming, state, selectedIds, navController, taskListViewModel, onPostpone)
-                        taskSection("Chưa có hạn", state.sections.noDate, state, selectedIds, navController, taskListViewModel, onPostpone)
-                        taskSection("Đã xong hôm nay", state.sections.completedToday, state, selectedIds, navController, taskListViewModel, onPostpone, swipeable = false)
+                        taskSection("Hôm nay", state.sections.today, state, selectedIds, navController, openTask, taskListViewModel, onPostpone)
+                        taskSection("Sắp tới", state.sections.upcoming, state, selectedIds, navController, openTask, taskListViewModel, onPostpone)
+                        taskSection("Chưa có hạn", state.sections.noDate, state, selectedIds, navController, openTask, taskListViewModel, onPostpone)
+                        taskSection("Đã xong hôm nay", state.sections.completedToday, state, selectedIds, navController, openTask, taskListViewModel, onPostpone, swipeable = false)
                     }
                 }
             }
+        }
+        if (twoPane) {
+            VerticalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Box(Modifier.weight(1.25f).fillMaxHeight()) {
+                val paneId = paneTaskId
+                if (paneId == null) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text("Chọn một việc để xem chi tiết", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                } else key(paneId) {
+                    TaskDetailScreen(
+                        navController = navController,
+                        taskId = paneId,
+                        taskDetailViewModel = rememberPaneDetailViewModel(paneId),
+                        onClose = { paneTaskId = null },
+                        onOpenTask = { paneTaskId = it }
+                    )
+                }
+            }
+        }
         }
     }
 
@@ -444,7 +478,8 @@ fun TaskListScreen(
             onTemplates = {
                 showQuickCreate = false
                 navController.navigate(Screen.Templates.route)
-            }
+            },
+            onScan = { showQuickCreate = false; startScan() }
         )
     }
 }
@@ -456,6 +491,7 @@ private fun LazyListScope.taskSection(
     state: TaskListUiState,
     selectedIds: Set<String>,
     navController: NavController,
+    openTask: (String) -> Unit,
     viewModel: TaskListViewModel,
     onPostpone: (Task) -> Unit,
     swipeable: Boolean = true,
@@ -478,13 +514,14 @@ private fun LazyListScope.taskSection(
                 task = task,
                 onCardClick = {
                     if (selectionMode) viewModel.toggleSelection(task.id)
-                    else navController.navigate(Screen.TaskDetail.createRoute(task.id))
+                    else openTask(task.id)
                 },
                 onToggleComplete = if (selectionMode) ({ viewModel.toggleSelection(task.id) }) else onToggle,
                 selectionMode = selectionMode,
                 selected = task.id in selectedIds,
                 onLongClick = { viewModel.toggleSelection(task.id) },
                 onDuplicate = { viewModel.duplicate(task) },
+                onPostpone = if (swipeable && !task.isCompleted) ({ onPostpone(task) }) else null,
                 onDeleteClick = { viewModel.deleteTask(task) },
                 recommendation = state.recommendations[task.id],
                 onSetPriority = { p -> viewModel.setPriority(task, p) },

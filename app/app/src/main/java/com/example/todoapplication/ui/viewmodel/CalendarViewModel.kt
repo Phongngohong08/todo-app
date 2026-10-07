@@ -4,6 +4,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.example.todoapplication.data.calendar.DeviceCalendar
+import com.example.todoapplication.data.calendar.DeviceEvent
+import com.example.todoapplication.data.repository.LocalPrefs
 import com.example.todoapplication.data.repository.TaskRepository
 import com.example.todoapplication.di.ServiceLocator
 import com.example.todoapplication.domain.RecurrenceRules
@@ -11,6 +14,7 @@ import com.example.todoapplication.domain.recurrenceSpec
 import com.example.todoapplication.domain.model.Task
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -44,13 +48,46 @@ sealed interface CalendarEvent {
  */
 class CalendarViewModel(
     private val repo: TaskRepository,
-    private val zone: () -> ZoneId = ZoneId::systemDefault
+    private val zone: () -> ZoneId = ZoneId::systemDefault,
+    localPrefs: LocalPrefs? = null
 ) : ViewModel() {
 
     val uiState: StateFlow<CalendarUiState> = repo.observeScheduled()
         .map { tasks -> CalendarUiState(isLoading = false, entriesByDay = buildEntries(tasks)) }
         .flowOn(Dispatchers.Default)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), CalendarUiState())
+
+    // ── Lịch của máy (CalendarContract) ──
+    private val prefs = localPrefs
+    val showDeviceCalendar: StateFlow<Boolean> = prefs?.showDeviceCalendar ?: MutableStateFlow(false)
+
+    private val _deviceEvents = MutableStateFlow<Map<String, List<DeviceEvent>>>(emptyMap())
+    /** "yyyy-MM-dd" → sự kiện của lịch máy rơi vào ngày đó. */
+    val deviceEvents: StateFlow<Map<String, List<DeviceEvent>>> = _deviceEvents
+
+    fun setShowDeviceCalendar(enabled: Boolean, context: android.content.Context) {
+        prefs?.setShowDeviceCalendar(enabled)
+        reloadDeviceEvents(context)
+    }
+
+    /** Đọc lại sự kiện (gọi khi bật, khi vừa cấp quyền, khi quay lại màn hình). Khoảng: 3 tháng trước → 6 tháng tới. */
+    fun reloadDeviceEvents(context: android.content.Context) {
+        if (!showDeviceCalendar.value || !DeviceCalendar.hasPermission(context)) {
+            _deviceEvents.value = emptyMap()
+            return
+        }
+        val app = context.applicationContext
+        viewModelScope.launch {
+            val z = zone()
+            val today = LocalDate.now(z)
+            val from = today.minusMonths(3).atStartOfDay(z).toInstant().toEpochMilli()
+            val to = today.plusMonths(6).atStartOfDay(z).toInstant().toEpochMilli()
+            _deviceEvents.value = DeviceCalendar.byDay(DeviceCalendar.events(app, from, to), z)
+        }
+    }
+
+    /** Số phút làm việc mỗi ngày (để tô đỏ ngày quá tải trong lịch tuần). */
+    val dailyCapacityMinutes: StateFlow<Int> = localPrefs?.dailyCapacityMinutes ?: MutableStateFlow(LocalPrefs.DEFAULT_DAILY_CAPACITY)
 
     private val _events = MutableSharedFlow<CalendarEvent>()
     val events: SharedFlow<CalendarEvent> = _events.asSharedFlow()
@@ -104,7 +141,7 @@ class CalendarViewModel(
             Instant.ofEpochMilli(millis).atZone(zone).toLocalDate().toString()
 
         val Factory = viewModelFactory {
-            initializer { CalendarViewModel(ServiceLocator.taskRepository) }
+            initializer { CalendarViewModel(ServiceLocator.taskRepository, localPrefs = ServiceLocator.localPrefs) }
         }
     }
 }

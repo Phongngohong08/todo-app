@@ -8,6 +8,7 @@ import com.example.todoapplication.data.notifications.ReminderScheduler
 import com.example.todoapplication.data.sync.SyncScheduler
 import com.example.todoapplication.data.sync.TaskChangeListener
 import com.example.todoapplication.widget.TasksWidgetProvider
+import com.example.todoapplication.data.location.LocationReminders
 
 /**
  * [TẦNG DATA] Side effect của Android framework khi task thay đổi — gom về một chỗ:
@@ -24,6 +25,8 @@ class TaskEffects(
     override fun afterLocalWrite(changed: List<TaskEntity>, removedIds: List<String>) {
         applyReminders(changed, removedIds)
         TasksWidgetProvider.refresh(context)
+        // Việc xong / bị xóa thì bỏ geofence của nó (bỏ qua nếu tập vùng không đổi)
+        LocationReminders.sync(context)
         syncScheduler.requestSync()
     }
 
@@ -31,6 +34,8 @@ class TaskEffects(
         val changed = changedIds.chunked(500).flatMap { db.taskDao().getByIds(it) }
         applyReminders(changed, removedIds)
         TasksWidgetProvider.refresh(context)
+        // Việc xong / bị xóa thì bỏ geofence của nó (bỏ qua nếu tập vùng không đổi)
+        LocationReminders.sync(context)
     }
 
     private fun applyReminders(changed: List<TaskEntity>, removedIds: Collection<String>) {

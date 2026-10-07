@@ -17,6 +17,7 @@ import com.example.todoapplication.domain.model.TaskStatus
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
+import androidx.paging.map
 import java.time.ZoneId
 import java.util.UUID
 
@@ -65,6 +66,12 @@ class TaskRepository(
     /** Việc đã hoàn thành, mới nhất trước — cho màn Lịch sử. */
     fun observeCompletedHistory(limit: Int = HISTORY_LIMIT): Flow<List<Task>> =
         taskDao.observeCompleted(limit).map { rows -> rows.map { it.toDomain() } }
+
+    /** Toàn bộ lịch sử hoàn thành, tải dần từng trang khi cuộn (Paging 3). */
+    fun pagedHistory(pageSize: Int = 40): Flow<androidx.paging.PagingData<Task>> =
+        androidx.paging.Pager(androidx.paging.PagingConfig(pageSize = pageSize, enablePlaceholders = false)) {
+            taskDao.pagingCompleted()
+        }.flow.map { page -> page.map { it.toDomain() } }
 
     /** Việc hoàn thành từ [sinceMillis] — cho Tổng kết tuần. */
     fun observeCompletedSince(sinceMillis: Long): Flow<List<Task>> =
@@ -357,6 +364,12 @@ class TaskRepository(
     /** Chuyển việc sang mục [section] ("" = chưa phân mục) — kéo thả giữa các cột. */
     suspend fun setSection(ids: List<String>, section: String): Boolean = mutateAll(ids) { current ->
         if (current.section == section) null else current.copy(section = section)
+    }
+
+    /** Đổi tên danh sách: mọi việc (kể cả đã xong) chuyển sang tên mới và được đồng bộ. */
+    suspend fun renameCategory(from: String, to: String) {
+        val ids = taskDao.getIdsInCategory(from)
+        if (ids.isNotEmpty()) mutateAll(ids) { it.copy(category = to) }
     }
 
     /** Đổi tên mục trong danh sách [category]: mọi việc đang ở mục cũ chuyển theo. "" = bỏ mục (về chưa phân mục). */

@@ -31,6 +31,19 @@ import com.example.todoapplication.ui.navigation.QuickCreateRequest
 import com.example.todoapplication.ui.navigation.Screen
 import com.example.todoapplication.ui.screens.*
 import com.example.todoapplication.ui.theme.TodoApplicationTheme
+import com.example.todoapplication.ui.components.APP_TABS
+import com.example.todoapplication.ui.components.AppNavigationRail
+import com.example.todoapplication.ui.components.LocalSharedTransitionScope
+import com.example.todoapplication.ui.components.LocalWindowWidthClass
+import com.example.todoapplication.ui.components.WithNavScope
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionLayout
+import androidx.compose.foundation.layout.Row
+import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSizeClassApi
+import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
+import androidx.compose.material3.windowsizeclass.calculateWindowSizeClass
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.navigation.compose.currentBackStackEntryAsState
 import kotlinx.coroutines.flow.MutableStateFlow
 
 /**
@@ -39,6 +52,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
  * Cũng là nơi nhận "đường dẫn" từ ngoài app: bấm thông báo, widget, app shortcut, chia sẻ từ app khác.
  */
 // FragmentActivity (thay vì ComponentActivity): BiometricPrompt của khóa ứng dụng cần nó
+@OptIn(ExperimentalMaterial3WindowSizeClassApi::class, ExperimentalSharedTransitionApi::class)
 class MainActivity : FragmentActivity() {
 
     /** Yêu cầu điều hướng từ Intent (onCreate / onNewIntent) chờ NavHost xử lý. */
@@ -108,12 +122,24 @@ class MainActivity : FragmentActivity() {
                     // NavHost = "bảng định tuyến": route nào → hiển thị Composable nào (như router ở backend)
                     val appLocked by AppLock.locked.collectAsStateWithLifecycle()
 
+                    // Giao diện thích ứng: lớp chiều rộng cửa sổ (đổi khi xoay / gập / chia đôi màn hình)
+                    val widthClass = calculateWindowSizeClass(this@MainActivity).widthSizeClass
+                    val backStackEntry by navController.currentBackStackEntryAsState()
+                    val currentRoute = backStackEntry?.destination?.route
+                    val onTab = APP_TABS.any { it.route == currentRoute }
+
+                    CompositionLocalProvider(LocalWindowWidthClass provides widthClass) {
+                    Row(Modifier.fillMaxSize()) {
+                    if (widthClass != WindowWidthSizeClass.Compact && onTab) AppNavigationRail(navController, currentRoute)
+                    // Hiệu ứng "thẻ việc mở rộng thành màn chi tiết" (shared element) giữa các màn trong NavHost
+                    SharedTransitionLayout(Modifier.weight(1f)) {
+                    CompositionLocalProvider(LocalSharedTransitionScope provides this) {
                     NavHost(navController = navController, startDestination = startDestination) {
                         composable(Screen.Login.route) { LoginScreen(navController) }
                         composable(Screen.Register.route) { RegisterScreen(navController) }
 
-                        composable(Screen.Today.route) { TodayScreen(navController) }
-                        composable(Screen.TaskList.route) { TaskListScreen(navController) }
+                        composable(Screen.Today.route) { WithNavScope(this) { TodayScreen(navController) } }
+                        composable(Screen.TaskList.route) { WithNavScope(this) { TaskListScreen(navController) } }
                         composable(Screen.Calendar.route) { CalendarScreen(navController) }
                         composable(Screen.Stats.route) { StatsScreen(navController) }
 
@@ -122,7 +148,7 @@ class MainActivity : FragmentActivity() {
                             arguments = listOf(navArgument("taskId") { type = NavType.StringType })
                         ) { backStackEntry ->
                             val taskId = backStackEntry.arguments?.getString("taskId") ?: "new"
-                            TaskDetailScreen(navController, taskId)
+                            WithNavScope(this) { TaskDetailScreen(navController, taskId) }
                         }
                         composable(
                             route = Screen.AICoach.route,
@@ -132,9 +158,12 @@ class MainActivity : FragmentActivity() {
                         }
                         composable(
                             route = Screen.Focus.route,
-                            arguments = listOf(navArgument("taskId") { type = NavType.StringType; nullable = true; defaultValue = null })
+                            arguments = listOf(
+                                navArgument("taskId") { type = NavType.StringType; nullable = true; defaultValue = null },
+                                navArgument("start") { type = NavType.BoolType; defaultValue = false }
+                            )
                         ) { entry ->
-                            FocusScreen(navController, entry.arguments?.getString("taskId"))
+                            FocusScreen(navController, entry.arguments?.getString("taskId"), autoStart = entry.arguments?.getBoolean("start") == true)
                         }
                         composable(Screen.WeeklyReview.route) { WeeklyReviewScreen(navController) }
                         composable(Screen.History.route) { HistoryScreen(navController) }
@@ -148,6 +177,10 @@ class MainActivity : FragmentActivity() {
                             route = Screen.ListBoard.route,
                             arguments = listOf(navArgument("name") { type = NavType.StringType })
                         ) { entry -> ListBoardScreen(navController, entry.arguments?.getString("name").orEmpty()) }
+                    }
+                    }
+                    }
+                    }
                     }
 
                     // Che toàn bộ app khi đang khóa (NavHost vẫn giữ nguyên trạng thái bên dưới)
@@ -192,6 +225,7 @@ class MainActivity : FragmentActivity() {
                 }
                 AppIntents.OPEN_REVIEW -> nav.navigate(Screen.WeeklyReview.route) { launchSingleTop = true }
                 AppIntents.OPEN_FOCUS -> nav.navigate(Screen.Focus.createRoute()) { launchSingleTop = true }
+                AppIntents.OPEN_FOCUS_START -> nav.navigate(Screen.Focus.createRoute(autoStart = true)) { launchSingleTop = true }
                 AppIntents.OPEN_HABITS -> nav.navigate(Screen.Habits.route) { launchSingleTop = true }
                 else -> AppIntents.taskIdOf(target)?.let { nav.navigate(Screen.TaskDetail.createRoute(it)) }
             }

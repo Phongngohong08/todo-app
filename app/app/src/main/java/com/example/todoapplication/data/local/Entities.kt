@@ -200,3 +200,62 @@ data class FocusSessionEntity(
     val minutes: Int,
     val isSynced: Boolean = false
 )
+
+/**
+ * Tệp đính kèm của một việc (ảnh chụp / tài liệu quét) — CHỈ lưu trên máy, trong bộ nhớ riêng của app
+ * (filesDir/attachments), mở ra ngoài qua FileProvider. Xóa việc hẳn thì đính kèm tự xóa theo (CASCADE).
+ */
+@Entity(
+    tableName = "attachments",
+    foreignKeys = [
+        ForeignKey(entity = TaskEntity::class, parentColumns = ["id"], childColumns = ["taskId"], onDelete = ForeignKey.CASCADE)
+    ],
+    indices = [Index(value = ["taskId"])]
+)
+data class AttachmentEntity(
+    @PrimaryKey val id: String,
+    val taskId: String,
+    /** Tên tệp trong filesDir/attachments. */
+    val fileName: String,
+    /** MIME, vd "image/jpeg", "application/pdf". */
+    val mimeType: String,
+    val createdAt: Long
+)
+
+/** Địa điểm đã lưu (Nhà, Công ty…) cho nhắc theo vị trí — chỉ trên máy. */
+@Entity(tableName = "places")
+data class PlaceEntity(
+    @PrimaryKey val id: String,
+    val name: String,
+    val latitude: Double,
+    val longitude: Double,
+    val radiusMeters: Int
+)
+
+/** Nhắc việc khi ĐẾN (ENTER) hoặc RỜI (EXIT) một địa điểm. Mỗi việc tối đa một nhắc theo địa điểm. */
+@Entity(
+    tableName = "task_locations",
+    foreignKeys = [
+        ForeignKey(entity = TaskEntity::class, parentColumns = ["id"], childColumns = ["taskId"], onDelete = ForeignKey.CASCADE),
+        ForeignKey(entity = PlaceEntity::class, parentColumns = ["id"], childColumns = ["placeId"], onDelete = ForeignKey.CASCADE)
+    ],
+    indices = [Index(value = ["placeId"])]
+)
+data class TaskLocationEntity(
+    @PrimaryKey val taskId: String,
+    val placeId: String,
+    /** ENTER | EXIT */
+    val trigger: String
+)
+
+/** Kết quả truy vấn: nhắc theo địa điểm của các việc còn chờ. */
+data class LocationReminder(
+    val taskId: String,
+    val title: String,
+    val placeId: String,
+    val placeName: String,
+    val latitude: Double,
+    val longitude: Double,
+    val radiusMeters: Int,
+    val trigger: String
+)

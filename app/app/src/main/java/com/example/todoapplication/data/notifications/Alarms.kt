@@ -12,6 +12,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.example.todoapplication.R
 import com.example.todoapplication.di.ServiceLocator
+import com.example.todoapplication.data.location.LocationReminders
 import com.example.todoapplication.ui.navigation.AppIntents
 import com.example.todoapplication.ui.screens.AlarmActivity
 import kotlinx.coroutines.CoroutineScope
@@ -161,6 +162,9 @@ class BootReceiver : BroadcastReceiver() {
         scope.launch {
             try {
                 if (ServiceLocator.sessionManager.isLoggedIn()) ReminderScheduler.rescheduleAll(context)
+                QuickAddNotifier.refresh(context)
+                // Hệ thống xóa mọi geofence khi khởi động lại máy → đăng ký lại
+                LocationReminders.sync(context, force = true)
             } finally {
                 pending.finish()
             }

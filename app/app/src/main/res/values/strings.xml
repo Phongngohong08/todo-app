@@ -12,4 +12,6 @@
     <!-- Tên hiện trong bảng "Chia sẻ" của app khác -->
     <string name="share_target_label">Thêm vào TaskFlow</string>
     <string name="widget_compact_description">Tiến độ mục tiêu hôm nay và việc tiếp theo</string>
+    <string name="widget_tasks_description">Việc cần làm — tích hoàn thành ngay trên widget</string>
+    <string name="widget_habits_description">Thói quen hôm nay — bấm để đánh dấu</string>
 </resources>

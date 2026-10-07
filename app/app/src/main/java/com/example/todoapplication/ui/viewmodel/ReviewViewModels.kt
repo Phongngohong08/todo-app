@@ -18,6 +18,11 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.Flow
+import androidx.paging.PagingData
+import androidx.paging.cachedIn
+import androidx.paging.insertSeparators
+import androidx.paging.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.Instant
@@ -54,18 +59,34 @@ class WeeklyReviewViewModel(
 }
 
 /** Việc đã hoàn thành, gom theo ngày hoàn thành (mới nhất trước). */
+/** Một dòng của lịch sử phân trang: tiêu đề ngày hoặc một việc. */
+sealed interface HistoryItem {
+    data class Header(val day: LocalDate) : HistoryItem
+    data class Row(val task: Task) : HistoryItem
+}
+
 class HistoryViewModel(
     private val repo: TaskRepository,
     private val zone: () -> ZoneId = ZoneId::systemDefault
 ) : ViewModel() {
 
-    val days: StateFlow<List<Pair<LocalDate, List<Task>>>?> = repo.observeCompletedHistory()
-        .map { tasks ->
-            tasks.groupBy { Instant.ofEpochMilli(it.completedAt ?: 0).atZone(zone()).toLocalDate() }
-                .toList()
-                .sortedByDescending { it.first }
+    /**
+     * Toàn bộ lịch sử, tải dần (Paging 3) — chèn tiêu đề ngày giữa hai việc khác ngày hoàn thành (insertSeparators).
+     * cachedIn giữ các trang đã tải qua xoay màn hình.
+     */
+    val history: Flow<PagingData<HistoryItem>> = repo.pagedHistory()
+        .map { page ->
+            page.map<Task, HistoryItem> { HistoryItem.Row(it) }
+                .insertSeparators { before, after ->
+                    val next = (after as? HistoryItem.Row)?.task ?: return@insertSeparators null
+                    val nextDay = dayOf(next)
+                    val prevDay = (before as? HistoryItem.Row)?.task?.let(::dayOf)
+                    if (prevDay != nextDay) HistoryItem.Header(nextDay) else null
+                }
         }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+        .cachedIn(viewModelScope)
+
+    private fun dayOf(task: Task): LocalDate = Instant.ofEpochMilli(task.completedAt ?: 0).atZone(zone()).toLocalDate()
 
     fun reopen(task: Task) {
         viewModelScope.launch { repo.setCompleted(task.id, false) }

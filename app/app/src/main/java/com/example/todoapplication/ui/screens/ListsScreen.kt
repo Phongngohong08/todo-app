@@ -23,6 +23,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
@@ -67,8 +70,11 @@ fun ListsScreen(
     var creating by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<ListInfo?>(null) }
     var confirmDelete by remember { mutableStateOf<String?>(null) }
+    val snackbar = remember { SnackbarHostState() }
+    LaunchedEffect(Unit) { viewModel.messages.collect { snackbar.showSnackbar(it) } }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbar) },
         topBar = {
             TopAppBar(
                 title = { Text("Danh sách", fontWeight = FontWeight.Bold) },
@@ -144,9 +150,9 @@ fun ListsScreen(
     editing?.let { info ->
         ListAppearanceDialog(
             initial = info,
-            nameEditable = false,
+            nameEditable = info.name !in CategoryRepository.DEFAULTS,
             onDismiss = { editing = null },
-            onSave = { viewModel.saveAppearance(it); editing = null }
+            onSave = { viewModel.saveList(info, it); editing = null }
         )
     }
     confirmDelete?.let { name ->
@@ -168,7 +174,7 @@ private fun ListAppearanceDialog(initial: ListInfo, nameEditable: Boolean, onDis
     var emoji by remember { mutableStateOf(initial.emoji) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (nameEditable) "Danh sách mới" else listTitle(initial)) },
+        title = { Text(if (initial.name.isEmpty()) "Danh sách mới" else listTitle(initial)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 if (nameEditable) {
@@ -342,6 +348,7 @@ private fun KanbanBoard(
                         column = col,
                         accent = accent,
                         dragState = dragState,
+                        allSections = listOf("") + sections,
                         index = sections.indexOf(col.section),
                         lastIndex = sections.lastIndex,
                         onMove = onMove,
@@ -372,6 +379,7 @@ private fun KanbanColumn(
     column: com.example.todoapplication.ui.viewmodel.BoardColumn,
     accent: Color,
     dragState: DragDropState<String>,
+    allSections: List<String>,
     index: Int,
     lastIndex: Int,
     onMove: (String, String) -> Unit,
@@ -428,7 +436,9 @@ private fun KanbanColumn(
                             task = task,
                             modifier = Modifier.dragSource(dragState, DragPayload(task.id, task.title)) { target -> onMove(task.id, target) },
                             onOpen = { onOpen(task) },
-                            onComplete = { onComplete(task) }
+                            onComplete = { onComplete(task) },
+                            moveTargets = allSections.filter { it != column.section },
+                            onMove = { target -> onMove(task.id, target) }
                         )
                     }
                 }
@@ -457,12 +467,26 @@ private fun KanbanColumn(
 
 /** Thẻ việc gọn trên bảng Kanban. */
 @Composable
-private fun BoardCard(task: Task, modifier: Modifier = Modifier, onOpen: () -> Unit, onComplete: () -> Unit) {
+private fun BoardCard(
+    task: Task,
+    modifier: Modifier = Modifier,
+    onOpen: () -> Unit,
+    onComplete: () -> Unit,
+    /** Trợ năng: các cột có thể chuyển tới — thay cho kéo thả (TalkBack không kéo được). */
+    moveTargets: List<String> = emptyList(),
+    onMove: (String) -> Unit = {}
+) {
     Surface(
         shape = RoundedCornerShape(12.dp),
         color = MaterialTheme.colorScheme.surface,
         shadowElevation = 1.dp,
         modifier = modifier.fillMaxWidth().clickable(onClick = onOpen)
+            .semantics(mergeDescendants = true) {
+                customActions = listOf(CustomAccessibilityAction("Hoàn thành") { onComplete(); true }) +
+                    moveTargets.map { target ->
+                        CustomAccessibilityAction("Chuyển sang " + target.ifEmpty { UNSECTIONED_LABEL }) { onMove(target); true }
+                    }
+            }
     ) {
         Row(Modifier.padding(10.dp), verticalAlignment = Alignment.Top) {
             Box(

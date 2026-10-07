@@ -40,6 +40,7 @@ import com.example.todoapplication.domain.model.RecurrenceMode
 import com.example.todoapplication.domain.model.Subtask
 import com.example.todoapplication.domain.model.TaskDraft
 import com.example.todoapplication.ui.components.rememberNotificationPermissionRequest
+import com.example.todoapplication.ui.components.sharedTaskBounds
 import com.example.todoapplication.ui.navigation.Screen
 import com.example.todoapplication.ui.theme.*
 import com.example.todoapplication.ui.utils.RECURRENCE_OPTIONS
@@ -69,9 +70,14 @@ import java.time.ZoneOffset
 fun TaskDetailScreen(
     navController: NavController,
     taskId: String,
-    taskDetailViewModel: TaskDetailViewModel = viewModel(factory = TaskDetailViewModel.Factory)
+    taskDetailViewModel: TaskDetailViewModel = viewModel(factory = TaskDetailViewModel.Factory),
+    /** Khung chi tiết bên phải (tablet): đóng khung thay vì quay lại màn trước. */
+    onClose: (() -> Unit)? = null,
+    /** Khung chi tiết: mở việc khác (vd bản sao) ngay trong khung. */
+    onOpenTask: ((String) -> Unit)? = null
 ) {
     val context = LocalContext.current
+    val close: () -> Unit = onClose ?: { navController.popBackStack() }
     val zone = remember { ZoneId.systemDefault() }
     val isNewTask = taskDetailViewModel.isNew
     val isLoading by taskDetailViewModel.isBusy.collectAsStateWithLifecycle()
@@ -113,6 +119,9 @@ fun TaskDetailScreen(
     val lists by taskDetailViewModel.lists.collectAsStateWithLifecycle()
     val allTags by taskDetailViewModel.allTags.collectAsStateWithLifecycle()
     val focusHistory by taskDetailViewModel.focusHistory.collectAsStateWithLifecycle()
+    val attachments by taskDetailViewModel.attachments.collectAsStateWithLifecycle()
+    val places by taskDetailViewModel.places.collectAsStateWithLifecycle()
+    val taskLocation by taskDetailViewModel.taskLocation.collectAsStateWithLifecycle()
     var breakdown by remember { mutableStateOf<TaskDetailEvent.BreakdownReady?>(null) }
 
     val dueDate: LocalDate? = dueAt?.let { Instant.ofEpochMilli(it).atZone(zone).toLocalDate() }
@@ -163,11 +172,11 @@ fun TaskDetailScreen(
                 }
                 TaskDetailEvent.Saved -> {
                     Toast.makeText(context, "Đã lưu công việc", Toast.LENGTH_SHORT).show()
-                    navController.popBackStack()
+                    close()
                 }
                 TaskDetailEvent.Deleted -> {
                     Toast.makeText(context, "Đã chuyển vào Thùng rác", Toast.LENGTH_SHORT).show()
-                    navController.popBackStack()
+                    close()
                 }
                 is TaskDetailEvent.Info -> Toast.makeText(context, event.message, Toast.LENGTH_SHORT).show()
                 is TaskDetailEvent.Error -> Toast.makeText(context, event.message, Toast.LENGTH_LONG).show()
@@ -178,7 +187,7 @@ fun TaskDetailScreen(
                 }
                 is TaskDetailEvent.Duplicated -> {
                     Toast.makeText(context, "Đã nhân bản — đang mở bản sao", Toast.LENGTH_SHORT).show()
-                    navController.navigate(Screen.TaskDetail.createRoute(event.taskId)) {
+                    if (onOpenTask != null) onOpenTask(event.taskId) else navController.navigate(Screen.TaskDetail.createRoute(event.taskId)) {
                         popUpTo(Screen.TaskDetail.route) { inclusive = true }
                     }
                 }
@@ -213,13 +222,14 @@ fun TaskDetailScreen(
     val tertiary = MaterialTheme.colorScheme.tertiary
 
     Scaffold(
+        modifier = Modifier.sharedTaskBounds(taskId),
         topBar = {
             Surface(color = MaterialTheme.colorScheme.primary, modifier = Modifier.fillMaxWidth()) {
                 Row(
                     modifier = Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 4.dp, vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    IconButton(onClick = { navController.popBackStack() }) {
+                    IconButton(onClick = close) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Quay lại", tint = MaterialTheme.colorScheme.onPrimary)
                     }
                     Text(
@@ -239,6 +249,15 @@ fun TaskDetailScreen(
                             canSkip = recurrence != "NONE" && dueAt != null && !isCompleted,
                             onSkip = taskDetailViewModel::skipOccurrence,
                             onDuplicate = taskDetailViewModel::duplicate,
+                            onAddToCalendar = if (dueAt == null) null else ({
+                                // Mở app Lịch của máy với sự kiện điền sẵn (Intent ACTION_INSERT — không cần quyền ghi lịch)
+                                val draftTask = com.example.todoapplication.domain.model.Task(
+                                    id = taskId, title = title, description = description, dueAt = dueAt, dueAllDay = dueAllDay,
+                                    startAt = startAt, estimatedMinutes = estimatedMinutes
+                                )
+                                runCatching { context.startActivity(com.example.todoapplication.data.calendar.DeviceCalendar.insertIntent(draftTask)) }
+                                    .onFailure { Toast.makeText(context, "Máy chưa có ứng dụng Lịch", Toast.LENGTH_SHORT).show() }
+                            }),
                             onDelete = taskDetailViewModel::delete
                         )
                     }
@@ -336,6 +355,8 @@ fun TaskDetailScreen(
                     shape = RoundedCornerShape(12.dp),
                     colors = fieldColors()
                 )
+                // Web / email / số điện thoại trong mô tả → bấm để mở
+                com.example.todoapplication.ui.components.LinkChips(description, Modifier.padding(top = 8.dp))
             }
 
             // ── Ngày của tôi ──
@@ -659,6 +680,28 @@ fun TaskDetailScreen(
                 }
             }
 
+            // ── Nhắc theo địa điểm (Geofencing) ──
+            DetailSection(emoji = "📍", title = "Nhắc theo địa điểm") {
+                LocationSection(
+                    enabled = !isNewTask,
+                    places = places,
+                    current = taskLocation,
+                    onSet = taskDetailViewModel::setLocation,
+                    onClear = taskDetailViewModel::clearLocation
+                )
+            }
+
+            // ── Đính kèm (ảnh / tài liệu quét) ──
+            DetailSection(emoji = "📎", title = "Đính kèm") {
+                AttachmentsSection(
+                    attachments = attachments,
+                    enabled = !isNewTask,
+                    onAdd = taskDetailViewModel::addAttachments,
+                    onDelete = taskDetailViewModel::deleteAttachment,
+                    onTextRecognized = { text -> description = if (description.isBlank()) text else description.trimEnd() + "\n\n" + text }
+                )
+            }
+
             // ── Lịch sử tập trung ──
             if (focusHistory.isNotEmpty()) {
                 DetailSection(emoji = "🍅", title = "Đã tập trung") {
@@ -887,7 +930,7 @@ private fun BreakdownDialog(
 }
 
 @Composable
-private fun DetailOverflowMenu(canSkip: Boolean, onSkip: () -> Unit, onDuplicate: () -> Unit, onDelete: () -> Unit) {
+private fun DetailOverflowMenu(canSkip: Boolean, onSkip: () -> Unit, onDuplicate: () -> Unit, onAddToCalendar: (() -> Unit)?, onDelete: () -> Unit) {
     var expanded by remember { mutableStateOf(false) }
     Box {
         IconButton(onClick = { expanded = true }) {
@@ -899,6 +942,13 @@ private fun DetailOverflowMenu(canSkip: Boolean, onSkip: () -> Unit, onDuplicate
                     text = { Text("Bỏ qua lần này") },
                     leadingIcon = { Icon(Icons.Default.SkipNext, contentDescription = null) },
                     onClick = { expanded = false; onSkip() }
+                )
+            }
+            if (onAddToCalendar != null) {
+                DropdownMenuItem(
+                    text = { Text("Thêm vào lịch của máy") },
+                    leadingIcon = { Icon(Icons.Default.EventAvailable, contentDescription = null) },
+                    onClick = { expanded = false; onAddToCalendar() }
                 )
             }
             DropdownMenuItem(
@@ -1030,3 +1080,19 @@ private fun fieldColors() = OutlinedTextFieldDefaults.colors(
     focusedContainerColor = MaterialTheme.colorScheme.surface,
     unfocusedContainerColor = MaterialTheme.colorScheme.surface
 )
+
+/**
+ * ViewModel chi tiết cho khung bên phải trên màn rộng: không có đích điều hướng riêng nên taskId được truyền
+ * qua CreationExtras (DEFAULT_ARGS_KEY) — createSavedStateHandle() của Factory đọc ra như khi mở bằng route.
+ * key theo taskId → đổi việc thì có ViewModel mới, quay lại việc cũ dùng lại cái cũ.
+ */
+@Composable
+fun rememberPaneDetailViewModel(taskId: String): TaskDetailViewModel {
+    val owner = checkNotNull(androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner.current)
+    val base = (owner as? androidx.lifecycle.HasDefaultViewModelProviderFactory)?.defaultViewModelCreationExtras
+        ?: androidx.lifecycle.viewmodel.CreationExtras.Empty
+    val extras = androidx.lifecycle.viewmodel.MutableCreationExtras(base).apply {
+        set(androidx.lifecycle.DEFAULT_ARGS_KEY, android.os.Bundle().apply { putString("taskId", taskId) })
+    }
+    return viewModel(key = "pane-$taskId", factory = TaskDetailViewModel.Factory, extras = extras)
+}

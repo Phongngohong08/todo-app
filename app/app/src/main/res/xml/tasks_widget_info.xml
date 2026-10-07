@@ -1,8 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Widget danh sách việc (Glance). Chọn nguồn khi đặt widget — không bắt buộc, sửa lại được (giữ widget để cấu hình). -->
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
     android:minWidth="250dp"
     android:minHeight="110dp"
-    android:updatePeriodMillis="0"
-    android:initialLayout="@layout/widget_tasks"
+    android:targetCellWidth="4"
+    android:targetCellHeight="3"
+    android:updatePeriodMillis="1800000"
+    android:initialLayout="@layout/glance_default_loading_layout"
+    android:configure="com.example.todoapplication.widget.TasksWidgetConfigActivity"
+    android:widgetFeatures="reconfigurable|configuration_optional"
+    android:description="@string/widget_tasks_description"
     android:resizeMode="horizontal|vertical"
     android:widgetCategory="home_screen" />

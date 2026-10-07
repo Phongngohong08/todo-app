@@ -171,6 +171,12 @@ class SettingsViewModel(
     val quietEnd: StateFlow<String> = localPrefs.quietEnd
     val alarmHighPriority: StateFlow<Boolean> = localPrefs.alarmHighPriority
     val appLockEnabled: StateFlow<Boolean> = localPrefs.appLockEnabled
+    val dailyCapacityMinutes: StateFlow<Int> = localPrefs.dailyCapacityMinutes
+    fun setDailyCapacityMinutes(v: Int) = localPrefs.setDailyCapacityMinutes(v)
+    val focusDnd: StateFlow<Boolean> = localPrefs.focusDnd
+    fun setFocusDnd(v: Boolean) = localPrefs.setFocusDnd(v)
+    val quickAddNotification: StateFlow<Boolean> = localPrefs.quickAddNotification
+    fun setQuickAddNotification(v: Boolean) = localPrefs.setQuickAddNotification(v)
 
     fun setNagMinutes(v: Int) = localPrefs.setNagMinutes(v)
     fun setNagHighOnly(v: Boolean) = localPrefs.setNagHighOnly(v)

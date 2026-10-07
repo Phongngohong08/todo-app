@@ -27,6 +27,8 @@ class HabitRepository(
     private val sync: SyncController,
     /** Đặt lại nhắc thói quen sau khi thói quen đổi (HabitReminderScheduler cần Context — test truyền rỗng). */
     private val rescheduleReminders: () -> Unit = {},
+    /** Sau khi đánh dấu / bỏ đánh dấu (làm mới widget thói quen). */
+    private val onCheckinChanged: () -> Unit = {},
     private val clock: () -> Long = System::currentTimeMillis
 ) {
     private val dao = db.habitDao()
@@ -86,6 +88,7 @@ class HabitRepository(
             dao.upsertCheckin(HabitCheckinEntity(habitId, date, next, isDirty = true))
             next
         }
+        onCheckinChanged()
         sync.requestSync(delayMillis = SYNC_DELAY_MS)
         return done
     }
@@ -116,6 +119,7 @@ class HabitRepository(
 
     private fun afterWrite() {
         rescheduleReminders()
+        onCheckinChanged()
         sync.requestSync(delayMillis = SYNC_DELAY_MS)
     }
 

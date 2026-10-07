@@ -61,11 +61,19 @@ fun TodayScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val focus by FocusSession.state.collectAsStateWithLifecycle()
     val habits by viewModel.habitsToday.collectAsStateWithLifecycle()
+    val todayEvents by viewModel.todayEvents.collectAsStateWithLifecycle()
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    androidx.lifecycle.compose.LifecycleEventEffect(androidx.lifecycle.Lifecycle.Event.ON_RESUME) { viewModel.reloadDeviceEvents(ctx) }
     val snackbar = remember { SnackbarHostState() }
+    // Lắc máy khi đang có thanh "Hoàn tác" → hoàn tác luôn (gia tốc kế)
+    com.example.todoapplication.ui.components.ShakeEffect {
+        snackbar.currentSnackbarData?.takeIf { it.visuals.actionLabel == "Hoàn tác" }?.performAction()
+    }
     val scope = rememberCoroutineScope()
     val askNotificationPermission = rememberNotificationPermissionRequest()
 
     var quickCreateText by remember { mutableStateOf<String?>(null) }
+    val startScan = com.example.todoapplication.ui.components.rememberScanToTasks { lines -> viewModel.createFromLines(lines) }
     var editingSlot by remember { mutableStateOf<Int?>(null) }
     var postponeTarget by remember { mutableStateOf<com.example.todoapplication.domain.model.Task?>(null) }
 
@@ -133,6 +141,12 @@ fun TodayScreen(
 
             item(key = "sync") { SyncBanner(state.isOnline, state.pendingSyncCount) }
 
+            // ── Lịch của máy hôm nay (CalendarContract) ──
+            if (todayEvents.isNotEmpty()) {
+                item(key = "events-header") { SectionHeader("📆 Lịch hôm nay", todayEvents.size) }
+                items(todayEvents, key = { "ev-" + it.id + "-" + it.begin }) { DeviceEventRow(it) }
+            }
+
             // ── Ngày của tôi ──
             item(key = "myday-header") {
                 SectionHeader("☀ Ngày của tôi", state.myDay.size - state.myDayDone)
@@ -162,6 +176,7 @@ fun TodayScreen(
                             onToggleMyDay = { viewModel.removeFromMyDay(task) },
                             onFocus = { navController.navigate(Screen.Focus.createRoute(task.id)) },
                             onDuplicate = { viewModel.duplicate(task) },
+                            onPostpone = if (task.isCompleted) null else ({ postponeTarget = task }),
                             today = state.today
                         )
                     }
@@ -271,7 +286,8 @@ fun TodayScreen(
             onTemplates = {
                 quickCreateText = null
                 navController.navigate(Screen.Templates.route)
-            }
+            },
+            onScan = { quickCreateText = null; startScan() }
         )
     }
 }

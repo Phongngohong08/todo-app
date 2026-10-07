@@ -142,3 +142,29 @@ val MIGRATION_6_7: Migration = object : Migration(6, 7) {
         db.execSQL("CREATE INDEX IF NOT EXISTS `index_focus_sessions_startedAt` ON `focus_sessions` (`startedAt`)")
     }
 }
+
+/**
+ * v7 → v8: tệp đính kèm, địa điểm đã lưu và nhắc theo địa điểm — dữ liệu riêng tư CHỈ trên máy (không đồng bộ).
+ * Chỉ tạo bảng mới. Câu lệnh phải khớp schema Room sinh ra (app/schemas/.../8.json) — MigrationTest kiểm tra.
+ */
+val MIGRATION_7_8: Migration = object : Migration(7, 8) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `attachments` (`id` TEXT NOT NULL, `taskId` TEXT NOT NULL, `fileName` TEXT NOT NULL, " +
+                "`mimeType` TEXT NOT NULL, `createdAt` INTEGER NOT NULL, PRIMARY KEY(`id`), " +
+                "FOREIGN KEY(`taskId`) REFERENCES `tasks`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )"
+        )
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_attachments_taskId` ON `attachments` (`taskId`)")
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `places` (`id` TEXT NOT NULL, `name` TEXT NOT NULL, `latitude` REAL NOT NULL, " +
+                "`longitude` REAL NOT NULL, `radiusMeters` INTEGER NOT NULL, PRIMARY KEY(`id`))"
+        )
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `task_locations` (`taskId` TEXT NOT NULL, `placeId` TEXT NOT NULL, `trigger` TEXT NOT NULL, " +
+                "PRIMARY KEY(`taskId`), " +
+                "FOREIGN KEY(`taskId`) REFERENCES `tasks`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , " +
+                "FOREIGN KEY(`placeId`) REFERENCES `places`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )"
+        )
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_task_locations_placeId` ON `task_locations` (`placeId`)")
+    }
+}

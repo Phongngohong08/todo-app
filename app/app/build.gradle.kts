@@ -31,6 +31,13 @@ android {
                 "proguard-rules.pro"
             )
         }
+        // Bản đo hiệu năng (Macrobenchmark): giống release (R8, không debuggable) nhưng ký bằng khóa debug để cài được
+        create("benchmark") {
+            initWith(getByName("release"))
+            signingConfig = signingConfigs.getByName("debug")
+            proguardFiles("benchmark-rules.pro")
+            matchingFallbacks += listOf("release")
+        }
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
@@ -76,6 +83,31 @@ dependencies {
 
     // Khóa ứng dụng bằng vân tay / khuôn mặt / mã PIN máy
     implementation(libs.androidx.biometric)
+
+    // Widget màn hình chính viết bằng Compose (Jetpack Glance)
+    implementation(libs.androidx.glance.appwidget)
+    implementation(libs.androidx.glance.material3)
+
+    // Cài đặt trên máy (thay SharedPreferences)
+    implementation(libs.androidx.datastore.preferences)
+
+    // Tải dần danh sách dài (Lịch sử, Thùng rác)
+    implementation(libs.androidx.paging.runtime)
+    implementation(libs.androidx.paging.compose)
+    implementation(libs.androidx.room.paging)
+
+    // Quét tài liệu + nhận chữ trên máy (ML Kit, chạy offline)
+    implementation(libs.mlkit.text.recognition)
+    implementation(libs.mlkit.document.scanner)
+
+    // Nhắc theo địa điểm (Geofencing) + vị trí hiện tại
+    implementation(libs.play.services.location)
+
+    // Giao diện thích ứng (điện thoại / tablet / màn gập)
+    implementation(libs.androidx.compose.material3.window.size)
+
+    // Cài Baseline Profile khi cài app → khởi động / cuộn nhanh hơn
+    implementation(libs.androidx.profileinstaller)
 
     // Background reminders / notifications
     implementation(libs.androidx.work.runtime.ktx)

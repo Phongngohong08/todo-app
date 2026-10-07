@@ -24,3 +24,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "Todo Application"
 include(":app")
+include(":macrobenchmark")

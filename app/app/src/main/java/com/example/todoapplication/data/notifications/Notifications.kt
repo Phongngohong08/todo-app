@@ -18,10 +18,16 @@ object Notifications {
     const val CHANNEL_DIGEST = "daily_digest"
     const val CHANNEL_FOCUS = "focus_timer"
     const val CHANNEL_ALARM = "task_alarms"
+    const val CHANNEL_FOCUS_ONGOING = "focus_ongoing"
+    const val CHANNEL_QUICK_ADD = "quick_add"
 
     const val ID_DIGEST = 7001
     const val ID_WEEKLY_REVIEW = 7002
     const val ID_FOCUS = 7003
+    /** Thông báo cố định của FocusService (đếm ngược). */
+    const val ID_FOCUS_ONGOING = 7004
+    /** Thông báo cố định "Thêm việc nhanh" (gõ trả lời ngay trên thông báo). */
+    const val ID_QUICK_ADD = 7005
 
     /** Mỗi việc một id thông báo báo thức riêng (khác id nhắc việc thường). */
     fun alarmId(taskId: String): Int = taskId.hashCode() xor 0x5A5A_0000
@@ -37,6 +43,11 @@ object Notifications {
                     .apply { description = "Tóm tắt việc cần làm buổi sáng và tổng kết cuối tuần" },
                 NotificationChannel(CHANNEL_FOCUS, "Hẹn giờ tập trung", NotificationManager.IMPORTANCE_HIGH)
                     .apply { description = "Báo khi hết phiên tập trung hoặc giờ nghỉ" },
+                // Thông báo cố định: không kêu, không rung
+                NotificationChannel(CHANNEL_FOCUS_ONGOING, "Đang tập trung", NotificationManager.IMPORTANCE_LOW)
+                    .apply { description = "Đồng hồ đếm ngược của phiên tập trung đang chạy" },
+                NotificationChannel(CHANNEL_QUICK_ADD, "Thêm việc nhanh", NotificationManager.IMPORTANCE_LOW)
+                    .apply { description = "Ô thêm việc cố định trên thanh thông báo" },
                 // Kênh báo thức: âm báo thức của máy, phát theo luồng báo thức (kêu cả khi để im lặng thông báo)
                 NotificationChannel(CHANNEL_ALARM, "Báo thức việc quan trọng", NotificationManager.IMPORTANCE_HIGH).apply {
                     description = "Đổ chuông toàn màn hình khi việc ưu tiên cao đến hạn"

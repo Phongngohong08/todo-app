@@ -12,8 +12,20 @@
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
     <!-- Khởi động lại máy → đặt lại báo thức (AlarmManager không tự giữ qua lần khởi động) -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- Phiên tập trung chạy bằng Foreground Service (đếm ngược trên thông báo cố định) -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <!-- Bật "Không làm phiền" trong lúc tập trung (người dùng cấp trong Cài đặt) -->
+    <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
+    <!-- Đọc lịch của máy (CalendarContract) để hiện sự kiện và tránh giờ bận khi AI lập lịch -->
+    <uses-permission android:name="android.permission.READ_CALENDAR" />
+    <!-- Nhắc theo địa điểm (Geofencing): vị trí chính xác + vị trí nền (người dùng cấp riêng, Android 10+) -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
 
     <application
+        android:enableOnBackInvokedCallback="true"
         android:name=".TodoApplication"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
@@ -24,6 +36,9 @@
         android:supportsRtl="true"
         android:networkSecurityConfig="@xml/network_security_config"
         android:theme="@style/Theme.TodoApplication">
+        <!-- Cho phép Macrobenchmark / Android Studio đo hiệu năng bản release -->
+        <profileable android:shell="true" />
+
         <!-- singleTop: mở từ thông báo / widget / shortcut khi app đang chạy → onNewIntent, không chồng thêm màn -->
         <activity
             android:name=".MainActivity"
@@ -59,14 +74,16 @@
             android:taskAffinity=""
             android:theme="@style/Theme.TodoApplication.Translucent" />
 
-        <!-- Thao tác trên widget: hoàn thành việc / mở việc (không có giao diện, đóng ngay) -->
+        <!-- Chọn nguồn việc khi đặt widget danh sách (Glance) -->
         <activity
-            android:name=".widget.WidgetActionActivity"
-            android:exported="false"
+            android:name=".widget.TasksWidgetConfigActivity"
+            android:exported="true"
             android:excludeFromRecents="true"
-            android:noHistory="true"
-            android:taskAffinity=""
-            android:theme="@style/Theme.TodoApplication.Translucent" />
+            android:theme="@style/Theme.TodoApplication">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
+            </intent-filter>
+        </activity>
 
         <!-- Nhận hành động Hoàn thành / Hoãn từ thông báo nhắc việc -->
         <!-- Báo thức việc quan trọng: hiện trên màn hình khóa, tự bật màn hình -->
@@ -98,12 +115,22 @@
             android:name=".data.notifications.NotificationActionReceiver"
             android:exported="false" />
 
+        <!-- Geofencing báo vào / ra vùng của địa điểm đã lưu -->
+        <receiver
+            android:name=".data.location.GeofenceReceiver"
+            android:exported="false" />
+
+        <!-- Ô "Thêm việc nhanh" cố định trên thanh thông báo (gõ trả lời trực tiếp) -->
+        <receiver
+            android:name=".data.notifications.QuickAddReceiver"
+            android:exported="false" />
+
         <!-- Nút "Đã làm" trên thông báo nhắc thói quen -->
         <receiver
             android:name=".data.notifications.HabitActionReceiver"
             android:exported="false" />
 
-        <!-- Widget màn hình chính: danh sách việc cần làm -->
+        <!-- Widget màn hình chính (Jetpack Glance): danh sách việc cần làm -->
         <receiver
             android:name=".widget.TasksWidgetProvider"
             android:exported="false">
@@ -127,10 +154,60 @@
                 android:resource="@xml/tasks_widget_compact_info" />
         </receiver>
 
+        <!-- Widget thói quen hôm nay (Glance) -->
+        <receiver
+            android:name=".widget.HabitsWidgetProvider"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/habits_widget_info" />
+        </receiver>
+
+        <!-- ContentProvider của app: chia sẻ tệp đính kèm / tệp xuất cho app khác qua content:// -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
+        <!-- Phiên tập trung: thông báo cố định đếm ngược + Không làm phiền -->
         <service
-            android:name=".widget.TasksWidgetService"
-            android:permission="android.permission.BIND_REMOTEVIEWS"
-            android:exported="false" />
+            android:name=".data.notifications.FocusService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="User-started Pomodoro focus countdown shown as an ongoing notification" />
+        </service>
+
+        <!-- Ô cài đặt nhanh (kéo thanh thông báo xuống): Tập trung, Thêm việc -->
+        <service
+            android:name=".ui.tiles.FocusTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_shortcut_focus"
+            android:label="Tập trung"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+        <service
+            android:name=".ui.tiles.QuickAddTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_shortcut_add"
+            android:label="Thêm việc"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
     </application>
 
 </manifest>

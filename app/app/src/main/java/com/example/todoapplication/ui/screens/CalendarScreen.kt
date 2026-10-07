@@ -18,6 +18,13 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
+import com.example.todoapplication.data.calendar.DeviceCalendar
+import com.example.todoapplication.data.calendar.DeviceEvent
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -68,10 +75,21 @@ fun CalendarScreen(
     calendarViewModel: CalendarViewModel = viewModel(factory = CalendarViewModel.Factory)
 ) {
     val state by calendarViewModel.uiState.collectAsStateWithLifecycle()
+    val capacity by calendarViewModel.dailyCapacityMinutes.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     var modeName by rememberSaveable { mutableStateOf(CalendarMode.MONTH.name) }
     val mode = CalendarMode.valueOf(modeName)
     val openTask: (String) -> Unit = { navController.navigate(Screen.TaskDetail.createRoute(it)) }
+
+    val context = LocalContext.current
+    val showDevice by calendarViewModel.showDeviceCalendar.collectAsStateWithLifecycle()
+    val deviceEvents by calendarViewModel.deviceEvents.collectAsStateWithLifecycle()
+    val calendarPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        calendarViewModel.setShowDeviceCalendar(granted, context)
+        if (!granted) android.widget.Toast.makeText(context, "Cần quyền đọc lịch để hiện sự kiện của máy", android.widget.Toast.LENGTH_SHORT).show()
+    }
+    // Quay lại app (có thể vừa thêm sự kiện ở app Lịch) → đọc lại
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { calendarViewModel.reloadDeviceEvents(context) }
 
     LaunchedEffect(Unit) {
         calendarViewModel.events.collect { event ->
@@ -94,13 +112,28 @@ fun CalendarScreen(
         containerColor = MaterialTheme.colorScheme.background
     ) { innerPadding ->
         Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
-            Text(
-                "Lịch công việc",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.statusBarsPadding().padding(horizontal = 20.dp, vertical = 12.dp)
-            )
+            Row(
+                Modifier.fillMaxWidth().statusBarsPadding().padding(start = 20.dp, end = 8.dp, top = 4.dp, bottom = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "Lịch công việc",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.weight(1f)
+                )
+                // Bật / tắt hiện sự kiện của lịch máy (xin quyền READ_CALENDAR lần đầu)
+                FilterChip(
+                    selected = showDevice,
+                    onClick = {
+                        if (showDevice) calendarViewModel.setShowDeviceCalendar(false, context)
+                        else if (DeviceCalendar.hasPermission(context)) calendarViewModel.setShowDeviceCalendar(true, context)
+                        else calendarPermission.launch(android.Manifest.permission.READ_CALENDAR)
+                    },
+                    label = { Text("📆 Lịch của máy", fontSize = 12.sp) }
+                )
+            }
             SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
                 CalendarMode.entries.forEachIndexed { index, m ->
                     SegmentedButton(
@@ -117,9 +150,9 @@ fun CalendarScreen(
                     CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                 }
             } else when (mode) {
-                CalendarMode.MONTH -> MonthView(state, openTask)
-                CalendarMode.WEEK -> WeekView(state, openTask, calendarViewModel::moveTask)
-                CalendarMode.AGENDA -> AgendaView(state, openTask, calendarViewModel::complete)
+                CalendarMode.MONTH -> MonthView(state, deviceEvents, openTask)
+                CalendarMode.WEEK -> WeekView(state, deviceEvents, capacity, openTask, calendarViewModel::moveTask)
+                CalendarMode.AGENDA -> AgendaView(state, deviceEvents, openTask, calendarViewModel::complete)
             }
         }
     }
@@ -128,7 +161,7 @@ fun CalendarScreen(
 // ─── Tháng ───────────────────────────────────────────────────────────────────
 
 @Composable
-private fun ColumnScope.MonthView(state: CalendarUiState, openTask: (String) -> Unit) {
+private fun ColumnScope.MonthView(state: CalendarUiState, deviceEvents: Map<String, List<DeviceEvent>>, openTask: (String) -> Unit) {
     val primary = MaterialTheme.colorScheme.primary
     val today = remember { LocalDate.now() }
     var shown by rememberSaveable { mutableStateOf(today.withDayOfMonth(1).toString()) }
@@ -191,14 +224,23 @@ private fun ColumnScope.MonthView(state: CalendarUiState, openTask: (String) -> 
                                     fontWeight = if (isToday || isSelected) FontWeight.Bold else FontWeight.Normal,
                                     color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
                                 )
-                                if (entries.isNotEmpty()) {
+                                val dayEvents = deviceEvents[key].orEmpty()
+                                if (entries.isNotEmpty() || dayEvents.isNotEmpty()) {
                                     Spacer(Modifier.height(2.dp))
-                                    Box(
-                                        modifier = Modifier
-                                            .size(5.dp)
-                                            .clip(CircleShape)
-                                            .background(if (isSelected) MaterialTheme.colorScheme.onPrimary else priorityDotColor(entries))
-                                    )
+                                    Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                                        if (entries.isNotEmpty()) Box(
+                                            modifier = Modifier
+                                                .size(5.dp)
+                                                .clip(CircleShape)
+                                                .background(if (isSelected) MaterialTheme.colorScheme.onPrimary else priorityDotColor(entries))
+                                        )
+                                        // Chấm vuông = có sự kiện trong lịch của máy
+                                        if (dayEvents.isNotEmpty()) Box(
+                                            modifier = Modifier
+                                                .size(5.dp)
+                                                .background(if (isSelected) MaterialTheme.colorScheme.onPrimary else Color(dayEvents.first().color))
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -212,6 +254,7 @@ private fun ColumnScope.MonthView(state: CalendarUiState, openTask: (String) -> 
 
     val date = LocalDate.parse(selectedDay)
     val selected = state.entriesByDay[selectedDay].orEmpty()
+    val selectedEvents = deviceEvents[selectedDay].orEmpty()
     Text(
         "Công việc ${dayTitle(date, today)}",
         fontWeight = FontWeight.Bold,
@@ -219,7 +262,7 @@ private fun ColumnScope.MonthView(state: CalendarUiState, openTask: (String) -> 
         color = MaterialTheme.colorScheme.onSurface,
         modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp)
     )
-    if (selected.isEmpty()) {
+    if (selected.isEmpty() && selectedEvents.isEmpty()) {
         Box(modifier = Modifier.fillMaxWidth().padding(top = 24.dp), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text("📭", fontSize = 36.sp)
@@ -232,6 +275,7 @@ private fun ColumnScope.MonthView(state: CalendarUiState, openTask: (String) -> 
             contentPadding = PaddingValues(horizontal = 20.dp, vertical = 6.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            items(selectedEvents, key = { "ev-" + it.id + "-" + it.begin }) { DeviceEventRow(it) }
             items(selected, key = { it.task.id + it.isProjected }) { entry ->
                 EntryRow(entry, onClick = { openTask(entry.task.id) })
             }
@@ -251,7 +295,7 @@ private fun WeekdayHeader() {
 // ─── Tuần (kéo thả đổi ngày) ─────────────────────────────────────────────────
 
 @Composable
-private fun ColumnScope.WeekView(state: CalendarUiState, openTask: (String) -> Unit, onMove: (String, LocalDate) -> Unit) {
+private fun ColumnScope.WeekView(state: CalendarUiState, deviceEvents: Map<String, List<DeviceEvent>>, capacity: Int, openTask: (String) -> Unit, onMove: (String, LocalDate) -> Unit) {
     val primary = MaterialTheme.colorScheme.primary
     val today = remember { LocalDate.now() }
     var weekStartKey by rememberSaveable { mutableStateOf(today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)).toString()) }
@@ -309,6 +353,8 @@ private fun ColumnScope.WeekView(state: CalendarUiState, openTask: (String) -> U
                     date = date,
                     today = today,
                     entries = state.entriesByDay[date.toString()].orEmpty(),
+                    events = deviceEvents[date.toString()].orEmpty(),
+                    capacity = capacity,
                     dragState = dragState,
                     openTask = openTask,
                     onMove = onMove
@@ -318,12 +364,25 @@ private fun ColumnScope.WeekView(state: CalendarUiState, openTask: (String) -> U
     }
 }
 
+/** Tổng thời lượng ước tính (phút) của các việc chưa xong trong ngày, kể cả lần lặp dự kiến. */
+private fun dayLoadMinutes(entries: List<CalendarEntry>): Int =
+    entries.filter { !it.task.isCompleted }.sumOf { it.task.estimatedMinutes }
+
+/** "45p", "2g", "2g30". */
+private fun compactDuration(minutes: Int): String = when {
+    minutes < 60 -> "${minutes}p"
+    minutes % 60 == 0 -> "${minutes / 60}g"
+    else -> "${minutes / 60}g${minutes % 60}"
+}
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun WeekDayRow(
     date: LocalDate,
     today: LocalDate,
     entries: List<CalendarEntry>,
+    events: List<DeviceEvent>,
+    capacity: Int,
     dragState: DragDropState<LocalDate>,
     openTask: (String) -> Unit,
     onMove: (String, LocalDate) -> Unit
@@ -358,8 +417,18 @@ private fun WeekDayRow(
                     fontWeight = FontWeight.Bold,
                     color = if (isToday) primary else MaterialTheme.colorScheme.onSurface
                 )
+                // Tải trong ngày: tổng thời lượng ước tính của việc chưa xong, đỏ khi vượt số giờ làm việc
+                val load = dayLoadMinutes(entries)
+                if (load > 0) {
+                    Text(
+                        compactDuration(load),
+                        fontSize = 10.sp,
+                        fontWeight = if (load > capacity) FontWeight.Bold else FontWeight.Normal,
+                        color = if (load > capacity) StateOverdue else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
-            if (entries.isEmpty()) {
+            if (entries.isEmpty() && events.isEmpty()) {
                 Text(
                     "—",
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
@@ -371,6 +440,7 @@ private fun WeekDayRow(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
+                    events.forEach { e -> key("ev", e.id, e.begin) { DeviceEventChip(e) } }
                     entries.forEach { entry ->
                         val task = entry.task
                         val draggable = !entry.isProjected && !task.isCompleted
@@ -420,11 +490,12 @@ private fun TaskChip(entry: CalendarEntry, modifier: Modifier, onClick: () -> Un
 // ─── Lịch trình ──────────────────────────────────────────────────────────────
 
 @Composable
-private fun ColumnScope.AgendaView(state: CalendarUiState, openTask: (String) -> Unit, onToggle: (com.example.todoapplication.domain.model.Task) -> Unit) {
+private fun ColumnScope.AgendaView(state: CalendarUiState, deviceEvents: Map<String, List<DeviceEvent>>, openTask: (String) -> Unit, onToggle: (com.example.todoapplication.domain.model.Task) -> Unit) {
     val today = remember { LocalDate.now() }
-    val days = remember(state.entriesByDay, today) {
+    val days = remember(state.entriesByDay, deviceEvents, today) {
         (0L until AGENDA_DAYS).map { today.plusDays(it) }
-            .mapNotNull { d -> state.entriesByDay[d.toString()]?.takeIf { it.isNotEmpty() }?.let { d to it } }
+            .filter { d -> state.entriesByDay[d.toString()].orEmpty().isNotEmpty() || deviceEvents[d.toString()].orEmpty().isNotEmpty() }
+            .map { d -> d to state.entriesByDay[d.toString()].orEmpty() }
     }
     if (days.isEmpty()) {
         Box(Modifier.fillMaxWidth().padding(top = 48.dp), contentAlignment = Alignment.Center) {
@@ -450,6 +521,7 @@ private fun ColumnScope.AgendaView(state: CalendarUiState, openTask: (String) ->
                     modifier = Modifier.padding(top = 8.dp)
                 )
             }
+            items(deviceEvents[date.toString()].orEmpty(), key = { "ev-$date-${it.id}-${it.begin}" }) { DeviceEventRow(it) }
             items(entries, key = { "$date-${it.task.id}-${it.isProjected}" }) { entry ->
                 EntryRow(entry, onClick = { openTask(entry.task.id) }, onToggle = if (entry.isProjected) null else ({ onToggle(entry.task) }))
             }
@@ -510,5 +582,53 @@ private fun priorityDotColor(entries: List<CalendarEntry>): Color {
         entries.any { it.task.priority == "HIGH" } -> PriorityHighColor
         entries.any { it.task.priority == "MEDIUM" } -> PriorityMediumColor
         else -> PriorityLowColor
+    }
+}
+
+// ─── Sự kiện của lịch máy ────────────────────────────────────────────────────
+
+private fun eventTime(e: DeviceEvent): String =
+    if (e.allDay) "Cả ngày" else formatTime(e.begin) + "–" + formatTime(e.end)
+
+/** Dòng sự kiện (chỉ xem — sửa trong app Lịch của máy; bấm để mở sự kiện đó). */
+@Composable
+fun DeviceEventRow(e: DeviceEvent) {
+    val context = LocalContext.current
+    Surface(
+        shape = RoundedCornerShape(14.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+        modifier = Modifier.fillMaxWidth().clickable {
+            runCatching {
+                context.startActivity(
+                    android.content.Intent(
+                        android.content.Intent.ACTION_VIEW,
+                        android.content.ContentUris.withAppendedId(android.provider.CalendarContract.Events.CONTENT_URI, e.id)
+                    )
+                )
+            }
+        }
+    ) {
+        Row(Modifier.padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.width(4.dp).height(32.dp).clip(RoundedCornerShape(2.dp)).background(Color(e.color)))
+            Spacer(Modifier.width(10.dp))
+            Column(Modifier.weight(1f)) {
+                Text(e.title, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onSurface)
+                Text("📆 " + eventTime(e) + " · " + e.calendarName, fontSize = 11.sp, maxLines = 1, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    }
+}
+
+@Composable
+private fun DeviceEventChip(e: DeviceEvent) {
+    Surface(shape = RoundedCornerShape(10.dp), color = Color(e.color).copy(alpha = 0.16f)) {
+        Text(
+            "📆 " + (if (e.allDay) "" else formatTime(e.begin) + " ") + e.title,
+            fontSize = 12.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp).widthIn(max = 200.dp)
+        )
     }
 }

@@ -46,6 +46,8 @@ Thanh điều hướng dưới có 4 tab:
 | 📅 **Lịch** | Xem việc theo tháng / tuần (kéo thả đổi ngày) / lịch trình 30 ngày |
 | 👤 **Tôi** | Mục tiêu & chuỗi ngày, thống kê & thời gian tập trung, thói quen, danh sách, tổng kết tuần, AI Coach, lịch sử, thùng rác, thiết lập |
 
+Trên **tablet, màn ngang hoặc máy gập mở**, thanh điều hướng chuyển sang **cột bên trái**; trên màn đủ rộng, tab **Việc làm** hiện **danh sách và chi tiết cạnh nhau** (bấm một việc là xem/sửa ngay bên phải). Mọi thao tác vuốt / kéo thả đều có lựa chọn thay thế trong menu hành động của **TalkBack**.
+
 ---
 
 ## 3. Tab Hôm nay: Ngày của tôi & lịch trình AI
@@ -109,6 +111,7 @@ Việc không chọn danh sách sẽ vào **📥 Hộp thư đến** (trước �
 - Phần app không nhận ra thì chọn bằng chip bên dưới (**Hạn**, **Danh mục**, **Ưu tiên**).
 - **Chi tiết**: mở form đầy đủ với nội dung đã điền. **Mẫu**: thư viện việc làm sẵn. **AI**: gửi câu dài/phức tạp cho AI phân tích (cần mạng).
 - Ô trống thì có các **mẫu gợi ý** (💧 Uống nước, 📚 Học tập…) để điền nhanh.
+- **📷 Quét**: chụp tờ giấy ghi việc / bảng trắng → app nhận chữ (trên máy, không cần mạng) → mỗi dòng thành một việc; bỏ chọn dòng không cần rồi bấm **Tạo việc**. Ngày giờ, !ưu tiên, #danh sách, @nhãn trong từng dòng vẫn được hiểu.
 
 ---
 
@@ -160,7 +163,7 @@ Nút **▦** ở thẻ đầu trang mở ma trận 4 ô: **Làm ngay** (quan tr�
 
 Bấm vào thẻ để mở. Các mục:
 
-1. **📝 Tên & Mô tả**.
+1. **📝 Tên & Mô tả**. Địa chỉ web, email, số điện thoại trong mô tả hiện thành **chip bấm được** (mở trình duyệt / soạn email / gọi điện).
 2. **☀ Ngày của tôi** — công tắc thêm/bỏ việc khỏi danh sách hôm nay.
 3. **🎯 Độ ưu tiên** — Thấp / Trung bình / Cao.
 4. **📅 Hạn chót** — chọn nhanh (Hôm nay / Ngày mai / 3 ngày sau / Cuối tuần / Không), hoặc chọn **ngày** và (tùy chọn) **giờ**. Không chọn giờ = **Cả ngày**. Khi có giờ, thêm được **giờ bắt đầu** để thành **khung giờ** (vd *09:00 → 10:30*): lời nhắc tính theo giờ bắt đầu, lịch hiện *09:00–10:30*, và nếu chưa ước tính thời lượng thì lấy luôn độ dài khung giờ. Dời hạn (vuốt hoãn, kéo trên lịch…) thì khung giờ dời theo.
@@ -170,9 +173,11 @@ Bấm vào thẻ để mở. Các mục:
 8. **🔁 Lặp lại** — xem [mục 7](#7-việc-lặp-lại).
 9. **🔔 Lời nhắc** — **chọn được nhiều lời nhắc** (tối đa 5), vd *trước 1 ngày* + *trước 30 phút* + *đúng giờ*. Việc có giờ: đúng giờ / trước 5, 10, 30 phút, 1 giờ, 1 ngày. Việc cả ngày: buổi sáng của ngày đến hạn (giờ đặt trong Thiết lập) hoặc trước 1 ngày.
 10. **🍅 Đã tập trung** — số phiên Pomodoro và tổng thời gian đã làm việc này (so với ước tính).
+- **📍 Nhắc theo địa điểm** — chọn địa điểm đã lưu (*Nhà, Công ty…*) và **Khi đến / Khi rời**: điện thoại báo đúng lúc bạn tới hoặc rời nơi đó, kể cả khi đóng app. Bấm **Lưu vị trí hiện tại thành địa điểm** để thêm (đặt tên, bán kính 100 / 200 / 500 m). Lần đầu app xin quyền vị trí, rồi xin "**Luôn cho phép**" (vị trí nền). Địa điểm chỉ lưu trên máy này.
+- **📎 Đính kèm** — **Quét tài liệu** (giấy tờ, hóa đơn, bảng trắng: tự cắt mép, làm phẳng) hoặc **Chọn ảnh** từ thư viện. Bấm ảnh để mở, **nhấn giữ** để *Nhận chữ → thêm vào mô tả* (chạy trên máy, không cần mạng) hoặc xóa. Đính kèm chỉ lưu trên máy này.
 11. **✅ Các bước con** — checklist có thanh tiến độ. Mỗi bước có thể có **hạn riêng** (bấm 📅 cạnh bước; nhấn giữ ngày để bỏ) — bước đến hạn / quá hạn sẽ được **gợi ý ở tab Hôm nay**. **✨ Nhờ AI chia nhỏ việc này**: AI gợi ý các bước (dựa trên tiêu đề + mô tả đang gõ), bạn bỏ chọn bước không cần rồi bấm **Thêm**; nếu chưa đặt thời lượng, có thể áp luôn thời lượng AI ước tính. Cần mạng.
 
-Trên thanh tiêu đề (việc đã có): **⏱** bắt đầu tập trung; **⋮ → Bỏ qua lần này** (việc lặp) · **Nhân bản** (tạo bản sao gồm cả bước con, rồi mở bản sao) · **Xóa**.
+Trên thanh tiêu đề (việc đã có): **⏱** bắt đầu tập trung; **⋮ → Bỏ qua lần này** (việc lặp) · **Nhân bản** (tạo bản sao gồm cả bước con, rồi mở bản sao) · **Thêm vào lịch của máy** (mở app Lịch với sự kiện điền sẵn — khung giờ hoặc thời lượng ước tính) · **Xóa**.
 
 ---
 
@@ -193,7 +198,10 @@ Trên thanh tiêu đề (việc đã có): **⏱** bắt đầu tập trung; **�
 
 - Mở từ: nút **▶** trên lịch trình AI, **⋮ → Bắt đầu tập trung** trên thẻ, nút **⏱** trong chi tiết, hoặc lối tắt **Tập trung** (nhấn giữ icon app).
 - Một phiên **25 phút** tập trung → nghỉ **5 phút**. 🍅 đếm số phiên đã xong cho việc đó.
-- Đóng app vẫn đếm đúng; hết giờ có thông báo (kèm nút **Việc đã xong**). Khi đang chạy, tab Hôm nay hiện thanh đếm ngược nhỏ.
+- Đóng app vẫn đếm đúng; hết giờ có thông báo (kèm nút **Việc đã xong**). Khi đang chạy, tab Hôm nay hiện thanh đếm ngược nhỏ. Trong lúc chạy có **thông báo cố định đếm ngược** (thấy cả trên màn khóa) với nút **Dừng**.
+- **Úp máy xuống bàn** khi đang ở màn Tập trung để bắt đầu phiên mới (máy rung xác nhận).
+- **Không làm phiền**: bật trong *Thiết lập → 📲 Tiện ích hệ thống* — app tự bật chế độ Không làm phiền của máy khi bắt đầu tập trung và trả lại như cũ khi xong.
+- **Ô cài đặt nhanh "Tập trung"** (kéo thanh thông báo xuống): bấm để bắt đầu 25 phút, bấm lần nữa để dừng.
 - **✓ Việc đã xong**: hoàn thành việc và kết thúc phiên.
 - Mỗi phiên tập trung xong (hoặc dừng sớm sau ít nhất 5 phút) được **lưu vào lịch sử** và đồng bộ theo tài khoản: xem ở **Tôi → 🍅 Tập trung** (phút hôm nay, 7 ngày, việc tập trung nhiều nhất) và trong chi tiết từng việc.
 
@@ -203,9 +211,10 @@ Trên thanh tiêu đề (việc đã có): **⏱** bắt đầu tập trung; **�
 
 Ba cách xem (nút chuyển ở đầu màn):
 - **Tháng**: **◀ ▶** chuyển tháng; ngày có việc có **chấm màu** theo độ ưu tiên. Bấm một ngày để xem danh sách việc.
-- **Tuần**: 7 ngày của tuần, mỗi ngày một hàng. **Nhấn giữ một việc rồi kéo sang ngày khác** để dời hạn (giữ nguyên giờ, có Hoàn tác). "Về tuần này" để quay lại.
+- **Tuần**: 7 ngày của tuần, mỗi ngày một hàng. **Nhấn giữ một việc rồi kéo sang ngày khác** để dời hạn (giữ nguyên giờ, có Hoàn tác). "Về tuần này" để quay lại. Dưới số ngày là **tổng thời lượng ước tính** của các việc trong ngày (vd *5g30*) — tô **đỏ** khi vượt số giờ làm việc mỗi ngày (*Thiết lập → 🗓 Kế hoạch*, mặc định 8 giờ).
 - **Lịch trình**: mọi việc có hạn trong 30 ngày tới, gom theo ngày; tích ô tròn để hoàn thành ngay.
 - Việc lặp hiện ở **tất cả các ngày lặp** trong 12 tháng tới (tôn trọng "mỗi N" và ngày kết thúc); các lần tương lai hiện **mờ** với nhãn "dự kiến" và không kéo được.
+- **📆 Lịch của máy** (nút ở góc trên): hiện sự kiện của Google Calendar / Outlook… đã có trên điện thoại (chấm vuông trong lịch tháng, chip trong lịch tuần, dòng trong lịch trình; bấm để mở trong app Lịch). Sự kiện hôm nay cũng hiện ở tab Hôm nay, và **Lịch trình AI xếp việc tránh các giờ bận** này. App chỉ đọc, không sửa lịch của bạn.
 - Bấm việc để mở chi tiết.
 
 ---
@@ -250,11 +259,13 @@ Tối Chủ nhật 19:00 app gửi thông báo nhắc xem Tổng kết tuần (t
 - **Nhắc việc**: theo mục 🔔 Lời nhắc trong chi tiết (không cần mạng). Việc cả ngày được nhắc vào giờ mặc định buổi sáng (Thiết lập → Thông báo).
 - Trên thông báo nhắc việc có 3 nút:
   - **Hoàn thành** — đánh dấu xong ngay (cả khi không có mạng).
-  - **Hoãn 1 giờ**.
-  - **Hoãn…** — chọn *15 phút nữa / 1 giờ / 3 giờ / Tối nay 20:00 / Sáng mai 08:00 / Thứ 2 tuần sau* (cuối tuần).
+  - **Hoãn** — chọn nhanh *30 phút / 1 giờ / Tối nay / Sáng mai* hoặc **gõ trả lời ngay trên thông báo** (vd *"mai 9h"*, *"2 tiếng"*, *"thứ 2"*).
+  - **Hoãn…** (thêm lựa chọn) — chọn *15 phút nữa / 1 giờ / 3 giờ / Tối nay 20:00 / Sáng mai 08:00 / Thứ 2 tuần sau* (cuối tuần).
 - Việc đã được hoàn thành trên thiết bị khác sẽ không bị nhắc nữa.
 - **Tóm tắt buổi sáng** (mặc định 07:30): *"3 việc đến hạn · 1 việc quá hạn · 4 việc trong Ngày của tôi"*. Ngày trống thì không gửi. Bấm để mở tab Hôm nay.
 - **Tổng kết tuần**: tối Chủ nhật 19:00.
+- **Ô "Thêm việc nhanh" trên thanh thông báo** (*Thiết lập → 📲 Tiện ích hệ thống*): một thông báo cố định có ô gõ — viết việc như ở thanh tạo nhanh rồi gửi, không cần mở app.
+- **Nhắc theo địa điểm**: xem [mục 6](#6-chi-tiết-công-việc).
 
 ### Nhắc hẹn nâng cao (Thiết lập → ⏰)
 - **Nhắc lại tới khi xong**: việc đến hạn mà chưa tích xong sẽ được nhắc lại sau mỗi 5 / 10 / 15 / 30 phút (tối đa 12 lần). Mặc định chỉ áp dụng cho việc **ưu tiên Cao**; tắt công tắc để áp dụng cho mọi việc.
@@ -266,13 +277,16 @@ Tối Chủ nhật 19:00 app gửi thông báo nhắc xem Tổng kết tuần (t
 ## 13. Widget, lối tắt & chia sẻ
 
 ### Widget màn hình chính
-1. Nhấn giữ vùng trống màn hình chính → **Widgets** → **TaskFlow AI** → kéo ra màn hình.
+1. Nhấn giữ vùng trống màn hình chính → **Widgets** → **TaskFlow AI** → kéo ra màn hình. Khi đặt widget danh sách, chọn **nguồn**: *Tất cả việc*, *☀ Ngày của tôi* hoặc một danh sách cụ thể (đặt được nhiều widget cho nhiều danh sách; nhấn giữ widget → cài đặt để đổi). Widget theo màu hình nền (Android 12+).
 2. Widget liệt kê việc chưa xong, **Ngày của tôi (☀) lên đầu**, hạn quá hạn tô đỏ.
 3. **Bấm ○** để hoàn thành ngay trên widget · **bấm tên việc** để mở việc đó · **+** để thêm việc · bấm tiêu đề để mở tab Hôm nay.
-4. **Widget nhỏ 2×2** (*Tiến độ mục tiêu hôm nay*): số việc đã xong / mục tiêu ngày kèm thanh tiến độ, **việc tiếp theo** (bấm để mở) và nút **+**.
+. **Widget thói quen** (*Thói quen hôm nay*): các thói quen cần làm hôm nay kèm 🔥 chuỗi — bấm để đánh dấu ngay trên màn hình chính.
 
 ### Lối tắt (nhấn giữ icon app)
 **Thêm việc** · **Hôm nay** · **Tập trung**.
+
+### Ô cài đặt nhanh (Quick Settings)
+Kéo thanh thông báo xuống → sửa ô → thêm **Tập trung** và **Thêm việc** (Android 13+ có nút thêm ngay trong *Thiết lập → 📲 Tiện ích hệ thống*).
 
 ### Chia sẻ từ app khác
 Trong trình duyệt, Zalo, ghi chú… chọn **Chia sẻ → Thêm vào TaskFlow**: thanh tạo nhanh mở ra với nội dung đã điền sẵn (ngày giờ trong câu cũng được nhận ra).
@@ -283,7 +297,8 @@ Trong trình duyệt, Zalo, ghi chú… chọn **Chia sẻ → Thêm vào TaskFl
 
 - **Đã hoàn thành** (tab Tôi): việc đã xong, gom theo ngày hoàn thành; nút ↺ để mở lại.
 - **Thùng rác** (tab Tôi): việc đã xóa được giữ **30 ngày** — kể cả việc xóa trên thiết bị khác. **Khôi phục** đưa việc trở lại (và đồng bộ lên máy chủ); **Xóa vĩnh viễn** hoặc **Dọn sạch** để xóa hẳn. Nếu đang offline, việc xóa hẳn sẽ hoàn tất sau khi đồng bộ.
-- Ngay sau khi xóa / hoàn thành / dời hạn, thanh thông báo phía dưới có nút **Hoàn tác**.
+- Ngay sau khi xóa / hoàn thành / dời hạn, thanh thông báo phía dưới có nút **Hoàn tác**. **Lắc máy** khi thanh này đang hiện cũng là Hoàn tác.
+- Lịch sử dài bao nhiêu cũng mở nhanh: app chỉ tải từng trang khi bạn cuộn tới.
 
 ---
 
@@ -293,11 +308,14 @@ Mở **Tôi → ⚙**:
 - **🌗 Giao diện**: Sáng / Tối / Theo hệ thống.
 - **🕐 Nhịp sinh hoạt**: giờ bắt đầu buổi sáng, kết thúc buổi tối, thời lượng phiên làm việc mặc định (15–480 phút) — AI dùng để xếp lịch trình.
 - **🎯 Mục tiêu hằng ngày**: số việc muốn hoàn thành mỗi ngày (1–50) và **ngày nghỉ** (ví dụ T7, CN — không làm đứt chuỗi).
-- **🏷️ Danh mục**: thêm / xóa danh mục tự tạo (3 danh mục mặc định không xóa được).
+- **🏷️ Danh mục**: thêm / xóa danh mục tự tạo (3 danh mục mặc định không xóa được). Đổi tên danh sách ở *Tôi → Danh sách → ✎* (các việc chuyển theo).
 - Nhấn **Lưu thiết lập** cho các mục trên (lưu theo tài khoản).
 - **🔔 Thông báo** (áp dụng ngay, theo từng máy): bật/tắt và giờ **tóm tắt buổi sáng**, bật/tắt **tổng kết tuần**, **giờ nhắc cho việc "cả ngày"**.
 - **⏰ Nhắc hẹn nâng cao** (theo từng máy): nhắc lại tới khi xong, báo thức cho việc ưu tiên Cao, giờ yên lặng — xem [mục 12](#12-nhắc-nhở--thông-báo).
 - **🔒 Bảo mật** (theo từng máy): **Khóa ứng dụng** bằng vân tay / khuôn mặt / mã PIN máy — hỏi khi mở app và khi quay lại sau hơn 30 giây. Cần cài sẵn vân tay hoặc mã khóa màn hình.
+- **📲 Tiện ích hệ thống**: bật Không làm phiền khi tập trung · ô "Thêm việc nhanh" trên thanh thông báo · thêm ô Tập trung / Thêm việc vào cài đặt nhanh.
+- **🗓 Kế hoạch**: số giờ làm việc mỗi ngày (để lịch tuần cảnh báo ngày quá tải).
+- **💾 Dữ liệu**: **Sao lưu ra tệp** (JSON, bạn chọn chỗ lưu: Drive, thẻ nhớ, Tải xuống…), **Xuất CSV** (mở bằng Excel / Google Sheets), **Gửi bản sao lưu** qua email / Zalo…, **Khôi phục từ tệp** (chỉ thêm những gì chưa có, không ghi đè).
 - **👤 Tài khoản**:
   - **Đăng xuất khỏi máy này** — các thiết bị khác vẫn đăng nhập.
   - **Đăng xuất khỏi mọi thiết bị** — dùng khi mất điện thoại hoặc đăng nhập nhầm ở máy lạ.

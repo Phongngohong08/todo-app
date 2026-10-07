@@ -103,11 +103,11 @@ app/src/main/java/com/example/todoapplication/
   data/
     api/                         # ApiService (Retrofit) + NetworkClient (token, tự refresh)
     model/Models.kt              # DTO JSON (TaskDto, TaskInputDto, TaskChangesDto, ...)
-    local/                       # Room — database version 7
+    local/                       # Room — database version 8
       Entities.kt                # tasks, subtasks (FK CASCADE), categories, chat_messages, sync_state
       Daos.kt                    # Truy vấn (Flow) — kể cả thống kê, lịch, widget
       AppDatabase.kt             # RoomDatabase singleton
-      Migrations.kt              # MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7 (giữ dữ liệu cũ)
+      Migrations.kt              # MIGRATION_4_5 … MIGRATION_7_8 (giữ dữ liệu cũ)
       Mappers.kt                 # DTO ↔ Entity ↔ Domain
     sync/                        # SyncEngine, SyncWorker, SyncScheduler, SyncController, ConnectivityObserver
     repository/
@@ -120,14 +120,16 @@ app/src/main/java/com/example/todoapplication/
       CoachActionApplier.kt      # Áp dụng hành động AI Coach đề xuất (sau khi người dùng xác nhận)
       ...                        # SessionEvents, QuickAddDraft, ThemeController, NetworkCallExt
     notifications/               # Nhắc việc (+ Hoãn…), DigestWorker (tóm tắt sáng, tổng kết tuần), FocusSession (Pomodoro); nhắc lại tới khi xong, giờ yên lặng; Alarms.kt (báo thức toàn màn hình + BootReceiver)
-  widget/                        # App widget đọc thẳng Room; WidgetActionActivity (tích xong / mở việc); CompactWidgetProvider (widget nhỏ 2×2)
+  widget/                        # Widget Jetpack Glance (danh sách có cấu hình, 2×2, thói quen) + màn cấu hình
+  data/calendar/ · data/location/ · data/backup/  # Lịch của máy (CalendarContract) · Geofencing · sao lưu SAF
+  ui/tiles/                      # Quick Settings Tile: Tập trung, Thêm việc
   di/ServiceLocator.kt           # Manual DI — đồ thị phụ thuộc ghi trong file
   ui/
     viewmodel/                   # ViewModel của từng màn (Today, TaskList, TaskDetail, Review/History/Trash, ...)
     screens/                     # Màn hình Compose + TaskComponents (thẻ việc, thanh tạo nhanh dùng chung) + SnoozeActivity, AlarmActivity, AppLock (khóa ứng dụng)
     components/DragDrop.kt       # Kéo-thả giữa các vùng (lịch tuần, ma trận) theo tọa độ gốc màn hình
     components/, theme/, navigation/, utils/
-app/schemas/                     # Schema Room đã export (4.json … 7.json) — dùng cho MigrationTest
+app/schemas/                     # Schema Room đã export (4.json … 8.json) — dùng cho MigrationTest
 ```
 
 ---
@@ -151,6 +153,7 @@ app/schemas/                     # Schema Room đã export (4.json … 7.json) �
 | `WeeklyReviewScreen` · `HistoryScreen` · `TrashScreen` | Tổng kết 7 ngày so với tuần trước (+ nhờ AI lập kế hoạch tuần tới) · việc đã xong theo ngày · thùng rác 30 ngày |
 | `SettingsScreen` | Giao diện Sáng/Tối; giờ giấc cho lập lịch AI; **mục tiêu ngày + ngày nghỉ**; danh mục; **thông báo** (tóm tắt sáng, tổng kết tuần, giờ nhắc việc cả ngày); **đăng xuất máy này / mọi thiết bị**; **nhắc hẹn nâng cao** (nhắc lại tới khi xong, báo thức việc ưu tiên Cao, giờ yên lặng); **khóa ứng dụng** |
 | `TemplatesScreen` | Thư viện mẫu nhiệm vụ |
+| `AttachmentsSection` · `LocationSection` · `BackupSection` | Đính kèm (quét / Photo Picker / nhận chữ) · nhắc theo địa điểm · sao lưu / xuất / khôi phục |
 | `AlarmActivity` · `LockScreen` | Báo thức toàn màn hình (hiện trên màn khóa) · màn che khi app đang khóa (`BiometricPrompt`) |
 
 ---
@@ -167,8 +170,20 @@ app/schemas/                     # Schema Room đã export (4.json … 7.json) �
 - **Tóm tắt buổi sáng & tổng kết tuần** — `DigestWorker` đọc Room (không cần mạng), tự hẹn lần kế tiếp.
 - **Quyền thông báo xin đúng lúc** — chỉ hỏi (kèm giải thích) khi người dùng đặt hạn/nhắc việc, bật tóm tắt hoặc bắt đầu tập trung, không hỏi ngay khi mở app.
 - **App shortcut & chia sẻ** — nhấn giữ icon: Thêm việc / Hôm nay / Tập trung; "Chia sẻ → Thêm vào TaskFlow" từ app khác mở thanh tạo nhanh đã điền sẵn.
-- **Widget màn hình chính** — `RemoteViewsService` đọc thẳng Room ("Ngày của tôi" lên đầu), tự làm mới sau mỗi thay đổi; **ô tích hoàn thành ngay trên widget** và nút **+** (qua `WidgetActionActivity` trong suốt — Android 12+ cấm broadcast tự mở Activity).
-- **Widget nhỏ 2×2** — `CompactWidgetProvider`: số việc xong hôm nay / mục tiêu + thanh tiến độ, việc tiếp theo, nút **+**; đọc Room trong `goAsync()` và vẽ lại cùng lúc với widget danh sách.
+- **Widget Jetpack Glance** (`widget/GlanceWidgets.kt`) — 3 widget viết bằng Compose: danh sách việc (chọn nguồn *Tất cả / Ngày của tôi / một danh sách* cho TỪNG widget qua `TasksWidgetConfigActivity` + `PreferencesGlanceStateDefinition`), widget nhỏ 2×2 (tiến độ mục tiêu + việc tiếp theo), widget thói quen. Ô tích / đánh dấu chạy `ActionCallback` trong tiến trình app (ghi Room → đồng bộ); màu theo `GlanceTheme` (Material You). `WidgetUpdater.refresh` vẽ lại sau mỗi thay đổi.
+- **Foreground Service tập trung** — `FocusService` (`specialUse`): thông báo cố định đếm ngược bằng Chronometer (hệ thống tự vẽ, không cập nhật mỗi giây), bật / trả lại **Không làm phiền** (`setInterruptionFilter`), tự dừng khi hết giờ; mở FGS bị chặn từ nền (Android 12+) thì `FocusWorker` vẫn báo hết giờ. Lịch sử phiên ghi vào Room → đồng bộ.
+- **Quick Settings Tile** — `FocusTileService` (bắt đầu / dừng tập trung), `QuickAddTileService`; Android 14 dùng `startActivityAndCollapse(PendingIntent)`, Android 13 cho thêm ô ngay trong app (`StatusBarManager.requestAddTileService`).
+- **Trả lời trên thông báo (RemoteInput)** — ô "Thêm việc nhanh" cố định (`QuickAddNotifier`) và nút **Hoãn** trên nhắc việc có gợi ý sẵn (`setChoices`) hoặc gõ tự do (`SnoozeText` hiểu "mai 9h", "2 tiếng"…). Câu thêm việc đi qua `SentenceTasks` = cùng bộ phân tích của thanh tạo nhanh.
+- **Chụp ảnh tạo việc / đính kèm** — ML Kit **Document Scanner** (không cần quyền CAMERA) + **Text Recognition** chạy trên máy; `ScanTextParser` tách dòng thành việc. Đính kèm chép vào `filesDir/attachments`, mở bằng `FileProvider`; chọn ảnh bằng **Photo Picker** (không cần quyền bộ nhớ). Ảnh thu nhỏ giải mã có `inSampleSize`.
+- **Nhắc theo địa điểm** — `LocationReminders`: Geofencing (ENTER / EXIT), `GeofenceReceiver` hiện thông báo; xin quyền vị trí 2 bước có giải thích; đăng ký lại khi khởi động máy và khi việc xong / bị xóa (bỏ qua nếu tập vùng không đổi).
+- **Lịch của máy** — `DeviceCalendar` đọc `CalendarContract.Instances` (đã tính sẵn sự kiện lặp, sự kiện cả ngày theo UTC); hiện ở tab Lịch / Hôm nay và gửi giờ bận cho `POST /plans/daily/generate`; "Thêm vào lịch của máy" dùng `ACTION_INSERT` (không cần quyền ghi).
+- **Cảm biến** — `Sensors.kt`: úp máy để bắt đầu tập trung, lắc để Hoàn tác (Snackbar `performAction`); listener gỡ khi rời màn (`DisposableEffect`).
+- **Giao diện thích ứng** — `WindowSizeClass` → `NavigationRail` (Medium / Expanded) và tab Việc làm chia đôi danh sách | chi tiết (Expanded); màn chi tiết nhúng vào khung phải bằng ViewModel tạo từ `CreationExtras`.
+- **Shared element + Predictive Back** — `SharedTransitionLayout` bọc NavHost, thẻ việc ↔ màn chi tiết dùng chung `sharedBounds`; `enableOnBackInvokedCallback`.
+- **Sao lưu SAF** — `BackupManager`: JSON / CSV ra tệp người dùng chọn (`CreateDocument`), khôi phục kiểu gộp (`OpenDocument`), gửi qua bảng Chia sẻ (`FileProvider`).
+- **Trợ năng** — mọi cử chỉ (vuốt hoàn thành / hoãn, kéo giữa cột Kanban / ô ma trận) có `CustomAccessibilityAction` tương đương; `stateDescription`, `heading()`, mô tả ô ngày của thói quen.
+- **DataStore + Paging 3** — `LocalPrefs` trên DataStore (tự chuyển từ SharedPreferences cũ); Lịch sử dùng `PagingSource` của Room + `insertSeparators`.
+- **Baseline Profile + Macrobenchmark** — module `:macrobenchmark` đo khởi động lạnh / cuộn và sinh `app/src/main/baseline-prof.txt` (ProfileInstaller cài khi cài app).
 - **AI Quick Add / AI Coach / Lịch trình AI** — báo rõ khi hết lượt AI (HTTP 429) hoặc AI chưa bật (503).
 - **Icon & màn khởi động** — adaptive icon vẽ bằng vector (nền gradient thương hiệu + "thẻ công việc" có dấu tích và tia sáng AI) kèm lớp **monochrome** cho themed icon Android 13+; màn khởi động dùng **SplashScreen API** (`core-splashscreen`) với icon **AnimatedVectorDrawable** trên Android 12+ (dấu tích tự vẽ bằng `trimPathEnd`, tia sáng bật ra) và hiệu ứng thoát mượt (`setOnExitAnimationListener`). Logo trong app (`AppLogo`) và icon thông báo dùng chung hình.
 - **Hiệu năng danh sách** — nhóm/sắp xếp/gợi ý tính trong ViewModel trên `Dispatchers.Default`; thời gian là `Long` (không parse chuỗi ISO khi vẽ); `LazyColumn` dùng `key` + `contentType`; `DateTimeFormatter` dùng lại (thread-safe).
@@ -208,6 +223,8 @@ Chạy với backend trên máy tính: đổi thành `http://10.0.2.2:8080/api/v
 
 ./gradlew testDebugUnitTest          # unit test (JVM): domain + ViewModel
 ./gradlew connectedDebugAndroidTest  # instrumented test (cần emulator): Room migration + đồng bộ
+./gradlew :macrobenchmark:connectedBenchmarkAndroidTest   # đo khởi động / cuộn, sinh Baseline Profile (thêm
+    # -Pandroid.testInstrumentationRunnerArguments.androidx.benchmark.suppressErrors=EMULATOR nếu chạy trên giả lập)
 ```
 
 | Bộ test | Nội dung |
@@ -215,8 +232,12 @@ Chạy với backend trên máy tính: đổi thành `http://10.0.2.2:8080/api/v
 | `domain/*Test` | Nhóm việc (quá hạn / hôm nay / sắp tới / chưa có hạn), việc cả ngày, lý do gợi ý, gợi ý Ngày của tôi, **bộ phân tích câu tiếng Việt**, quy tắc lặp (mỗi N, theo ngày hoàn thành, ngày kết thúc, bỏ qua — cùng vector với test Go), chuỗi ngày + ngày nghỉ, tổng kết tuần, chỉnh lịch trình, lựa chọn hoãn |
 | `CoachActionApplierTest` | Áp dụng hành động AI Coach: hạn cả ngày, Ngày của tôi, tạo việc, bỏ qua đề xuất sai |
 | `TaskListViewModelTest` · `SettingsViewModelTest` | Luồng state từ Room, bộ lọc thông minh, debounce, hoàn thành/xóa + Hoàn tác, dời việc quá hạn + Hoàn tác, tạo nhanh vào Ngày của tôi, kéo-thả · đăng xuất máy này/mọi thiết bị khi còn thay đổi chưa đồng bộ |
-| `MigrationTest` (androidTest) | Dựng DB v4/v5 từ schema JSON, chạy `MIGRATION_4_5` / `MIGRATION_5_6`, kiểm tra schema khớp và dữ liệu được giữ (cột mới có giá trị mặc định) |
-| `SyncEngineTest` (androidTest) | Room thật + server giả: tạo khi offline, mất mạng, thay đổi từ máy khác, hoàn tác xóa sau đồng bộ, việc lặp offline, sửa khi đang gửi |
+| `MigrationTest` (androidTest) | Dựng DB v4…v7 từ schema JSON, chạy từng migration tới v8, kiểm tra schema khớp và dữ liệu được giữ (cột mới có giá trị mặc định) |
+| `SyncEngineTest` (androidTest) | Room thật + server giả: tạo khi offline, mất mạng, thay đổi từ máy khác, hoàn tác xóa sau đồng bộ, việc lặp offline, sửa khi đang gửi, thói quen + check-in hai chiều, server cũ không có API thói quen |
+| `ComponentsUiTest` (androidTest, Compose UI) | Thẻ việc + hành động TalkBack, thanh chọn nhiều, thẻ thói quen, phân tích câu khi gõ |
+| `PlatformFeaturesLogicTest` · `OrganizerLogicTest` | Tách dòng từ ảnh, câu hoãn trên thông báo, CSV, ngày của sự kiện lịch · nhãn, lời nhắc, thói quen, Kanban, bộ lọc đã lưu, thống kê tập trung |
+
+CI: [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) chạy Go vet + test, unit test + build debug / release, và test trên giả lập.
 
 > ⚙️ AGP 9 dùng "built-in Kotlin" nên cần flag `android.disallowKotlinSourceSets=false` trong `gradle.properties` để KSP (Room) thêm được source set sinh mã.
 
@@ -233,3 +254,9 @@ Chạy với backend trên máy tính: đổi thành `http://10.0.2.2:8080/api/v
 | `SCHEDULE_EXACT_ALARM` | Báo thức cho việc ưu tiên Cao kêu đúng phút (Android 12+; người dùng cấp trong Thiết lập — thiếu thì báo thức vẫn kêu nhưng có thể trễ) |
 | `USE_FULL_SCREEN_INTENT` | Hiện báo thức toàn màn hình trên màn khóa (Android 14+ cần người dùng cho phép) |
 | `RECEIVE_BOOT_COMPLETED` | Hẹn lại nhắc việc / báo thức sau khi khởi động lại máy |
+| `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_SPECIAL_USE` | Phiên tập trung chạy bằng Foreground Service |
+| `ACCESS_NOTIFICATION_POLICY` | Bật "Không làm phiền" khi tập trung (người dùng cấp trong Cài đặt) |
+| `READ_CALENDAR` | Hiện sự kiện của lịch máy, tránh giờ bận khi AI lập lịch — xin khi bật "📆 Lịch của máy" |
+| `ACCESS_FINE_LOCATION`, `ACCESS_COARSE_LOCATION`, `ACCESS_BACKGROUND_LOCATION` | Nhắc theo địa điểm (Geofencing) — xin 2 bước khi đặt nhắc địa điểm |
+
+Không cần quyền camera / bộ nhớ: Document Scanner, Photo Picker, Storage Access Framework do hệ thống cung cấp. Chi tiết kỹ thuật: [CONG-NGHE-SU-DUNG.md](CONG-NGHE-SU-DUNG.md).

@@ -1,6 +1,43 @@
 # Công nghệ & Kỹ thuật Android sử dụng
 
-Tài liệu liệt kê đầy đủ các công nghệ, thư viện và **kỹ thuật lập trình Android** được áp dụng trong ứng dụng quản lý công việc cá nhân tích hợp AI (TaskFlow AI). Trọng tâm là kỹ thuật xây dựng phần mềm Android phía client, đặc biệt là kiến trúc **offline-first** (Room là nguồn dữ liệu duy nhất + đồng bộ nền bằng WorkManager).
+Tài liệu liệt kê các công nghệ, thư viện và **kỹ thuật lập trình Android** được áp dụng trong TaskFlow AI — ứng dụng quản lý công việc cá nhân tích hợp AI. Trọng tâm là phần client Android: kiến trúc **offline-first** (Room là nguồn dữ liệu duy nhất, đồng bộ nền bằng WorkManager) và việc khai thác các API đặc thù của nền tảng (Service, ContentProvider, cảm biến, camera + ML, vị trí, widget, Quick Settings, thông báo nâng cao, giao diện thích ứng).
+
+---
+
+## 0. Bản đồ nhanh: tính năng ↔ kỹ thuật Android
+
+### Bốn thành phần chính của Android
+
+| Thành phần | Trong app |
+| :--- | :--- |
+| **Activity** | `MainActivity` (single-activity + NavHost, là `FragmentActivity` cho BiometricPrompt), `AlarmActivity` (báo thức trên màn khóa), `SnoozeActivity` (hộp chọn hoãn trong suốt), `TasksWidgetConfigActivity` (cấu hình widget) |
+| **Service** | `FocusService` — **Foreground Service** (`specialUse`) đếm ngược Pomodoro; `FocusTileService`, `QuickAddTileService` — **TileService** (Quick Settings) |
+| **BroadcastReceiver** | `NotificationActionReceiver` (Hoàn thành / Hoãn / trả lời trên thông báo), `QuickAddReceiver`, `HabitActionReceiver`, `AlarmReceiver`, `BootReceiver` (đặt lại nhắc / geofence sau khởi động), `GeofenceReceiver`, các `GlanceAppWidgetReceiver` |
+| **ContentProvider** | **Cung cấp:** `FileProvider` (chia sẻ tệp đính kèm, tệp sao lưu qua `content://`). **Dùng:** `CalendarContract` (lịch của máy), Storage Access Framework (`CreateDocument` / `OpenDocument`), Photo Picker |
+
+### Tính năng → API
+
+| Tính năng | Kỹ thuật / API |
+| :--- | :--- |
+| Pomodoro chạy nền, đếm ngược trên màn khóa | Foreground Service + ongoing notification + `setUsesChronometer` / `setChronometerCountDown` |
+| Tự bật "Không làm phiền" khi tập trung | `NotificationManager.setInterruptionFilter` + quyền `ACCESS_NOTIFICATION_POLICY` |
+| Ô "Tập trung" / "Thêm việc" trong cài đặt nhanh | `TileService`, `startActivityAndCollapse(PendingIntent)` (Android 14), `StatusBarManager.requestAddTileService` (Android 13) |
+| Thêm việc / hoãn ngay trên thông báo | `RemoteInput` (direct reply) + `setChoices` (gợi ý trả lời nhanh) |
+| Báo thức toàn màn hình cho việc quan trọng | `AlarmManager.setAlarmClock`, full-screen intent, `showWhenLocked` / `turnScreenOn` |
+| Nhắc việc, nhắc dai, giờ yên lặng, nhắc thói quen | WorkManager (`OneTimeWorkRequest`, unique work, `APPEND_OR_REPLACE`, tag) |
+| Nhắc theo địa điểm (đến / rời) | Geofencing API + FusedLocationProvider, quyền vị trí 2 bước (foreground → background) |
+| Chụp giấy / bảng trắng thành việc | ML Kit **Document Scanner** (không cần quyền CAMERA) + ML Kit **Text Recognition** chạy trên máy |
+| Đính kèm ảnh vào việc | **Photo Picker** (`PickMultipleVisualMedia`, không cần quyền bộ nhớ), bộ nhớ riêng app, `FileProvider` |
+| Hiện lịch Google của máy, AI tránh giờ bận | `CalendarContract.Instances` (ContentResolver) + quyền `READ_CALENDAR`; thêm sự kiện bằng `Intent.ACTION_INSERT` |
+| Úp máy để bắt đầu tập trung, lắc để hoàn tác | `SensorManager` (gia tốc kế) đăng ký theo vòng đời composable |
+| Widget màn hình chính | **Jetpack Glance** (Compose cho widget), `ActionCallback`, cấu hình theo từng widget (`PreferencesGlanceStateDefinition`), màu Material You |
+| Khóa ứng dụng | `BiometricPrompt` (`BIOMETRIC_WEAK or DEVICE_CREDENTIAL`) |
+| Tablet / màn ngang / máy gập | `WindowSizeClass` → `NavigationRail` + giao diện danh sách \| chi tiết |
+| Thẻ việc "nở" thành màn chi tiết, cử chỉ quay lại xem trước | Shared element transition (`SharedTransitionLayout`, `sharedBounds`), Predictive Back (`enableOnBackInvokedCallback`) |
+| Sao lưu / xuất CSV / khôi phục | Storage Access Framework + `FileProvider` + bảng Chia sẻ |
+| Hỗ trợ TalkBack | Semantics: `customActions` thay cho vuốt / kéo thả, `stateDescription`, `heading`, `contentDescription` |
+| Nhập bằng giọng nói | `RecognizerIntent` (tiếng Việt) qua Activity Result API |
+| Khởi động nhanh | Baseline Profile + ProfileInstaller, đo bằng Macrobenchmark |
 
 ---
 
@@ -9,12 +46,13 @@ Tài liệu liệt kê đầy đủ các công nghệ, thư viện và **kỹ th
 | Hạng mục | Giá trị |
 | :--- | :--- |
 | Ngôn ngữ | **Kotlin** 2.2.10 |
-| Build tool | **Android Gradle Plugin (AGP)** 9.2.1 + Gradle (Kotlin DSL) |
+| Build tool | **Android Gradle Plugin (AGP)** 9.2.1 + Gradle 9.4 (Kotlin DSL) |
 | Quản lý dependency | **Version Catalog** (`gradle/libs.versions.toml`) |
-| Annotation processor | **KSP** (Kotlin Symbol Processing) 2.2.10-2.0.2 |
+| Annotation processor | **KSP** 2.2.10-2.0.2 |
 | `compileSdk` / `targetSdk` | 36 |
 | `minSdk` | 29 (Android 10) |
-| JVM target | Java 11 |
+| Module | `:app` (ứng dụng), `:macrobenchmark` (đo hiệu năng + sinh Baseline Profile) |
+| Build type | `debug`, `release` (R8 + shrink resources), `benchmark` (như release, ký debug, không đổi tên lớp) |
 
 ---
 
@@ -22,23 +60,21 @@ Tài liệu liệt kê đầy đủ các công nghệ, thư viện và **kỹ th
 
 | Công nghệ | Vai trò |
 | :--- | :--- |
-| **Jetpack Compose** (BOM 2026.02.01) | Toàn bộ UI khai báo (declarative), không dùng XML layout |
-| **Material 3** (`material3`) | `colorScheme`, `Scaffold`, `Card`, `SnackbarHost`, `PullToRefreshBox`, `ModalBottomSheet`, `SwipeToDismissBox`… |
-| **Material Icons Extended** | Bộ icon đầy đủ (vd `CloudOff`, `CloudUpload` cho trạng thái đồng bộ) |
-| **Compose Animation** | `Modifier.animateItem()` (thẻ trượt mượt giữa các nhóm), `animateColorAsState` |
-| **Compose Canvas** | Vẽ tùy biến: biểu đồ cột năng suất tuần, bản đồ nhiệt năm |
-| **Haptic feedback** | `LocalHapticFeedback` — rung nhẹ khi kéo-thả, khi vuốt hoàn thành |
-| **SplashScreen API** (`core-splashscreen` 1.0.1) | Màn khởi động theo thương hiệu, icon AnimatedVectorDrawable (Android 12+), hiệu ứng thoát tùy biến |
-| **Adaptive icon** (vector) | Lớp nền + lớp trước + lớp **monochrome** (themed icon Android 13+); không cần ảnh bitmap theo mật độ màn hình vì minSdk 29 |
-| **Lifecycle Runtime Compose** | `collectAsStateWithLifecycle()`, `LifecycleEventEffect(ON_START)` |
+| **Jetpack Compose** (BOM 2026.02.01) | Toàn bộ UI khai báo, không dùng XML layout |
+| **Material 3** | `Scaffold`, `ModalBottomSheet`, `SwipeToDismissBox`, `SegmentedButton`, `NavigationRail`, `PullToRefreshBox`, `DatePicker`… |
+| **material3-window-size-class** | Giao diện thích ứng theo kích thước cửa sổ |
+| **Compose Animation** | `animateItem()`, **shared element transition** giữa danh sách và chi tiết |
+| **Jetpack Glance** 1.1.1 | Widget viết bằng Compose |
+| **SplashScreen API**, **Adaptive icon** (monochrome) | Màn khởi động, themed icon Android 13+ |
 
 ### Kỹ thuật UI áp dụng
-- **Theme động Sáng/Tối** qua `lightColorScheme()` / `darkColorScheme()` + nút chuyển (SYSTEM/LIGHT/DARK).
-- **Edge-to-edge** (`enableEdgeToEdge()`) + xử lý **WindowInsets**.
-- **State hoisting**: màn hình chỉ giữ state UI thuần (menu mở/đóng, chế độ sắp xếp) bằng `remember`/`rememberSaveable`; dữ liệu nghiệp vụ đến từ ViewModel.
-- **TextField không vòng qua ViewModel**: ô tìm kiếm giữ text cục bộ (cập nhật đồng bộ từng phím), ViewModel chỉ nhận giá trị để lọc — tránh giật con trỏ.
-- **Undo pattern**: xóa/hoàn thành thực hiện ngay, Snackbar có nút **Hoàn tác** (thay cho hộp thoại xác nhận).
-- **LazyColumn tối ưu**: `key` ổn định + `contentType` cho từng loại item; dữ liệu đã được nhóm/sắp xếp sẵn trong ViewModel nên khối composable không tính toán lại khi recompose.
+- **Theme Sáng / Tối / Theo hệ thống**, **edge-to-edge** + WindowInsets.
+- **Giao diện thích ứng**: Compact → thanh dưới; Medium → NavigationRail; Expanded → Rail + tab Việc làm chia đôi *danh sách | chi tiết*. Màn chi tiết nhúng được vào khung phải nhờ ViewModel tạo với `CreationExtras` (`DEFAULT_ARGS_KEY` chứa `taskId`).
+- **Kéo thả tự viết** (`ui/components/DragDrop.kt`): vùng thả ghi tọa độ gốc màn hình (`boundsInRoot`), dùng chung cho lịch tuần, ma trận Eisenhower, bảng Kanban.
+- **Cử chỉ**: vuốt phải hoàn thành, vuốt trái hoãn, nhấn giữ chọn nhiều, kéo thả, lắc máy để hoàn tác.
+- **Undo pattern**: thao tác thực hiện ngay + Snackbar "Hoàn tác".
+- **LazyColumn tối ưu**: `key` ổn định + `contentType`; tính toán nặng trong ViewModel trên `Dispatchers.Default`.
+- **Trợ năng**: mọi thao tác cử chỉ đều có `CustomAccessibilityAction` tương đương (Hoàn thành, Hoãn, Chuyển sang mục / ô khác…); tiêu đề nhóm có `heading()`.
 
 ---
 
@@ -46,10 +82,9 @@ Tài liệu liệt kê đầy đủ các công nghệ, thư viện và **kỹ th
 
 | Công nghệ | Vai trò |
 | :--- | :--- |
-| **Navigation Compose** 2.8.5 | Điều hướng giữa các màn hình, một Activity duy nhất |
-| **ViewModel** (`lifecycle-viewmodel-compose`) | Tầng trình bày MVVM, giữ state qua config change |
-| **SavedStateHandle** | ViewModel đọc tham số route (`taskId`) — sống sót cả khi hệ điều hành giết tiến trình |
-| **Lifecycle** 2.10.0 | Thành phần nhận biết vòng đời |
+| **Navigation Compose** 2.8.5 | Single-activity, tham số route, deep link nội bộ (`AppIntents`) |
+| **ViewModel** + **SavedStateHandle** | MVVM, sống sót qua xoay màn và khi tiến trình bị giết |
+| **Lifecycle** 2.10 | `collectAsStateWithLifecycle`, `LifecycleEventEffect(ON_START / ON_RESUME)` |
 
 ### Kiến trúc **MVVM + Offline-first**
 
@@ -61,23 +96,15 @@ View (Composable) ──hành động──► ViewModel ──ghi──► Repo
                                                       SyncEngine ◄────┘ ⇄ Server (REST)
 ```
 
-- **View** (`ui/screens/`): chỉ render state và gửi hành động; **không** gọi API.
-- **ViewModel** (`ui/viewmodel/`, 9 cái): `StateFlow<…UiState>` được **dẫn xuất** từ các Flow của Room bằng `combine` + `stateIn(WhileSubscribed(5000))`; sự kiện một lần (Snackbar, điều hướng) qua `SharedFlow`. Việc nặng (nhóm/sắp xếp/gợi ý) chạy bằng `flowOn(Dispatchers.Default)`; dispatcher được truyền qua constructor để test tất định.
-- **Domain** (`domain/`): logic thuần Kotlin — `TaskListLogic`, `RecurrenceRules`, `SortOrder`, `StatsCalculator`. Nhận "bây giờ" và múi giờ làm tham số → test lặp lại được.
-- **Repository** (`data/repository/`): đọc = Flow từ Room; ghi = transaction Room + side effect (`TaskEffects`: nhắc việc, widget, xin đồng bộ). Repository công việc **không gọi API**.
-- **Sync** (`data/sync/`): `SyncEngine` đẩy/kéo thay đổi; `SyncController` là mặt tiền duy nhất cho ViewModel (trạng thái mạng, đang đồng bộ, "đồng bộ ngay").
-- **Tách 3 dạng dữ liệu**: `TaskDto` (JSON) ↔ `TaskEntity` (Room) ↔ `Task` (domain), chuyển đổi trong `Mappers.kt`.
+- **View** (`ui/screens/`): chỉ render state và gửi hành động.
+- **ViewModel** (`ui/viewmodel/`): `StateFlow<…UiState>` dẫn xuất từ Flow của Room bằng `combine` + `stateIn(WhileSubscribed(5000))`; sự kiện một lần qua `SharedFlow`.
+- **Domain** (`domain/`): logic thuần Kotlin có unit test — `TaskListLogic`, `RecurrenceRules`, `QuickAddParser` (phân tích câu tiếng Việt), `HabitLogic`, `Scheduling` (giờ yên lặng, hoãn, Eisenhower), `BoardLogic`, `TagRules`, `ScanTextParser`, `SnoozeText`, `FocusStats`…
+- **Repository** (`data/repository/`): đọc = Flow; ghi = transaction Room + side effect (`TaskEffects`: nhắc việc, widget, geofence, xin đồng bộ).
+- **Sync** (`data/sync/`): `SyncEngine` đẩy / kéo task, danh mục + cài đặt danh sách, thói quen + check-in, phiên tập trung; bỏ qua êm phần server cũ chưa hỗ trợ (404).
+- **Dữ liệu chỉ trên máy** (không đồng bộ vì riêng tư): tệp đính kèm, địa điểm và nhắc theo địa điểm.
 
-### Dependency Injection — **ServiceLocator (manual DI)**
-
-- `di/ServiceLocator.kt` cung cấp singleton `by lazy` (ApiService, AppDatabase, SyncEngine, các Repository), khởi tạo trong `TodoApplication.onCreate()`.
-- ViewModel nhận phụ thuộc qua **`viewModelFactory { initializer { … } }`** (kể cả `createSavedStateHandle()`), gọi bằng `viewModel(factory = …)`.
-- > **Lưu ý:** dự định ban đầu dùng **Hilt**, nhưng Hilt Gradle plugin (tới 2.57.1) **không tương thích AGP 9** (lỗi *"Android BaseExtension not found"*). Đã chuyển sang ServiceLocator để đạt cùng mục tiêu DI mà vẫn build được.
-
-### Kỹ thuật kiến trúc khác
-- **Single-Activity Architecture**: 1 `MainActivity` + `NavHost`.
-- **Luồng dữ liệu một chiều (UDF)**: sau khi ghi, ViewModel không tự sửa state — Room phát dữ liệu mới và mọi màn hình (kể cả widget) tự cập nhật.
-- **Event bus một chiều** bằng `SharedFlow` (`SessionEvents.forcedLogout`) để buộc đăng xuất khi phiên hết hạn.
+### Dependency Injection — ServiceLocator (manual DI)
+`di/ServiceLocator.kt` cung cấp singleton `by lazy`; ViewModel nhận phụ thuộc qua `viewModelFactory { initializer { … } }`. (Hilt Gradle plugin chưa tương thích AGP 9 — lỗi *"Android BaseExtension not found"* — nên dùng DI thủ công.)
 
 ---
 
@@ -85,126 +112,122 @@ View (Composable) ──hành động──► ViewModel ──ghi──► Repo
 
 | Công nghệ | Vai trò |
 | :--- | :--- |
-| **Retrofit 2** (2.9.0) | Khai báo REST API kiểu interface |
-| **OkHttp** (4.12.0) | HTTP client, interceptor, authenticator |
-| **Gson Converter** | (De)serialize JSON ↔ data class |
-| **OkHttp Logging Interceptor** | Log request/response (chỉ bản debug, che header `Authorization`) |
+| **Retrofit 2** + **OkHttp** + **Gson** | REST API kiểu interface |
+| **Interceptor / Authenticator** | Gắn Bearer token; tự làm mới token khi 401 (thread-safe) |
+| **EncryptedSharedPreferences** | Access + refresh token (khóa trong Android Keystore) |
+| **Network Security Config** | Release chỉ HTTPS |
 
-### Kỹ thuật mạng áp dụng
-- **Interceptor** tự gắn `Authorization: Bearer <access_token>`.
-- **Authenticator** tự làm mới token khi gặp `401` — thread-safe bằng `synchronized` để nhiều request 401 đồng thời chỉ refresh một lần.
-- **Access + Refresh token** lưu bằng **EncryptedSharedPreferences** (khóa trong Android Keystore). Đăng xuất gọi `POST /auth/logout` để server thu hồi refresh token.
-- **Network Security Config**: bản release chỉ cho HTTPS; bản debug cho phép HTTP tới địa chỉ local (source set `src/debug`).
-- **Request idempotent** cho đồng bộ: `PUT /tasks/{id}` (tạo nếu chưa có), `DELETE` lặp lại vẫn thành công → gửi lại sau khi mất mạng luôn an toàn.
+Mọi request đồng bộ **idempotent** (`PUT /{resource}/{id}` tạo nếu chưa có, `DELETE` lặp lại vẫn thành công) nên gửi lại sau khi mất mạng luôn an toàn.
 
 ---
 
 ## 5. Bất đồng bộ (Asynchronous)
 
-| Công nghệ | Vai trò |
-| :--- | :--- |
-| **Kotlin Coroutines** | `suspend fun`, `viewModelScope`, `goAsync()` + coroutine trong BroadcastReceiver |
-| **Flow / StateFlow / SharedFlow** | Dữ liệu phản ứng từ Room tới UI; sự kiện một lần |
-| **Mutex** | Chỉ một lần đồng bộ chạy tại một thời điểm |
-
-### Toán tử Flow áp dụng
-- `combine` — ghép dữ liệu Room + bộ lọc + trạng thái mạng + trạng thái đồng bộ thành một `UiState`.
-- `debounce(250)` + `distinctUntilChanged` — chỉ truy vấn khi người dùng ngừng gõ tìm kiếm.
-- `flatMapLatest` — đổi bộ lọc thì hủy truy vấn cũ, không bao giờ hiện kết quả của bộ lọc trước.
-- `flowOn(Dispatchers.Default)` — tính toán nặng ngoài luồng UI.
-- `stateIn(WhileSubscribed(5000))` — ngừng lắng nghe database khi màn hình không hiển thị (giữ 5 giây để qua được xoay màn hình).
-- `callbackFlow` + `awaitClose` — bọc `ConnectivityManager.NetworkCallback` thành `Flow<Boolean>`.
+- **Coroutines**: `viewModelScope`, `goAsync()` + coroutine trong BroadcastReceiver, `suspendCancellableCoroutine` bọc Task của Play services / ML Kit.
+- **Flow**: `combine`, `debounce` + `distinctUntilChanged` (tìm kiếm), `flatMapLatest`, `flowOn`, `stateIn`, `callbackFlow` (theo dõi mạng), `first { }` (FocusService chờ phiên đổi).
+- **Mutex**: chỉ một lần đồng bộ tại một thời điểm.
 
 ---
 
-## 6. Lưu trữ cục bộ (Room — nguồn dữ liệu duy nhất)
+## 6. Lưu trữ cục bộ
 
 | Công nghệ | Vai trò |
 | :--- | :--- |
-| **Room** 2.7.1 (qua KSP) | SQLite: `@Entity`, `@Dao`, `@Database`, `@Upsert`, `@Transaction`, `@Embedded`, `ForeignKey`, `Index` |
-| **room-testing** | `MigrationTestHelper` kiểm tra migration trên thiết bị |
-| **EncryptedSharedPreferences** | Phiên đăng nhập (mã hóa) |
-| **SharedPreferences** | Chế độ giao diện (tùy chọn riêng của máy) |
+| **Room** 2.7.1 (KSP) | Nguồn dữ liệu duy nhất — **version 8**, 12 bảng |
+| **Room Paging** + **Paging 3** | Lịch sử hoàn thành tải dần từng trang (`PagingSource` do Room sinh, `insertSeparators` chèn tiêu đề ngày, `cachedIn`) |
+| **DataStore (Preferences)** | Cài đặt trên máy (thay SharedPreferences, tự chuyển dữ liệu cũ bằng `SharedPreferencesMigration`) |
+| **EncryptedSharedPreferences** | Phiên đăng nhập |
+| **Bộ nhớ riêng của app** (`filesDir/attachments`) | Tệp đính kèm |
 
 ### Kỹ thuật áp dụng
-- **5 bảng** (version 5): `tasks` (kèm cờ đồng bộ `isDirty`, `isDeleted`, `localVersion`), `subtasks` (khóa ngoại `ON DELETE CASCADE`), `categories`, `chat_messages`, `sync_state`.
-- **Flow từ DAO**: Room tự phát lại khi bảng liên quan đổi → danh sách, lịch, thống kê, widget luôn khớp.
-- **Truy vấn tổng hợp trong SQL**: tiến độ checklist bằng subquery (`TaskWithProgress` + `@Embedded`), thống kê `SUM(CASE…)` / `GROUP BY`.
-- **`@Upsert` thay vì `REPLACE`**: `REPLACE` = DELETE + INSERT sẽ kích hoạt CASCADE xóa sạch bước con.
-- **Transaction** (`withTransaction`) cho mọi thao tác ghi nhiều bảng (vd hoàn thành việc lặp = cập nhật task + tạo lần kế tiếp + chép checklist).
-- **Migration có kiểm thử**: `MIGRATION_4_5` chuyển bảng cache cũ sang mô hình mới *mà không mất dữ liệu* — đổi chuỗi thời gian ISO sang epoch millis bằng `strftime` của SQLite, tạo lại bảng để thêm khóa ngoại. Schema mỗi version export ra `app/schemas/` và được `MigrationTest` so khớp.
-- **Thời gian lưu dạng `Long`** (epoch millis): so sánh/sắp xếp nhanh, không parse chuỗi khi vẽ.
-- `RoomDatabase` **singleton** (`@Volatile` + double-checked locking).
-- > Lưu ý kỹ thuật: AGP 9 dùng "built-in Kotlin" nên cần flag `android.disallowKotlinSourceSets=false` trong `gradle.properties` để KSP của Room thêm được thư mục mã sinh.
+- **Bảng**: `tasks`, `subtasks`, `categories`, `list_meta`, `chat_messages`, `sync_state`, `habits`, `habit_checkins`, `focus_sessions`, `attachments`, `places`, `task_locations`.
+- **Cờ đồng bộ** `isDirty` + `localVersion` + bia mộ `isDeleted` — không bao giờ mất thay đổi khi người dùng sửa tiếp lúc đang gửi.
+- **Khóa ngoại `ON DELETE CASCADE`**, **`@Upsert`** (thay `REPLACE` vốn xóa rồi chèn → kích hoạt CASCADE).
+- **Subquery trong SQL** cho tiến độ checklist và "bước con đến hạn sớm nhất".
+- **Migration có kiểm thử** 4→5→6→7→8, mỗi bước chỉ thêm cột / bảng; schema export ra `app/schemas/` và `MigrationTest` so khớp trên SQLite thật.
 
 ---
 
-## 7. Tác vụ nền (WorkManager)
+## 7. Tác vụ nền
 
-| Công nghệ | Vai trò |
+| Công nghệ | Áp dụng |
 | :--- | :--- |
-| **WorkManager** 2.10.0 | Đồng bộ dữ liệu + nhắc nhở công việc |
+| **WorkManager** | Đồng bộ (unique + debounce + backoff + periodic 30 phút), nhắc việc (nhiều lời nhắc / việc bằng tag), nhắc dai, giờ yên lặng, tóm tắt sáng, tổng kết tuần, nhắc thói quen, hết giờ tập trung |
+| **AlarmManager** | Báo thức chính xác cho việc ưu tiên Cao |
+| **Foreground Service** | Phiên tập trung (`FOREGROUND_SERVICE_SPECIAL_USE`); không mở được từ nền (Android 12+) thì WorkManager vẫn báo hết giờ |
+| **Geofencing** | Nhắc khi đến / rời địa điểm; đăng ký lại khi khởi động máy |
 
-### Đồng bộ (`SyncWorker`, `SyncScheduler`)
-- **Unique work + `ExistingWorkPolicy.REPLACE` + trễ 1 giây** = *debounce*: nhiều thao tác liên tiếp chỉ tạo một lần đồng bộ.
-- **Constraints `NetworkType.CONNECTED`**: mất mạng thì WorkManager tự chờ, có mạng là chạy — kể cả khi app đã đóng.
-- **Backoff EXPONENTIAL** khi lỗi mạng/máy chủ (`Result.retry()`), dừng hẳn khi lỗi xác thực (`Result.failure()`).
-- **PeriodicWorkRequest 30 phút** (`ExistingPeriodicWorkPolicy.KEEP`) để kéo thay đổi từ thiết bị khác.
-- `getWorkInfosByTagFlow` → Flow "đang đồng bộ" cho UI.
-
-### Nhắc nhở (`ReminderScheduler`, `ReminderWorker`)
-- `OneTimeWorkRequest` đặt tại `due − reminder_offset`, unique theo task id; lượt **"Hoãn 1 giờ"** là job riêng nên không bị hủy khi đặt lại nhắc việc.
-- **Tồn tại qua khởi động lại máy**; hiển thị `NotificationCompat` — hoàn toàn local, không dùng FCM.
+> Job được hẹn từ chính worker đang chạy dùng `APPEND_OR_REPLACE` — `REPLACE` sẽ hủy luôn worker hiện tại.
 
 ---
 
-## 8. Tính năng nền tảng Android khác
+## 8. Camera, ML, cảm biến, vị trí
 
-| Kỹ thuật | Áp dụng |
+| Công nghệ | Áp dụng |
 | :--- | :--- |
-| **Runtime Permissions** | Xin `POST_NOTIFICATIONS` (Android 13+) qua **Activity Result API** |
-| **ConnectivityManager** | `registerDefaultNetworkCallback` + `NET_CAPABILITY_VALIDATED` — biết khi nào thật sự có Internet |
-| **Application class** | Khởi tạo DI, bật đồng bộ nền, đồng bộ lại khi có mạng (scope sống cùng tiến trình) |
-| **Lifecycle-aware sync** | `LifecycleEventEffect(ON_START)` — đồng bộ mỗi khi app trở lại màn hình |
-| **BroadcastReceiver** | `NotificationActionReceiver` xử lý nút Hoàn thành/Hoãn (`goAsync()` + ghi Room) |
-| **Notification Actions** | `NotificationCompat.Action` + `PendingIntent.getBroadcast` |
-| **App Widget (Collection)** | `AppWidgetProvider` + `RemoteViewsService`/`RemoteViewsFactory` đọc Room |
-| **Vibrator / Haptics** | Rung báo nhắc việc; haptic feedback khi kéo-thả |
+| **ML Kit Document Scanner** (Play services) | Giao diện chụp tài liệu tự bắt mép / khử nghiêng; app không cần quyền CAMERA |
+| **ML Kit Text Recognition** (Latin, chạy trên máy) | Nhận chữ tiếng Việt có dấu, offline → tách dòng thành việc / chép vào mô tả |
+| **SensorManager** (gia tốc kế) | Úp máy để bắt đầu Pomodoro, lắc để Hoàn tác |
+| **Fused Location + Geofencing** | Lưu "Nhà", "Công ty" từ vị trí hiện tại; nhắc theo vùng |
+| **SpeechRecognizer** (`RecognizerIntent`) | Nhập việc bằng giọng nói |
 
 ---
 
-## 9. Thư viện bên thứ ba (Third-party)
+## 9. Thư viện
 
 | Thư viện | Mục đích |
 | :--- | :--- |
-| **`sh.calvin.reorderable`** 2.4.3 | Kéo-thả sắp xếp item trong `LazyColumn` (`draggableHandle` + `onDragStopped` để lưu khi thả tay) |
+| `androidx.glance` 1.1.1 | Widget Compose |
+| `androidx.datastore:datastore-preferences` 1.1.7 | Cài đặt |
+| `androidx.paging` 3.3.6 + `room-paging` | Danh sách dài |
+| `com.google.mlkit:text-recognition` · `play-services-mlkit-document-scanner` | Nhận chữ · quét tài liệu |
+| `play-services-location` 21.3 | Vị trí + geofence |
+| `androidx.biometric` 1.1.0 | Khóa ứng dụng |
+| `androidx.profileinstaller` · `androidx.benchmark:benchmark-macro-junit4` | Baseline Profile · đo hiệu năng |
+| `sh.calvin.reorderable` 2.4.3 | Kéo-thả sắp xếp trong `LazyColumn` |
 
 ---
 
-## 10. Quyền (Permissions) — `AndroidManifest.xml`
+## 10. Quyền (Permissions)
 
-| Quyền | Mục đích |
-| :--- | :--- |
-| `INTERNET` | Gọi REST API |
-| `ACCESS_NETWORK_STATE` | Theo dõi trạng thái mạng (banner offline, đồng bộ lại khi có mạng) |
-| `POST_NOTIFICATIONS` | Hiển thị nhắc nhở (Android 13+) |
-| `VIBRATE` | Rung báo khi có thông báo nhắc việc |
+| Quyền | Mục đích | Xin khi nào |
+| :--- | :--- | :--- |
+| `INTERNET`, `ACCESS_NETWORK_STATE` | Gọi API, biết lúc có mạng để đồng bộ | — |
+| `POST_NOTIFICATIONS` | Mọi thông báo (Android 13+) | Lúc người dùng đặt nhắc lần đầu |
+| `VIBRATE` | Rung nhắc việc | — |
+| `SCHEDULE_EXACT_ALARM`, `USE_FULL_SCREEN_INTENT` | Báo thức đúng phút, hiện trên màn khóa | Khi bật báo thức trong Thiết lập (mở trang cài đặt hệ thống) |
+| `RECEIVE_BOOT_COMPLETED` | Đặt lại nhắc / geofence sau khởi động | — |
+| `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_SPECIAL_USE` | Phiên tập trung | — |
+| `ACCESS_NOTIFICATION_POLICY` | Bật "Không làm phiền" khi tập trung | Khi bật tùy chọn (trang cài đặt hệ thống) |
+| `READ_CALENDAR` | Đọc lịch của máy | Khi bật "📆 Lịch của máy" |
+| `ACCESS_FINE_LOCATION` → `ACCESS_BACKGROUND_LOCATION` | Nhắc theo địa điểm | Khi đặt nhắc địa điểm (2 bước, có giải thích trước bước nền) |
+
+Không cần quyền camera / bộ nhớ: Document Scanner, Photo Picker và Storage Access Framework do hệ thống cung cấp giao diện, app chỉ nhận đúng tệp người dùng chọn.
 
 ---
 
-## 11. Kiểm thử (Testing)
+## 11. Kiểm thử & chất lượng
 
 | Loại | Công cụ | Nội dung |
 | :--- | :--- | :--- |
-| **Unit test (JVM)** | JUnit 4 | Domain: nhóm/sắp xếp, quy tắc lặp, id tất định (cùng vector với backend Go), fractional indexing, thống kê theo ngày lịch |
-| **ViewModel test** | Mockito-Kotlin + kotlinx-coroutines-test (`StandardTestDispatcher`, `advanceUntilIdle`, `backgroundScope`) | Luồng state từ Room, debounce tìm kiếm, Hoàn tác, kéo-thả, đăng xuất khi còn thay đổi chưa đồng bộ |
-| **Instrumented test** | AndroidJUnit4 + Room in-memory + server giả (`FakeServer : ApiService`) | Giao thức đồng bộ: tạo offline, mất mạng giữa chừng, thay đổi từ máy khác, hoàn tác xóa, việc lặp offline, sửa khi đang gửi |
-| **Migration test** | `MigrationTestHelper` | Dựng DB v4 từ schema JSON, chạy migration, so schema với v5, kiểm tra dữ liệu |
+| **Unit test (JVM)** | JUnit 4, Mockito-Kotlin, coroutines-test | Domain (lặp, phân tích câu, thói quen, Kanban, nhãn, bộ lọc, quét chữ, câu hoãn, CSV, ngày của sự kiện lịch…), ViewModel (Hoàn tác, chọn nhiều, debounce, kéo thả) — 116 test |
+| **Instrumented test** | AndroidJUnit4 + Room in-memory + `FakeServer : ApiService` | Giao thức đồng bộ: offline, mất mạng giữa chừng, máy khác sửa, thói quen, server cũ không có API |
+| **Migration test** | `MigrationTestHelper` | Từng bước 4→5→6→7→8 trên SQLite thật |
+| **Compose UI test** | `createComposeRule` | Thẻ việc + hành động TalkBack, thanh chọn nhiều, thẻ thói quen, phân tích câu khi gõ |
+| **Macrobenchmark** | `:macrobenchmark` | Khởi động lạnh có / không Baseline Profile, độ mượt khi cuộn; `BaselineProfileGenerator` sinh `app/src/main/baseline-prof.txt` |
+| **CI** | GitHub Actions (`.github/workflows/ci.yml`) | Go vet + test; unit test + build debug/release; test trên giả lập (android-emulator-runner) |
 
-Chạy: `./gradlew testDebugUnitTest` và `./gradlew connectedDebugAndroidTest` (cần emulator).
+Lệnh:
+```bash
+./gradlew :app:testDebugUnitTest                 # unit test
+./gradlew :app:connectedDebugAndroidTest         # cần giả lập / máy thật
+./gradlew :macrobenchmark:connectedBenchmarkAndroidTest \
+  -Pandroid.testInstrumentationRunnerArguments.androidx.benchmark.suppressErrors=EMULATOR   # đo trên giả lập
+```
+> Số đo Macrobenchmark trên giả lập (GPU phần mềm) chỉ mang tính tham khảo — nên đo trên máy thật. Bài đo cuộn danh sách cần sẵn một tài khoản đã đăng nhập trên máy đo.
 
 ---
 
 ## 12. Backend (tóm tắt — ngoài phạm vi môn Android)
 
-Ứng dụng giao tiếp với backend **Go (Golang)** theo Clean Architecture, dùng PostgreSQL + Qdrant (vector DB) + Google Gemini API. Backend cung cấp các endpoint đồng bộ (`GET /tasks/sync`, `PUT /tasks/{id}` idempotent, xóa mềm) cho app offline-first. Chi tiết tại [`../backend/README.md`](../backend/README.md).
+Backend **Go** theo Clean Architecture, PostgreSQL + Qdrant + Google Gemini. Cung cấp API đồng bộ idempotent cho task, danh sách, thói quen, phiên tập trung, và lập lịch AI tránh giờ bận lấy từ lịch của máy. Chi tiết tại [`../backend/README.md`](../backend/README.md).

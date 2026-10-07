@@ -21,6 +21,9 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import com.example.todoapplication.ui.navigation.Screen
+import androidx.compose.ui.res.stringResource
+import androidx.annotation.StringRes
+import com.example.todoapplication.R
 
 /*
  * [TẦNG UI · GIAO DIỆN THÍCH ỨNG] Theo WindowSizeClass (Material 3):
@@ -40,13 +43,13 @@ fun isWideLayout(): Boolean = LocalWindowWidthClass.current != WindowWidthSizeCl
 @Composable
 fun isTwoPane(): Boolean = LocalWindowWidthClass.current == WindowWidthSizeClass.Expanded
 
-data class TabItem(val route: String, val icon: ImageVector, val label: String)
+data class TabItem(val route: String, val icon: ImageVector, @StringRes val labelRes: Int)
 
 val APP_TABS = listOf(
-    TabItem(Screen.Today.route, Icons.Default.WbSunny, "Hôm nay"),
-    TabItem(Screen.TaskList.route, Icons.Default.Checklist, "Việc làm"),
-    TabItem(Screen.Calendar.route, Icons.Default.DateRange, "Lịch"),
-    TabItem(Screen.Stats.route, Icons.Default.Person, "Tôi")
+    TabItem(Screen.Today.route, Icons.Default.WbSunny, R.string.tab_today),
+    TabItem(Screen.TaskList.route, Icons.Default.Checklist, R.string.tab_tasks),
+    TabItem(Screen.Calendar.route, Icons.Default.DateRange, R.string.tab_calendar),
+    TabItem(Screen.Stats.route, Icons.Default.Person, R.string.tab_me)
 )
 
 /** Chuyển tab: giữ trạng thái từng tab (saveState / restoreState), không chồng thêm màn. */
@@ -66,8 +69,8 @@ fun AppNavigationRail(navController: NavController, currentRoute: String?) {
             NavigationRailItem(
                 selected = currentRoute == tab.route,
                 onClick = { if (currentRoute != tab.route) navigateToTab(navController, tab.route) },
-                icon = { Icon(tab.icon, contentDescription = tab.label) },
-                label = { Text(tab.label) }
+                icon = { Icon(tab.icon, contentDescription = stringResource(tab.labelRes)) },
+                label = { Text(stringResource(tab.labelRes)) }
             )
         }
     }

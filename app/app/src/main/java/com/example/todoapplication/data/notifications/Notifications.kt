@@ -11,6 +11,8 @@ import android.media.RingtoneManager
 import android.os.Build
 import androidx.core.content.ContextCompat
 import com.example.todoapplication.ui.navigation.AppIntents
+import com.example.todoapplication.R
+import com.example.todoapplication.i18n.str
 
 /** Kênh thông báo + tiện ích dùng chung cho nhắc việc, tóm tắt buổi sáng, tổng kết tuần và hẹn giờ tập trung. */
 object Notifications {
@@ -37,20 +39,20 @@ object Notifications {
         val manager = context.getSystemService(NotificationManager::class.java) ?: return
         manager.createNotificationChannels(
             listOf(
-                NotificationChannel(CHANNEL_REMINDERS, "Nhắc việc", NotificationManager.IMPORTANCE_HIGH)
-                    .apply { description = "Thông báo khi công việc đến hạn" },
-                NotificationChannel(CHANNEL_DIGEST, "Tóm tắt & tổng kết", NotificationManager.IMPORTANCE_DEFAULT)
-                    .apply { description = "Tóm tắt việc cần làm buổi sáng và tổng kết cuối tuần" },
-                NotificationChannel(CHANNEL_FOCUS, "Hẹn giờ tập trung", NotificationManager.IMPORTANCE_HIGH)
-                    .apply { description = "Báo khi hết phiên tập trung hoặc giờ nghỉ" },
+                NotificationChannel(CHANNEL_REMINDERS, str(R.string.channel_reminders), NotificationManager.IMPORTANCE_HIGH)
+                    .apply { description = str(R.string.channel_reminders_desc) },
+                NotificationChannel(CHANNEL_DIGEST, str(R.string.channel_digest), NotificationManager.IMPORTANCE_DEFAULT)
+                    .apply { description = str(R.string.channel_digest_desc) },
+                NotificationChannel(CHANNEL_FOCUS, str(R.string.channel_focus), NotificationManager.IMPORTANCE_HIGH)
+                    .apply { description = str(R.string.channel_focus_desc) },
                 // Thông báo cố định: không kêu, không rung
-                NotificationChannel(CHANNEL_FOCUS_ONGOING, "Đang tập trung", NotificationManager.IMPORTANCE_LOW)
-                    .apply { description = "Đồng hồ đếm ngược của phiên tập trung đang chạy" },
-                NotificationChannel(CHANNEL_QUICK_ADD, "Thêm việc nhanh", NotificationManager.IMPORTANCE_LOW)
-                    .apply { description = "Ô thêm việc cố định trên thanh thông báo" },
+                NotificationChannel(CHANNEL_FOCUS_ONGOING, str(R.string.channel_focus_ongoing), NotificationManager.IMPORTANCE_LOW)
+                    .apply { description = str(R.string.channel_focus_ongoing_desc) },
+                NotificationChannel(CHANNEL_QUICK_ADD, str(R.string.channel_quick_add), NotificationManager.IMPORTANCE_LOW)
+                    .apply { description = str(R.string.channel_quick_add_desc) },
                 // Kênh báo thức: âm báo thức của máy, phát theo luồng báo thức (kêu cả khi để im lặng thông báo)
-                NotificationChannel(CHANNEL_ALARM, "Báo thức việc quan trọng", NotificationManager.IMPORTANCE_HIGH).apply {
-                    description = "Đổ chuông toàn màn hình khi việc ưu tiên cao đến hạn"
+                NotificationChannel(CHANNEL_ALARM, str(R.string.channel_alarm), NotificationManager.IMPORTANCE_HIGH).apply {
+                    description = str(R.string.channel_alarm_desc)
                     setSound(
                         RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM),
                         AudioAttributes.Builder()

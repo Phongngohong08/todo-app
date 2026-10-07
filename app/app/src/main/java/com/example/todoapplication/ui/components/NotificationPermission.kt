@@ -16,6 +16,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import com.example.todoapplication.data.notifications.Notifications
 import com.example.todoapplication.di.ServiceLocator
+import androidx.compose.ui.res.stringResource
+import com.example.todoapplication.R
 
 /**
  * Xin quyền thông báo (Android 13+) ĐÚNG LÚC — khi người dùng vừa đặt hạn/nhắc việc hoặc bật thông báo buổi
@@ -33,7 +35,7 @@ fun rememberNotificationPermissionRequest(): (reason: String) -> Unit {
     rationale?.let { reason ->
         AlertDialog(
             onDismissRequest = { rationale = null },
-            title = { Text("Bật thông báo?", color = MaterialTheme.colorScheme.onSurface) },
+            title = { Text(stringResource(R.string.notif_permission_title), color = MaterialTheme.colorScheme.onSurface) },
             text = { Text(reason, color = MaterialTheme.colorScheme.onSurfaceVariant) },
             confirmButton = {
                 TextButton(onClick = {
@@ -42,13 +44,13 @@ fun rememberNotificationPermissionRequest(): (reason: String) -> Unit {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                         launcher.launch(Manifest.permission.POST_NOTIFICATIONS)
                     }
-                }) { Text("Bật", color = MaterialTheme.colorScheme.primary) }
+                }) { Text(stringResource(R.string.action_turn_on), color = MaterialTheme.colorScheme.primary) }
             },
             dismissButton = {
                 TextButton(onClick = {
                     rationale = null
                     ServiceLocator.localPrefs.notificationPermissionAsked = true
-                }) { Text("Để sau", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                }) { Text(stringResource(R.string.action_later), color = MaterialTheme.colorScheme.onSurfaceVariant) }
             },
             containerColor = MaterialTheme.colorScheme.surface
         )

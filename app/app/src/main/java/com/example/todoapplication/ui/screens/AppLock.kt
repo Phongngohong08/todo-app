@@ -24,6 +24,9 @@ import androidx.fragment.app.FragmentActivity
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import androidx.compose.ui.res.stringResource
+import com.example.todoapplication.R
+import com.example.todoapplication.i18n.str
 
 /**
  * Khóa ứng dụng: khi bật trong Cài đặt, app đòi vân tay / khuôn mặt / mã PIN máy lúc mở lần đầu
@@ -101,8 +104,8 @@ fun LockScreen() {
                 )
                 prompt.authenticate(
                     BiometricPrompt.PromptInfo.Builder()
-                        .setTitle("Mở khóa TaskFlow")
-                        .setSubtitle("Xác thực để xem công việc của bạn")
+                        .setTitle(str(R.string.lock_prompt_title))
+                        .setSubtitle(str(R.string.lock_prompt_subtitle))
                         .setAllowedAuthenticators(AppLock.AUTHENTICATORS)
                         .build()
                 )
@@ -122,12 +125,12 @@ fun LockScreen() {
         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(32.dp)) {
             Icon(Icons.Default.Lock, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(56.dp))
             Spacer(Modifier.height(16.dp))
-            Text("TaskFlow đang khóa", fontWeight = FontWeight.Bold, fontSize = 20.sp, color = MaterialTheme.colorScheme.onSurface)
+            Text(stringResource(R.string.lock_locked), fontWeight = FontWeight.Bold, fontSize = 20.sp, color = MaterialTheme.colorScheme.onSurface)
             error?.let {
                 Text(it, color = MaterialTheme.colorScheme.error, fontSize = 13.sp, modifier = Modifier.padding(top = 8.dp))
             }
             Spacer(Modifier.height(24.dp))
-            Button(onClick = { authenticate() }) { Text("Mở khóa") }
+            Button(onClick = { authenticate() }) { Text(stringResource(R.string.lock_unlock)) }
         }
     }
 }

@@ -49,10 +49,15 @@ import com.example.todoapplication.data.repository.ThemeMode
 import com.example.todoapplication.ui.components.rememberNotificationPermissionRequest
 import com.example.todoapplication.ui.navigation.Screen
 import com.example.todoapplication.ui.theme.PriorityHighColor
-import com.example.todoapplication.ui.utils.WEEKDAY_SHORT
+import com.example.todoapplication.ui.utils.weekdayShortLabels
+import com.example.todoapplication.ui.utils.formatDuration
+import com.example.todoapplication.i18n.AppLanguage
 import com.example.todoapplication.ui.utils.categoryLabel
 import com.example.todoapplication.ui.viewmodel.SettingsEvent
 import com.example.todoapplication.ui.viewmodel.SettingsViewModel
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.pluralStringResource
+import com.example.todoapplication.i18n.str
 
 /** [TẦNG UI · MÀN HÌNH] Cài đặt — chỉnh giờ làm việc/thời lượng (cho AI) và chọn theme Sáng/Tối. */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -110,10 +115,10 @@ fun SettingsScreen(
     confirmLogout?.let { pending ->
         AlertDialog(
             onDismissRequest = { confirmLogout = null },
-            title = { Text("Đăng xuất khi chưa đồng bộ?", color = MaterialTheme.colorScheme.onSurface) },
+            title = { Text(stringResource(R.string.logout_unsynced_title), color = MaterialTheme.colorScheme.onSurface) },
             text = {
                 Text(
-                    "Còn ${pending.pendingChanges} thay đổi chưa gửi được lên máy chủ (đang offline). Đăng xuất bây giờ sẽ làm mất các thay đổi này.",
+                    pluralStringResource(R.plurals.logout_unsynced_text, pending.pendingChanges, pending.pendingChanges),
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             },
@@ -121,10 +126,10 @@ fun SettingsScreen(
                 TextButton(onClick = {
                     confirmLogout = null
                     settingsViewModel.logoutNow(pending.allDevices)
-                }) { Text("Vẫn đăng xuất", color = PriorityHighColor) }
+                }) { Text(stringResource(R.string.logout_anyway), color = PriorityHighColor) }
             },
             dismissButton = {
-                TextButton(onClick = { confirmLogout = null }) { Text("Ở lại", color = MaterialTheme.colorScheme.primary) }
+                TextButton(onClick = { confirmLogout = null }) { Text(stringResource(R.string.logout_stay), color = MaterialTheme.colorScheme.primary) }
             },
             containerColor = MaterialTheme.colorScheme.surface
         )
@@ -149,12 +154,12 @@ fun SettingsScreen(
                 IconButton(onClick = { navController.popBackStack() }) {
                     Icon(
                         Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Quay lại",
+                        contentDescription = stringResource(R.string.action_back),
                         tint = MaterialTheme.colorScheme.onSurface
                     )
                 }
                 Text(
-                    "Thiết lập",
+                    stringResource(R.string.settings_title),
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
@@ -178,11 +183,11 @@ fun SettingsScreen(
                     Spacer(Modifier.height(4.dp))
 
                     // Theme section
-                    SettingsSection(title = "🌗 Giao diện") {
+                    SettingsSection(title = stringResource(R.string.settings_appearance)) {
                         val themeOptions = listOf(
-                            ThemeMode.LIGHT to "☀️ Sáng",
-                            ThemeMode.DARK to "🌙 Tối",
-                            ThemeMode.SYSTEM to "📱 Hệ thống"
+                            ThemeMode.LIGHT to stringResource(R.string.theme_light),
+                            ThemeMode.DARK to stringResource(R.string.theme_dark),
+                            ThemeMode.SYSTEM to stringResource(R.string.theme_system)
                         )
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -213,17 +218,42 @@ fun SettingsScreen(
                         }
                     }
 
-                    // Schedule section
-                    SettingsSection(title = "🕐 Nhịp sinh hoạt") {
+                    // Ngôn ngữ của riêng app (per-app language): Android 13+ do hệ thống lưu, máy cũ hơn app tự lưu
+                    SettingsSection(title = stringResource(R.string.settings_language)) {
+                        val currentLanguage = remember { AppLanguage.current(context) }
+                        val activity = remember(context) {
+                            generateSequence(context) { (it as? android.content.ContextWrapper)?.baseContext }
+                                .filterIsInstance<android.app.Activity>().firstOrNull()
+                        }
+                        Row(
+                            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            (listOf(AppLanguage.SYSTEM to stringResource(R.string.language_system)) + AppLanguage.SUPPORTED).forEach { (tag, label) ->
+                                StatusFilterChip(text = label, selected = currentLanguage == tag, onClick = {
+                                    if (tag != currentLanguage) activity?.let { AppLanguage.set(it, tag) }
+                                })
+                            }
+                        }
                         Text(
-                            "AI dùng các thông số này để sắp xếp lịch trình phù hợp với bạn.",
+                            stringResource(R.string.language_hint),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = 11.sp,
+                            modifier = Modifier.padding(top = 6.dp)
+                        )
+                    }
+
+                    // Schedule section
+                    SettingsSection(title = stringResource(R.string.settings_rhythm)) {
+                        Text(
+                            stringResource(R.string.settings_rhythm_hint),
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontSize = 12.sp,
                             modifier = Modifier.padding(bottom = 12.dp)
                         )
 
                         TimePickerField(
-                            label = "Bắt đầu buổi sáng",
+                            label = stringResource(R.string.settings_morning_start),
                             value = morningStart,
                             onValueChange = { settingsViewModel.setMorning(it) }
                         )
@@ -231,7 +261,7 @@ fun SettingsScreen(
                         Spacer(Modifier.height(12.dp))
 
                         TimePickerField(
-                            label = "Kết thúc buổi tối",
+                            label = stringResource(R.string.settings_evening_end),
                             value = eveningEnd,
                             onValueChange = { settingsViewModel.setEvening(it) }
                         )
@@ -241,7 +271,7 @@ fun SettingsScreen(
                         OutlinedTextField(
                             value = workDuration,
                             onValueChange = { settingsViewModel.setDuration(it) },
-                            label = { Text("Thời lượng phiên làm việc (phút)") },
+                            label = { Text(stringResource(R.string.settings_work_duration)) },
                             modifier = Modifier.fillMaxWidth(),
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             colors = OutlinedTextFieldDefaults.colors(
@@ -257,27 +287,27 @@ fun SettingsScreen(
                     }
 
                     // Mục tiêu hằng ngày + ngày nghỉ (kiểu Todoist Karma)
-                    SettingsSection(title = "🎯 Mục tiêu hằng ngày") {
+                    SettingsSection(title = stringResource(R.string.settings_daily_goal)) {
                         Text(
-                            "Chuỗi ngày 🔥 chỉ tăng khi bạn hoàn thành đủ số việc này. Ngày nghỉ không làm đứt chuỗi.",
+                            stringResource(R.string.settings_daily_goal_hint),
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontSize = 12.sp,
                             modifier = Modifier.padding(bottom = 8.dp)
                         )
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("Mỗi ngày hoàn thành", color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
+                            Text(stringResource(R.string.settings_complete_each_day), color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
                             IconButton(onClick = { settingsViewModel.setDailyGoal(state.dailyGoal - 1) }) {
-                                Icon(Icons.Default.Remove, contentDescription = "Giảm")
+                                Icon(Icons.Default.Remove, contentDescription = stringResource(R.string.action_decrease))
                             }
                             Text("${state.dailyGoal}", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = MaterialTheme.colorScheme.onSurface)
                             IconButton(onClick = { settingsViewModel.setDailyGoal(state.dailyGoal + 1) }) {
-                                Icon(Icons.Default.Add, contentDescription = "Tăng")
+                                Icon(Icons.Default.Add, contentDescription = stringResource(R.string.action_increase))
                             }
-                            Text("việc", color = MaterialTheme.colorScheme.onSurface)
+                            Text(stringResource(R.string.unit_tasks), color = MaterialTheme.colorScheme.onSurface)
                         }
-                        Text("Ngày nghỉ", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp, bottom = 6.dp))
+                        Text(stringResource(R.string.settings_days_off), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp, bottom = 6.dp))
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            WEEKDAY_SHORT.forEach { (code, label) ->
+                            weekdayShortLabels().forEach { (code, label) ->
                                 val sel = code in state.daysOff
                                 Box(
                                     modifier = Modifier
@@ -295,9 +325,9 @@ fun SettingsScreen(
                     }
 
                     // Category management section
-                    SettingsSection(title = "🏷️ Danh mục") {
+                    SettingsSection(title = stringResource(R.string.settings_lists)) {
                         Text(
-                            "Danh mục dùng khi tạo công việc. Bạn có thể thêm danh mục riêng và xoá danh mục tự thêm.",
+                            stringResource(R.string.settings_lists_hint),
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontSize = 12.sp,
                             modifier = Modifier.padding(bottom = 10.dp)
@@ -310,10 +340,10 @@ fun SettingsScreen(
                             ) {
                                 Text(categoryLabel(c), color = MaterialTheme.colorScheme.onSurface, fontSize = 14.sp, modifier = Modifier.weight(1f))
                                 if (isDefault) {
-                                    Text("Mặc định", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
+                                    Text(stringResource(R.string.settings_default_list), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
                                 } else {
                                     IconButton(onClick = { settingsViewModel.removeCategory(c) }, modifier = Modifier.size(28.dp)) {
-                                        Icon(Icons.Default.Close, contentDescription = "Xoá", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
+                                        Icon(Icons.Default.Close, contentDescription = stringResource(R.string.action_delete), tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
                                     }
                                 }
                             }
@@ -328,7 +358,7 @@ fun SettingsScreen(
                             OutlinedTextField(
                                 value = newCat,
                                 onValueChange = { newCat = it },
-                                label = { Text("Danh mục mới") },
+                                label = { Text(stringResource(R.string.list_new)) },
                                 modifier = Modifier.weight(1f),
                                 singleLine = true,
                                 shape = RoundedCornerShape(12.dp),
@@ -348,7 +378,7 @@ fun SettingsScreen(
                                     .padding(horizontal = 16.dp, vertical = 14.dp),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Text("Thêm", color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                                Text(stringResource(R.string.action_add), color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
                             }
                         }
                     }
@@ -374,7 +404,7 @@ fun SettingsScreen(
                             CircularProgressIndicator(color = Color.White, modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
                         } else {
                             Text(
-                                "Lưu thiết lập",
+                                stringResource(R.string.settings_save),
                                 color = Color.White,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 15.sp
@@ -383,106 +413,106 @@ fun SettingsScreen(
                     }
 
                     // Thông báo (theo thiết bị, áp dụng ngay — không cần bấm Lưu)
-                    SettingsSection(title = "🔔 Thông báo") {
+                    SettingsSection(title = stringResource(R.string.settings_notifications)) {
                         SwitchRow(
-                            title = "Tóm tắt buổi sáng",
-                            subtitle = "Số việc đến hạn, quá hạn và trong Ngày của tôi",
+                            title = stringResource(R.string.settings_morning_digest),
+                            subtitle = stringResource(R.string.settings_morning_digest_sub),
                             checked = digestEnabled,
                             onChange = {
                                 settingsViewModel.setDigestEnabled(it)
-                                if (it) askNotificationPermission("Bật thông báo để nhận tóm tắt việc cần làm mỗi sáng.")
+                                if (it) askNotificationPermission(str(R.string.settings_digest_rationale))
                             }
                         )
                         if (digestEnabled) {
-                            TimePickerField(label = "Giờ gửi tóm tắt", value = digestTime, onValueChange = settingsViewModel::setDigestTime)
+                            TimePickerField(label = stringResource(R.string.settings_digest_time), value = digestTime, onValueChange = settingsViewModel::setDigestTime)
                         }
                         Spacer(Modifier.height(8.dp))
                         SwitchRow(
-                            title = "Tổng kết tuần",
-                            subtitle = "Tối Chủ nhật 19:00 — xem lại tuần và lập kế hoạch tuần tới",
+                            title = stringResource(R.string.review_title),
+                            subtitle = stringResource(R.string.settings_weekly_review_sub),
                             checked = weeklyReview,
                             onChange = settingsViewModel::setWeeklyReviewEnabled
                         )
                         Spacer(Modifier.height(8.dp))
                         TimePickerField(
-                            label = "Giờ nhắc cho việc \"cả ngày\"",
+                            label = stringResource(R.string.settings_all_day_time),
                             value = allDayReminder,
                             onValueChange = settingsViewModel::setAllDayReminderTime
                         )
                     }
 
                     // Tiện ích hệ thống Android (theo thiết bị)
-                    SettingsSection(title = "📲 Tiện ích hệ thống") {
+                    SettingsSection(title = stringResource(R.string.settings_system)) {
                         SwitchRow(
-                            title = "Bật Không làm phiền khi tập trung",
-                            subtitle = "Tắt thông báo của mọi app trong phiên Pomodoro, tự bật lại khi xong",
+                            title = stringResource(R.string.settings_focus_dnd),
+                            subtitle = stringResource(R.string.settings_focus_dnd_sub),
                             checked = focusDnd,
                             onChange = { enable ->
                                 settingsViewModel.setFocusDnd(enable)
                                 if (enable && !FocusDnd.hasAccess(context)) {
-                                    Toast.makeText(context, "Cho phép TaskFlow quản lý \"Không làm phiền\"", Toast.LENGTH_LONG).show()
+                                    Toast.makeText(context, str(R.string.settings_dnd_grant), Toast.LENGTH_LONG).show()
                                     context.startActivity(Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS))
                                 }
                             }
                         )
                         Spacer(Modifier.height(8.dp))
                         SwitchRow(
-                            title = "Ô \"Thêm việc nhanh\" trên thanh thông báo",
-                            subtitle = "Gõ việc ngay trên thông báo, không cần mở app",
+                            title = stringResource(R.string.settings_quick_add_notif),
+                            subtitle = stringResource(R.string.settings_quick_add_notif_sub),
                             checked = quickAddNotif,
                             onChange = { enable ->
                                 settingsViewModel.setQuickAddNotification(enable)
-                                if (enable) askNotificationPermission("Bật thông báo để dùng ô thêm việc nhanh.")
+                                if (enable) askNotificationPermission(str(R.string.settings_quick_add_rationale))
                                 QuickAddNotifier.refresh(context)
                             }
                         )
                         if (Build.VERSION.SDK_INT >= 33) {
                             Spacer(Modifier.height(8.dp))
-                            Text("Ô cài đặt nhanh", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Medium)
+                            Text(stringResource(R.string.settings_qs_tiles), color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Medium)
                             Text(
-                                "Thêm ô \"Tập trung\" / \"Thêm việc\" vào bảng kéo xuống từ đỉnh màn hình",
+                                stringResource(R.string.settings_qs_tiles_sub),
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 fontSize = 11.sp
                             )
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 6.dp)) {
-                                OutlinedButton(onClick = { requestAddTile(context, FocusTileService::class.java, "Tập trung", R.drawable.ic_shortcut_focus) }) {
-                                    Text("+ Tập trung")
+                                OutlinedButton(onClick = { requestAddTile(context, FocusTileService::class.java, str(R.string.tile_focus), R.drawable.ic_shortcut_focus) }) {
+                                    Text("+ " + stringResource(R.string.tile_focus))
                                 }
-                                OutlinedButton(onClick = { requestAddTile(context, QuickAddTileService::class.java, "Thêm việc", R.drawable.ic_shortcut_add) }) {
-                                    Text("+ Thêm việc")
+                                OutlinedButton(onClick = { requestAddTile(context, QuickAddTileService::class.java, str(R.string.tile_quick_add), R.drawable.ic_shortcut_add) }) {
+                                    Text("+ " + stringResource(R.string.tile_quick_add))
                                 }
                             }
                         }
                     }
 
                     // Kế hoạch tuần (theo thiết bị)
-                    SettingsSection(title = "🗓 Kế hoạch") {
-                        Text("Số giờ làm việc mỗi ngày", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Medium)
+                    SettingsSection(title = stringResource(R.string.settings_planning)) {
+                        Text(stringResource(R.string.settings_capacity), color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Medium)
                         Text(
-                            "Lịch tuần cộng thời lượng ước tính của từng ngày và tô đỏ ngày vượt mức này.",
+                            stringResource(R.string.settings_capacity_hint),
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontSize = 11.sp
                         )
                         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 6.dp)) {
                             IconButton(onClick = { settingsViewModel.setDailyCapacityMinutes(dailyCapacity - 30) }) {
-                                Icon(Icons.Default.Remove, contentDescription = "Giảm")
+                                Icon(Icons.Default.Remove, contentDescription = stringResource(R.string.action_decrease))
                             }
                             Text(
-                                "%d giờ%s".format(dailyCapacity / 60, if (dailyCapacity % 60 != 0) " ${dailyCapacity % 60} phút" else ""),
+                                formatDuration(dailyCapacity),
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 16.sp
                             )
                             IconButton(onClick = { settingsViewModel.setDailyCapacityMinutes(dailyCapacity + 30) }) {
-                                Icon(Icons.Default.Add, contentDescription = "Tăng")
+                                Icon(Icons.Default.Add, contentDescription = stringResource(R.string.action_increase))
                             }
                         }
                     }
 
                     // Nhắc hẹn nâng cao (theo thiết bị)
-                    SettingsSection(title = "⏰ Nhắc hẹn nâng cao") {
-                        Text("Nhắc lại tới khi xong", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Medium)
+                    SettingsSection(title = stringResource(R.string.settings_advanced_reminders)) {
+                        Text(stringResource(R.string.settings_nag), color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Medium)
                         Text(
-                            "Việc đến hạn mà chưa tích xong sẽ được nhắc lại (tối đa ${LocalPrefs.MAX_NAGS} lần).",
+                            stringResource(R.string.settings_nag_hint, LocalPrefs.MAX_NAGS),
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontSize = 11.sp
                         )
@@ -490,54 +520,54 @@ fun SettingsScreen(
                             Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(vertical = 8.dp),
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            listOf(0 to "Tắt", 5 to "5 phút", 10 to "10 phút", 15 to "15 phút", 30 to "30 phút").forEach { (m, label) ->
+                            (listOf(0 to stringResource(R.string.settings_off)) + listOf(5, 10, 15, 30).map { it to formatDuration(it) }).forEach { (m, label) ->
                                 StatusFilterChip(text = label, selected = nagMinutes == m, onClick = { settingsViewModel.setNagMinutes(m) })
                             }
                         }
                         if (nagMinutes > 0) {
                             SwitchRow(
-                                title = "Chỉ việc ưu tiên Cao",
-                                subtitle = "Tắt để nhắc lại mọi việc có hạn",
+                                title = stringResource(R.string.settings_nag_high_only),
+                                subtitle = stringResource(R.string.settings_nag_high_only_sub),
                                 checked = nagHighOnly,
                                 onChange = settingsViewModel::setNagHighOnly
                             )
                         }
                         HorizontalDivider(Modifier.padding(vertical = 10.dp), color = MaterialTheme.colorScheme.outlineVariant)
                         SwitchRow(
-                            title = "Báo thức cho việc ưu tiên Cao",
-                            subtitle = "Đổ chuông + hiện toàn màn hình kể cả khi khóa máy, như đồng hồ báo thức",
+                            title = stringResource(R.string.settings_alarm_high),
+                            subtitle = stringResource(R.string.settings_alarm_high_sub),
                             checked = alarmHighPriority,
                             onChange = {
                                 settingsViewModel.setAlarmHighPriority(it)
-                                if (it) askNotificationPermission("Bật thông báo để báo thức cho việc quan trọng hoạt động.")
+                                if (it) askNotificationPermission(str(R.string.settings_alarm_rationale))
                             }
                         )
                         if (alarmHighPriority) AlarmPermissionHints()
                         HorizontalDivider(Modifier.padding(vertical = 10.dp), color = MaterialTheme.colorScheme.outlineVariant)
                         SwitchRow(
-                            title = "Giờ yên lặng",
-                            subtitle = "Nhắc rơi vào khung giờ này sẽ dời tới lúc hết giờ yên lặng (báo thức vẫn kêu)",
+                            title = stringResource(R.string.settings_quiet_hours),
+                            subtitle = stringResource(R.string.settings_quiet_hours_sub),
                             checked = quietEnabled,
                             onChange = settingsViewModel::setQuietEnabled
                         )
                         if (quietEnabled) {
                             Spacer(Modifier.height(8.dp))
                             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                Box(Modifier.weight(1f)) { TimePickerField("Từ", quietStart, settingsViewModel::setQuietStart) }
-                                Box(Modifier.weight(1f)) { TimePickerField("Đến", quietEnd, settingsViewModel::setQuietEnd) }
+                                Box(Modifier.weight(1f)) { TimePickerField(stringResource(R.string.settings_from), quietStart, settingsViewModel::setQuietStart) }
+                                Box(Modifier.weight(1f)) { TimePickerField(stringResource(R.string.settings_to), quietEnd, settingsViewModel::setQuietEnd) }
                             }
                         }
                     }
 
                     // Bảo mật (theo thiết bị)
-                    SettingsSection(title = "🔒 Bảo mật") {
+                    SettingsSection(title = stringResource(R.string.settings_security)) {
                         SwitchRow(
-                            title = "Khóa ứng dụng",
-                            subtitle = "Dùng vân tay / khuôn mặt / mã PIN máy khi mở app hoặc quay lại sau ${AppLock.RELOCK_AFTER_MS / 1000} giây",
+                            title = stringResource(R.string.settings_app_lock),
+                            subtitle = stringResource(R.string.settings_app_lock_sub, AppLock.RELOCK_AFTER_MS / 1000),
                             checked = appLockEnabled,
                             onChange = { enable ->
                                 if (enable && !AppLock.isAvailable(context)) {
-                                    Toast.makeText(context, "Máy chưa cài vân tay hoặc mã khóa màn hình", Toast.LENGTH_LONG).show()
+                                    Toast.makeText(context, str(R.string.settings_no_lock_screen), Toast.LENGTH_LONG).show()
                                 } else {
                                     settingsViewModel.setAppLockEnabled(enable)
                                 }
@@ -546,43 +576,40 @@ fun SettingsScreen(
                     }
 
                     // Sao lưu / xuất / khôi phục (Storage Access Framework)
-                    SettingsSection(title = "💾 Dữ liệu") { BackupSection() }
+                    SettingsSection(title = stringResource(R.string.settings_data)) { BackupSection() }
 
                     // Tài khoản
-                    SettingsSection(title = "👤 Tài khoản") {
+                    SettingsSection(title = stringResource(R.string.settings_account)) {
                         OutlinedButton(
                             onClick = { settingsViewModel.requestLogout(allDevices = false) },
                             modifier = Modifier.fillMaxWidth()
-                        ) { Text("Đăng xuất khỏi máy này") }
+                        ) { Text(stringResource(R.string.settings_logout)) }
                         Spacer(Modifier.height(6.dp))
                         TextButton(
                             onClick = { settingsViewModel.requestLogout(allDevices = true) },
                             modifier = Modifier.fillMaxWidth()
-                        ) { Text("Đăng xuất khỏi mọi thiết bị", color = PriorityHighColor) }
+                        ) { Text(stringResource(R.string.settings_logout_all), color = PriorityHighColor) }
                         Text(
-                            "Dùng khi mất điện thoại hoặc đăng nhập nhầm ở máy lạ.",
+                            stringResource(R.string.settings_logout_all_hint),
                             fontSize = 11.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
 
                     // About / FAQ section
-                    SettingsSection(title = "ℹ️ Giới thiệu") {
-                        Text("TaskFlow AI", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurface)
-                        Text("Phiên bản 1.0", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp, bottom = 8.dp))
+                    SettingsSection(title = stringResource(R.string.settings_about)) {
+                        Text(stringResource(R.string.app_name), fontWeight = FontWeight.Bold, fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurface)
+                        Text(stringResource(R.string.settings_version, com.example.todoapplication.BuildConfig.VERSION_NAME), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp, bottom = 8.dp))
                         Text(
-                            "Ứng dụng quản lý công việc cá nhân tích hợp AI: công việc theo danh sách, mục / Kanban và nhãn; lịch tháng / tuần; thói quen; tập trung Pomodoro; mục tiêu & thống kê; lịch trình AI hằng ngày và AI Coach có trí nhớ dài hạn. Dùng được khi offline, đồng bộ giữa các máy.",
+                            stringResource(R.string.settings_about_text),
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontSize = 12.sp,
                             lineHeight = 18.sp
                         )
                         Spacer(Modifier.height(10.dp))
-                        Text("Hỏi đáp nhanh", fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface)
+                        Text(stringResource(R.string.settings_faq), fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface)
                         Text(
-                            "• Không nhận thông báo? Hãy cấp quyền thông báo và đặt hạn chót cho việc.\n" +
-                                "• Thêm danh sách mới? Ngay tại mục Danh mục ở trên, ở Tôi → Danh sách, hoặc trong màn chi tiết công việc.\n" +
-                                "• Chia việc theo giai đoạn? Mở một danh sách → thêm mục → kéo thẻ giữa các cột Kanban.\n" +
-                                "• AI hiểu sai khi thêm nhanh? Mô tả rõ thời gian/độ ưu tiên hơn, rồi chỉnh tay trước khi lưu.",
+                            stringResource(R.string.settings_faq_text),
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontSize = 12.sp,
                             lineHeight = 18.sp,
@@ -614,12 +641,12 @@ private fun AlarmPermissionHints() {
     }
     val packageUri = Uri.parse("package:${context.packageName}")
     if (!exactOk && Build.VERSION.SDK_INT >= 31) {
-        PermissionHint("Chưa cho phép hẹn giờ chính xác — báo thức có thể kêu trễ vài phút.") {
+        PermissionHint(stringResource(R.string.settings_exact_alarm_missing)) {
             context.startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, packageUri))
         }
     }
     if (!fullScreenOk && Build.VERSION.SDK_INT >= 34) {
-        PermissionHint("Chưa cho phép hiện toàn màn hình — báo thức chỉ hiện thành thông báo.") {
+        PermissionHint(stringResource(R.string.settings_full_screen_missing)) {
             context.startActivity(Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT, packageUri))
         }
     }
@@ -629,7 +656,7 @@ private fun AlarmPermissionHints() {
 private fun PermissionHint(text: String, onGrant: () -> Unit) {
     Row(Modifier.fillMaxWidth().padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
         Text(text, fontSize = 11.sp, color = PriorityHighColor, modifier = Modifier.weight(1f))
-        TextButton(onClick = onGrant) { Text("Cấp quyền") }
+        TextButton(onClick = onGrant) { Text(stringResource(R.string.settings_grant)) }
     }
 }
 
@@ -684,7 +711,7 @@ fun TimePickerField(
                     val initialHour = parts.getOrNull(0)?.toIntOrNull() ?: 8
                     val initialMinute = parts.getOrNull(1)?.toIntOrNull() ?: 0
                     TimePickerDialog(context, { _, hour, minute ->
-                        onValueChange(String.format("%02d:%02d", hour, minute))
+                        onValueChange(String.format(java.util.Locale.ROOT, "%02d:%02d", hour, minute))
                     }, initialHour, initialMinute, true).show()
                 }
         ) {
@@ -696,7 +723,7 @@ fun TimePickerField(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    value.ifEmpty { "Chọn giờ" },
+                    value.ifEmpty { stringResource(R.string.detail_pick_time) },
                     color = MaterialTheme.colorScheme.onSurface,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.SemiBold
@@ -726,8 +753,8 @@ private fun requestAddTile(context: android.content.Context, service: Class<*>, 
         context.mainExecutor
     ) { result ->
         val msg = when (result) {
-            android.app.StatusBarManager.TILE_ADD_REQUEST_RESULT_TILE_ADDED -> "Đã thêm ô \"$label\""
-            android.app.StatusBarManager.TILE_ADD_REQUEST_RESULT_TILE_ALREADY_ADDED -> "Ô \"$label\" đã có sẵn"
+            android.app.StatusBarManager.TILE_ADD_REQUEST_RESULT_TILE_ADDED -> str(R.string.settings_tile_added, label)
+            android.app.StatusBarManager.TILE_ADD_REQUEST_RESULT_TILE_ALREADY_ADDED -> str(R.string.settings_tile_exists, label)
             else -> null
         }
         msg?.let { Toast.makeText(context, it, Toast.LENGTH_SHORT).show() }

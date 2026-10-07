@@ -55,6 +55,10 @@ import com.example.todoapplication.ui.utils.formatDueLabel
 import com.example.todoapplication.ui.viewmodel.ListBoardEvent
 import com.example.todoapplication.ui.viewmodel.ListBoardViewModel
 import com.example.todoapplication.ui.viewmodel.ListsViewModel
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.pluralStringResource
+import com.example.todoapplication.R
+import com.example.todoapplication.i18n.str
 
 /** Nhãn hiển thị của danh sách kèm emoji (nếu có). */
 fun listTitle(info: ListInfo): String = (if (info.emoji.isNotBlank()) info.emoji + " " else "") + categoryLabel(info.name)
@@ -77,10 +81,10 @@ fun ListsScreen(
         snackbarHost = { SnackbarHost(snackbar) },
         topBar = {
             TopAppBar(
-                title = { Text("Danh sách", fontWeight = FontWeight.Bold) },
+                title = { Text(stringResource(R.string.lists_title), fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Quay lại")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.action_back))
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
@@ -88,7 +92,7 @@ fun ListsScreen(
         },
         floatingActionButton = {
             FloatingActionButton(onClick = { creating = true }, containerColor = MaterialTheme.colorScheme.primary, shape = CircleShape) {
-                Icon(Icons.Default.Add, contentDescription = "Thêm danh sách", tint = MaterialTheme.colorScheme.onPrimary)
+                Icon(Icons.Default.Add, contentDescription = stringResource(R.string.list_add), tint = MaterialTheme.colorScheme.onPrimary)
             }
         },
         containerColor = MaterialTheme.colorScheme.background
@@ -119,18 +123,18 @@ fun ListsScreen(
                         Column(Modifier.weight(1f)) {
                             Text(categoryLabel(info.name), fontWeight = FontWeight.SemiBold)
                             val parts = buildList {
-                                add("${item.pending} việc")
-                                if (item.overdue > 0) add("${item.overdue} quá hạn")
-                                if (info.sections.isNotEmpty()) add("${info.sections.size} mục")
+                                add(pluralStringResource(R.plurals.count_tasks, item.pending, item.pending))
+                                if (item.overdue > 0) add(stringResource(R.string.list_overdue_count, item.overdue))
+                                if (info.sections.isNotEmpty()) add(pluralStringResource(R.plurals.list_section_count, info.sections.size, info.sections.size))
                             }
                             Text(parts.joinToString(" · "), fontSize = 12.sp, color = if (item.overdue > 0) StateOverdue else MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         IconButton(onClick = { editing = info }) {
-                            Icon(Icons.Default.Edit, contentDescription = "Sửa danh sách", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Icon(Icons.Default.Edit, contentDescription = stringResource(R.string.list_edit), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         if (info.name !in CategoryRepository.DEFAULTS) {
                             IconButton(onClick = { confirmDelete = info.name }) {
-                                Icon(Icons.Default.Delete, contentDescription = "Xóa danh sách", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.list_delete), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
                     }
@@ -158,10 +162,10 @@ fun ListsScreen(
     confirmDelete?.let { name ->
         AlertDialog(
             onDismissRequest = { confirmDelete = null },
-            title = { Text("Xóa danh sách \"$name\"?") },
-            text = { Text("Các việc trong danh sách vẫn được giữ, chỉ bỏ danh sách khỏi bộ lọc.") },
-            confirmButton = { TextButton(onClick = { viewModel.delete(name); confirmDelete = null }) { Text("Xóa", color = MaterialTheme.colorScheme.error) } },
-            dismissButton = { TextButton(onClick = { confirmDelete = null }) { Text("Hủy") } }
+            title = { Text(stringResource(R.string.list_delete_title, categoryLabel(name))) },
+            text = { Text(stringResource(R.string.list_delete_text)) },
+            confirmButton = { TextButton(onClick = { viewModel.delete(name); confirmDelete = null }) { Text(stringResource(R.string.action_delete), color = MaterialTheme.colorScheme.error) } },
+            dismissButton = { TextButton(onClick = { confirmDelete = null }) { Text(stringResource(R.string.action_cancel)) } }
         )
     }
 }
@@ -174,35 +178,35 @@ private fun ListAppearanceDialog(initial: ListInfo, nameEditable: Boolean, onDis
     var emoji by remember { mutableStateOf(initial.emoji) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (initial.name.isEmpty()) "Danh sách mới" else listTitle(initial)) },
+        title = { Text(if (initial.name.isEmpty()) stringResource(R.string.list_new) else listTitle(initial)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 if (nameEditable) {
                     OutlinedTextField(
                         value = name,
                         onValueChange = { name = it.take(CategoryRepository.MAX_LENGTH) },
-                        label = { Text("Tên danh sách") },
+                        label = { Text(stringResource(R.string.list_name)) },
                         singleLine = true
                     )
                 }
-                Text("Biểu tượng", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                Text(stringResource(R.string.list_icon), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                 EmojiPickerRow(LIST_EMOJIS, emoji) { emoji = it }
-                Text("Màu", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                Text(stringResource(R.string.list_color), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                 ColorPickerRow(color) { color = if (it == color) "" else it }
             }
         },
         confirmButton = {
             TextButton(enabled = name.isNotBlank(), onClick = { onSave(initial.copy(name = name.trim(), color = color, emoji = emoji)) }) {
-                Text("Lưu")
+                Text(stringResource(R.string.action_save))
             }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Hủy") } }
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } }
     )
 }
 
 // ─── Một danh sách: Kanban / Danh sách ───────────────────────────────────────
 
-private const val UNSECTIONED_LABEL = "Chưa phân mục"
+private fun unsectionedLabel(): String = str(R.string.list_unsectioned)
 
 /**
  * [TẦNG UI · MÀN HÌNH] Một danh sách. Chế độ **Kanban**: mỗi mục là một cột, nhấn giữ thẻ rồi kéo sang cột khác;
@@ -228,7 +232,7 @@ fun ListBoardScreen(
             when (e) {
                 is ListBoardEvent.Moved -> {
                     val r = snackbar.showSnackbar(
-                        "Đã chuyển sang \"${e.section.ifEmpty { UNSECTIONED_LABEL }}\"", "Hoàn tác", duration = SnackbarDuration.Short
+                        str(R.string.matrix_moved, e.section.ifEmpty { unsectionedLabel() }), str(R.string.action_undo), duration = SnackbarDuration.Short
                     )
                     if (r == SnackbarResult.ActionPerformed) viewModel.undoMove(e.task)
                 }
@@ -244,18 +248,18 @@ fun ListBoardScreen(
                 title = { Text(listTitle(state.info.copy(name = name)), fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Quay lại")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.action_back))
                     }
                 },
                 actions = {
                     IconButton(onClick = { kanban = !kanban }) {
                         Icon(
                             if (kanban) Icons.AutoMirrored.Filled.ViewList else Icons.Default.ViewColumn,
-                            contentDescription = if (kanban) "Xem dạng danh sách" else "Xem dạng Kanban"
+                            contentDescription = stringResource(if (kanban) R.string.list_view_list else R.string.list_view_kanban)
                         )
                     }
-                    IconButton(onClick = { addingSection = true }) { Icon(Icons.Default.PlaylistAdd, contentDescription = "Thêm mục") }
-                    IconButton(onClick = { editingLook = true }) { Icon(Icons.Default.Palette, contentDescription = "Màu & biểu tượng") }
+                    IconButton(onClick = { addingSection = true }) { Icon(Icons.Default.PlaylistAdd, contentDescription = stringResource(R.string.list_add_section)) }
+                    IconButton(onClick = { editingLook = true }) { Icon(Icons.Default.Palette, contentDescription = stringResource(R.string.list_appearance)) }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
             )
@@ -285,7 +289,7 @@ fun ListBoardScreen(
                     state.columns.forEach { col ->
                         if (col.section.isNotEmpty() || col.tasks.isNotEmpty()) {
                             item(key = "h-" + col.section) {
-                                SectionHeader(col.section.ifEmpty { UNSECTIONED_LABEL }, col.tasks.size)
+                                SectionHeader(col.section.ifEmpty { unsectionedLabel() }, col.tasks.size)
                             }
                             items(col.tasks, key = { it.id }) { task ->
                                 BoardCard(task, onOpen = { openTask(task) }, onComplete = { viewModel.complete(task) })
@@ -294,7 +298,7 @@ fun ListBoardScreen(
                     }
                     if (state.completedCount > 0) {
                         item(key = "done") {
-                            Text("✓ ${state.completedCount} việc đã xong", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(pluralStringResource(R.plurals.list_completed_count, state.completedCount, state.completedCount), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 }
@@ -303,12 +307,12 @@ fun ListBoardScreen(
     }
 
     if (addingSection) {
-        TextPromptDialog("Thêm mục", "VD: Cần làm, Đang làm, Chờ phản hồi", "", onDismiss = { addingSection = false }) {
+        TextPromptDialog(stringResource(R.string.list_add_section), stringResource(R.string.list_section_hint), "", onDismiss = { addingSection = false }) {
             viewModel.addSection(it); addingSection = false
         }
     }
     renaming?.let { section ->
-        TextPromptDialog("Đổi tên mục", "", section, onDismiss = { renaming = null }) {
+        TextPromptDialog(stringResource(R.string.list_rename_section), "", section, onDismiss = { renaming = null }) {
             viewModel.renameSection(section, it); renaming = null
         }
     }
@@ -367,7 +371,7 @@ private fun KanbanBoard(
                 modifier = Modifier.width(200.dp).height(56.dp).clickable(onClick = onAddSection)
             ) {
                 Box(contentAlignment = Alignment.Center) {
-                    Text("+ Thêm mục", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
+                    Text(stringResource(R.string.list_add_section_plus), color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
                 }
             }
         }
@@ -403,7 +407,7 @@ private fun KanbanColumn(
                 Box(Modifier.size(8.dp).clip(CircleShape).background(accent))
                 Spacer(Modifier.width(8.dp))
                 Text(
-                    column.section.ifEmpty { UNSECTIONED_LABEL },
+                    column.section.ifEmpty { unsectionedLabel() },
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.weight(1f),
                     maxLines = 1,
@@ -414,14 +418,14 @@ private fun KanbanColumn(
                     var menu by remember { mutableStateOf(false) }
                     Box {
                         IconButton(onClick = { menu = true }, modifier = Modifier.size(32.dp)) {
-                            Icon(Icons.Default.MoreVert, contentDescription = "Tùy chọn mục", modifier = Modifier.size(18.dp))
+                            Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.list_section_options), modifier = Modifier.size(18.dp))
                         }
                         DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                            DropdownMenuItem(text = { Text("Đổi tên") }, onClick = { menu = false; onRename() })
-                            if (index > 0) DropdownMenuItem(text = { Text("Chuyển sang trái") }, onClick = { menu = false; onShift(-1) })
-                            if (index in 0 until lastIndex) DropdownMenuItem(text = { Text("Chuyển sang phải") }, onClick = { menu = false; onShift(1) })
+                            DropdownMenuItem(text = { Text(stringResource(R.string.action_rename)) }, onClick = { menu = false; onRename() })
+                            if (index > 0) DropdownMenuItem(text = { Text(stringResource(R.string.list_move_left)) }, onClick = { menu = false; onShift(-1) })
+                            if (index in 0 until lastIndex) DropdownMenuItem(text = { Text(stringResource(R.string.list_move_right)) }, onClick = { menu = false; onShift(1) })
                             DropdownMenuItem(
-                                text = { Text("Xóa mục (giữ việc)", color = MaterialTheme.colorScheme.error) },
+                                text = { Text(stringResource(R.string.list_delete_section), color = MaterialTheme.colorScheme.error) },
                                 onClick = { menu = false; onDelete() }
                             )
                         }
@@ -444,7 +448,7 @@ private fun KanbanColumn(
                 }
                 if (column.tasks.isEmpty()) {
                     Text(
-                        "Kéo việc vào đây",
+                        stringResource(R.string.list_drop_here),
                         fontSize = 12.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                         modifier = Modifier.padding(vertical = 12.dp).align(Alignment.CenterHorizontally)
@@ -454,7 +458,7 @@ private fun KanbanColumn(
             OutlinedTextField(
                 value = input,
                 onValueChange = { input = it },
-                placeholder = { Text("+ Thêm việc", fontSize = 13.sp) },
+                placeholder = { Text(stringResource(R.string.list_add_task_plus), fontSize = 13.sp) },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                 keyboardActions = KeyboardActions(onDone = { onAdd(input); input = "" }),
@@ -482,9 +486,9 @@ private fun BoardCard(
         shadowElevation = 1.dp,
         modifier = modifier.fillMaxWidth().clickable(onClick = onOpen)
             .semantics(mergeDescendants = true) {
-                customActions = listOf(CustomAccessibilityAction("Hoàn thành") { onComplete(); true }) +
+                customActions = listOf(CustomAccessibilityAction(str(R.string.a11y_complete)) { onComplete(); true }) +
                     moveTargets.map { target ->
-                        CustomAccessibilityAction("Chuyển sang " + target.ifEmpty { UNSECTIONED_LABEL }) { onMove(target); true }
+                        CustomAccessibilityAction(str(R.string.a11y_move_to, target.ifEmpty { unsectionedLabel() })) { onMove(target); true }
                     }
             }
     ) {
@@ -534,7 +538,7 @@ fun TextPromptDialog(title: String, hint: String, initial: String, onDismiss: ()
                 singleLine = true
             )
         },
-        confirmButton = { TextButton(enabled = text.isNotBlank(), onClick = { onConfirm(text.trim()) }) { Text("Lưu") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Hủy") } }
+        confirmButton = { TextButton(enabled = text.isNotBlank(), onClick = { onConfirm(text.trim()) }) { Text(stringResource(R.string.action_save)) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } }
     )
 }

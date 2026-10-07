@@ -1,5 +1,8 @@
 package com.example.todoapplication.data.repository
 
+import com.example.todoapplication.R
+import com.example.todoapplication.i18n.str
+
 /** Lỗi HTTP kèm mã trạng thái, để tầng trên phân biệt (vd 429 = rate limit) và hiển thị thông báo phù hợp. */
 class ApiException(val code: Int) : Exception("HTTP $code") {
     /** true nếu server báo quá tải / hết hạn mức AI (HTTP 429). */
@@ -12,8 +15,8 @@ class ApiException(val code: Int) : Exception("HTTP $code") {
  */
 fun Throwable.aiFailureMessage(fallback: String): String = when {
     this is ApiException && isRateLimited ->
-        "Bạn đã dùng hết lượt AI hoặc thao tác quá nhanh. Vui lòng thử lại sau."
-    this is ApiException && code == 503 -> "Tính năng AI tạm thời chưa khả dụng."
+        str(R.string.ai_rate_limited)
+    this is ApiException && code == 503 -> str(R.string.ai_unavailable)
     else -> fallback
 }
 

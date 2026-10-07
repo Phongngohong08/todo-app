@@ -12,6 +12,9 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
+import com.example.todoapplication.R
+import com.example.todoapplication.ui.utils.shortDate
 import com.example.todoapplication.domain.HabitDay
 import com.example.todoapplication.domain.HabitSummary
 import com.example.todoapplication.domain.model.Habit
@@ -38,6 +41,10 @@ class ComponentsUiTest {
     @get:Rule
     val compose = createComposeRule()
 
+    // So với chuỗi lấy từ tài nguyên theo ngôn ngữ của máy test → chạy đúng cả khi máy để tiếng Anh lẫn tiếng Việt
+    private val context = InstrumentationRegistry.getInstrumentation().targetContext
+    private fun s(id: Int, vararg args: Any) = context.getString(id, *args)
+
     private val task = Task(id = "t1", title = "Nộp báo cáo quý", priority = "HIGH", tags = listOf("gấp"))
 
     @Test
@@ -61,9 +68,9 @@ class ComponentsUiTest {
         // TalkBack: menu hành động thay cho vuốt
         val card = compose.onNode(SemanticsMatcher.keyIsDefined(SemanticsActions.CustomActions) and hasText("Nộp báo cáo quý", substring = true))
         val actions = card.fetchSemanticsNode().config[SemanticsActions.CustomActions]
-        assertTrue(actions.any { it.label == "Hoàn thành" })
-        actions.first { it.label == "Hoãn sang ngày khác" }.action()
-        actions.first { it.label == "Hoàn thành" }.action()
+        assertTrue(actions.any { it.label == s(R.string.a11y_complete) })
+        actions.first { it.label == s(R.string.a11y_postpone) }.action()
+        actions.first { it.label == s(R.string.a11y_complete) }.action()
         compose.runOnIdle {
             assertEquals(1, postponed)
             assertEquals(1, completed)
@@ -81,8 +88,8 @@ class ComponentsUiTest {
                 )
             }
         }
-        compose.onNodeWithText("Đã chọn 3").assertIsDisplayed()
-        compose.onNodeWithContentDescription("Xong").performClick()
+        compose.onNodeWithText(s(R.string.selection_count, 3)).assertIsDisplayed()
+        compose.onNodeWithContentDescription(s(R.string.action_done)).performClick()
         compose.runOnIdle { assertTrue(completed) }
     }
 
@@ -97,10 +104,10 @@ class ComponentsUiTest {
         )
         compose.setContent { TodoApplicationTheme { HabitCard(summary, onToggle = { toggled = it }, onEdit = {}) } }
 
-        compose.onNodeWithText("🔥 2 ngày").assertIsDisplayed()
-        compose.onNode(hasContentDescription("T4 7/10: chưa làm")).performClick()
+        compose.onNodeWithText("🔥 " + context.resources.getQuantityString(R.plurals.habit_streak_days, 2, 2)).assertIsDisplayed()
+        compose.onNode(hasContentDescription(s(R.string.habit_day_not_done, shortDate(today)))).performClick()
         compose.runOnIdle { assertEquals(today, toggled) }
-        compose.onNode(hasContentDescription("T3 6/10: đã làm")).assertIsDisplayed()
+        compose.onNode(hasContentDescription(s(R.string.habit_day_done, shortDate(today.minusDays(1))))).assertIsDisplayed()
     }
 
     @Test
@@ -114,8 +121,8 @@ class ComponentsUiTest {
             }
         }
         compose.onNode(SemanticsMatcher.keyIsDefined(SemanticsProperties.EditableText)).performTextInput("Mua rau !cao @nhà")
-        compose.onNodeWithText("Hiểu là:").assertIsDisplayed()
+        compose.onNodeWithText(s(R.string.quick_add_understood)).assertIsDisplayed()
         compose.onNodeWithText("@nhà").assertIsDisplayed()
-        compose.onNodeWithText("🚩 Cao").assertIsDisplayed()
+        compose.onNodeWithText("🚩 " + s(R.string.priority_high)).assertIsDisplayed()
     }
 }

@@ -21,6 +21,10 @@ import com.example.todoapplication.ui.theme.StateCompleted
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.pluralStringResource
+import com.example.todoapplication.R
+import com.example.todoapplication.i18n.str
 
 /**
  * [TẦNG UI · MÀN HÌNH] Hẹn giờ tập trung (Pomodoro 25'/5') cho một việc — như TickTick Focus / Forest.
@@ -39,7 +43,7 @@ fun FocusScreen(navController: NavController, taskId: String?, autoStart: Boolea
 
     // Đang chạy phiên cho việc khác → hiện phiên đó (một lúc chỉ tập trung một việc)
     val active = session
-    val title = active?.title ?: task?.title ?: "Phiên tập trung"
+    val title = active?.title ?: task?.title ?: stringResource(R.string.focus_default_title)
 
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(active?.endAt) {
@@ -51,7 +55,7 @@ fun FocusScreen(navController: NavController, taskId: String?, autoStart: Boolea
 
     fun start(phase: FocusSession.Phase) {
         FocusSession.start(context, active?.taskId ?: taskId, title, phase)
-        askNotificationPermission("Bật thông báo để được báo khi hết phiên tập trung, kể cả khi bạn rời app.")
+        askNotificationPermission(str(R.string.focus_notif_rationale))
     }
 
     // Úp máy xuống bàn (gia tốc kế) khi chưa có phiên / vừa hết phiên → bắt đầu tập trung, có rung xác nhận
@@ -70,10 +74,10 @@ fun FocusScreen(navController: NavController, taskId: String?, autoStart: Boolea
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Tập trung") },
+                title = { Text(stringResource(R.string.focus_title)) },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Quay lại")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.action_back))
                     }
                 }
             )
@@ -103,10 +107,10 @@ fun FocusScreen(navController: NavController, taskId: String?, autoStart: Boolea
                     Text("%02d:%02d".format(secs / 60, secs % 60), fontSize = 44.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                     Text(
                         when {
-                            active == null -> "Sẵn sàng"
-                            remaining == 0L -> "Hết giờ"
-                            isBreak -> "Đang nghỉ ☕"
-                            else -> "Đang tập trung"
+                            active == null -> stringResource(R.string.focus_ready)
+                            remaining == 0L -> stringResource(R.string.focus_time_up)
+                            isBreak -> stringResource(R.string.focus_on_break)
+                            else -> stringResource(R.string.focus_focusing)
                         },
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -114,19 +118,19 @@ fun FocusScreen(navController: NavController, taskId: String?, autoStart: Boolea
             }
 
             if ((active?.completedFocus ?: 0) > 0) {
-                Text("🍅".repeat(active!!.completedFocus.coerceAtMost(8)) + "  ${active.completedFocus} phiên", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("🍅".repeat(active!!.completedFocus.coerceAtMost(8)) + "  " + pluralStringResource(R.plurals.focus_sessions_done, active.completedFocus, active.completedFocus), color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
 
             when {
                 active == null -> Button(onClick = { start(FocusSession.Phase.FOCUS) }, modifier = Modifier.fillMaxWidth()) {
-                    Text("Bắt đầu ${FocusSession.FOCUS_MINUTES} phút")
+                    Text(stringResource(R.string.focus_start_minutes, FocusSession.FOCUS_MINUTES))
                 }
                 remaining == 0L -> Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    if (!isBreak) OutlinedButton(onClick = { start(FocusSession.Phase.BREAK) }) { Text("Nghỉ ${FocusSession.BREAK_MINUTES} phút") }
-                    Button(onClick = { start(FocusSession.Phase.FOCUS) }) { Text("Phiên tiếp theo") }
+                    if (!isBreak) OutlinedButton(onClick = { start(FocusSession.Phase.BREAK) }) { Text(stringResource(R.string.focus_break_minutes, FocusSession.BREAK_MINUTES)) }
+                    Button(onClick = { start(FocusSession.Phase.FOCUS) }) { Text(stringResource(R.string.focus_next_session)) }
                 }
                 else -> OutlinedButton(onClick = { FocusSession.stop(context) }, modifier = Modifier.fillMaxWidth()) {
-                    Text("Dừng phiên")
+                    Text(stringResource(R.string.focus_stop))
                 }
             }
 
@@ -139,16 +143,16 @@ fun FocusScreen(navController: NavController, taskId: String?, autoStart: Boolea
                         navController.popBackStack()
                     }
                 }) {
-                    Text("✓ Việc đã xong", color = StateCompleted, fontWeight = FontWeight.SemiBold)
+                    Text(stringResource(R.string.focus_task_done), color = StateCompleted, fontWeight = FontWeight.SemiBold)
                 }
             }
 
             if (active == null || remaining == 0L) {
-                Text("📱 Úp máy xuống bàn để bắt đầu phiên mới", fontSize = 13.sp, color = MaterialTheme.colorScheme.tertiary)
+                Text(stringResource(R.string.focus_flip_hint), fontSize = 13.sp, color = MaterialTheme.colorScheme.tertiary)
             }
 
             Text(
-                "Mẹo: tắt thông báo khác và chỉ làm đúng một việc này cho tới khi hết giờ.",
+                stringResource(R.string.focus_tip),
                 fontSize = 12.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center

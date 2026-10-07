@@ -21,6 +21,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import java.util.concurrent.TimeUnit
+import com.example.todoapplication.i18n.str
 
 /**
  * Phiên tập trung kiểu Pomodoro gắn với một công việc (như TickTick / Forest): 25 phút làm → 5 phút nghỉ.
@@ -158,10 +159,10 @@ class FocusWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
         val isFocus = s.phase == FocusSession.Phase.FOCUS
         val builder = NotificationCompat.Builder(ctx, Notifications.CHANNEL_FOCUS)
             .setSmallIcon(R.drawable.ic_stat_task)
-            .setContentTitle(if (isFocus) "Hết ${FocusSession.FOCUS_MINUTES} phút tập trung 🍅" else "Hết giờ nghỉ")
+            .setContentTitle(if (isFocus) str(R.string.focus_done_title, FocusSession.FOCUS_MINUTES) else str(R.string.focus_break_over))
             .setContentText(
-                if (isFocus) "\"${s.title}\" — nghỉ ${FocusSession.BREAK_MINUTES} phút rồi làm tiếp nhé"
-                else "Sẵn sàng cho phiên tiếp theo: \"${s.title}\""
+                if (isFocus) str(R.string.focus_done_text, s.title, FocusSession.BREAK_MINUTES)
+                else str(R.string.focus_next_ready, s.title)
             )
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setAutoCancel(true)
@@ -175,7 +176,7 @@ class FocusWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
                 putExtra(NotificationActionReceiver.EXTRA_NOTIF_ID, Notifications.ID_FOCUS)
             }
             builder.addAction(
-                android.R.drawable.ic_menu_save, "Việc đã xong",
+                android.R.drawable.ic_menu_save, str(R.string.focus_notif_task_done),
                 PendingIntent.getBroadcast(
                     ctx, Notifications.ID_FOCUS, complete,
                     PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE

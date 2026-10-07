@@ -16,6 +16,8 @@ import com.example.todoapplication.ui.theme.PriorityMediumColor
 import com.example.todoapplication.ui.theme.StateCancelled
 import com.example.todoapplication.ui.theme.StateOverdue
 import com.example.todoapplication.ui.utils.priorityLabel
+import androidx.compose.ui.res.stringResource
+import com.example.todoapplication.R
 
 /** Pill nhỏ dạng nhãn màu (nền tint + viền + chữ cùng tông). */
 @Composable
@@ -45,10 +47,10 @@ fun PriorityPill(priority: String) {
 }
 
 @Composable
-fun OverduePill() = TintPill("QUÁ HẠN", StateOverdue)
+fun OverduePill() = TintPill(stringResource(R.string.pill_overdue), StateOverdue)
 
 @Composable
-fun CancelledPill() = TintPill("ĐÃ HỦY", StateCancelled)
+fun CancelledPill() = TintPill(stringResource(R.string.pill_cancelled), StateCancelled)
 
 /** Chip nhãn (#tag) dùng màu primary. */
 @Composable

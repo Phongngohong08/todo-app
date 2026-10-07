@@ -20,6 +20,8 @@ import kotlinx.coroutines.flow.map
 import androidx.paging.map
 import java.time.ZoneId
 import java.util.UUID
+import com.example.todoapplication.R
+import com.example.todoapplication.i18n.str
 
 /** Việc cần làm sau khi task trên máy thay đổi — tách ra để repository không phụ thuộc Android framework. */
 fun interface LocalChangeEffects {
@@ -143,7 +145,7 @@ class TaskRepository(
         }
         return create(
             TaskDraft(
-                title = "${src.title} (bản sao)",
+                title = str(R.string.task_copy_title, src.title),
                 description = src.description,
                 priority = src.priority,
                 dueAt = src.dueAt,

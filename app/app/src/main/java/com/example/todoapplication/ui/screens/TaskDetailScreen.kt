@@ -44,7 +44,8 @@ import com.example.todoapplication.ui.components.sharedTaskBounds
 import com.example.todoapplication.ui.navigation.Screen
 import com.example.todoapplication.ui.theme.*
 import com.example.todoapplication.ui.utils.RECURRENCE_OPTIONS
-import com.example.todoapplication.ui.utils.WEEKDAY_SHORT
+import com.example.todoapplication.ui.utils.WEEKDAY_CODES
+import com.example.todoapplication.ui.utils.weekdayShortLabels
 import com.example.todoapplication.ui.utils.categoryLabel
 import com.example.todoapplication.ui.utils.formatDueLabel
 import com.example.todoapplication.ui.utils.formatDuration
@@ -59,6 +60,10 @@ import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
 import java.time.ZoneOffset
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.pluralStringResource
+import com.example.todoapplication.R
+import com.example.todoapplication.i18n.str
 
 /**
  * [TẦNG UI · MÀN HÌNH] Chi tiết công việc — tạo mới (taskId="new") hoặc sửa; kèm danh sách bước con.
@@ -171,11 +176,11 @@ fun TaskDetailScreen(
                     formInitialized = true
                 }
                 TaskDetailEvent.Saved -> {
-                    Toast.makeText(context, "Đã lưu công việc", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, str(R.string.detail_saved), Toast.LENGTH_SHORT).show()
                     close()
                 }
                 TaskDetailEvent.Deleted -> {
-                    Toast.makeText(context, "Đã chuyển vào Thùng rác", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, str(R.string.detail_trashed), Toast.LENGTH_SHORT).show()
                     close()
                 }
                 is TaskDetailEvent.Info -> Toast.makeText(context, event.message, Toast.LENGTH_SHORT).show()
@@ -183,10 +188,10 @@ fun TaskDetailScreen(
                 is TaskDetailEvent.BreakdownReady -> breakdown = event
                 is TaskDetailEvent.EstimateReady -> {
                     estimatedMinutes = event.minutes
-                    Toast.makeText(context, "AI gợi ý: ${formatDuration(event.minutes)}", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, str(R.string.detail_ai_estimate, formatDuration(event.minutes)), Toast.LENGTH_SHORT).show()
                 }
                 is TaskDetailEvent.Duplicated -> {
-                    Toast.makeText(context, "Đã nhân bản — đang mở bản sao", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, str(R.string.detail_duplicated), Toast.LENGTH_SHORT).show()
                     if (onOpenTask != null) onOpenTask(event.taskId) else navController.navigate(Screen.TaskDetail.createRoute(event.taskId)) {
                         popUpTo(Screen.TaskDetail.route) { inclusive = true }
                     }
@@ -230,10 +235,10 @@ fun TaskDetailScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     IconButton(onClick = close) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Quay lại", tint = MaterialTheme.colorScheme.onPrimary)
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.action_back), tint = MaterialTheme.colorScheme.onPrimary)
                     }
                     Text(
-                        text = if (isNewTask) "Công việc mới ✨" else "Chỉnh sửa công việc",
+                        text = stringResource(if (isNewTask) R.string.detail_new_title else R.string.detail_edit_title),
                         fontWeight = FontWeight.Bold,
                         fontSize = 18.sp,
                         color = MaterialTheme.colorScheme.onPrimary,
@@ -242,7 +247,7 @@ fun TaskDetailScreen(
                     if (!isNewTask) {
                         if (!isCompleted) {
                             IconButton(onClick = { navController.navigate(Screen.Focus.createRoute(taskId)) }) {
-                                Icon(Icons.Default.Timer, contentDescription = "Bắt đầu tập trung", tint = MaterialTheme.colorScheme.onPrimary)
+                                Icon(Icons.Default.Timer, contentDescription = stringResource(R.string.plan_start_focus), tint = MaterialTheme.colorScheme.onPrimary)
                             }
                         }
                         DetailOverflowMenu(
@@ -256,7 +261,7 @@ fun TaskDetailScreen(
                                     startAt = startAt, estimatedMinutes = estimatedMinutes
                                 )
                                 runCatching { context.startActivity(com.example.todoapplication.data.calendar.DeviceCalendar.insertIntent(draftTask)) }
-                                    .onFailure { Toast.makeText(context, "Máy chưa có ứng dụng Lịch", Toast.LENGTH_SHORT).show() }
+                                    .onFailure { Toast.makeText(context, str(R.string.detail_no_calendar_app), Toast.LENGTH_SHORT).show() }
                             }),
                             onDelete = taskDetailViewModel::delete
                         )
@@ -282,11 +287,11 @@ fun TaskDetailScreen(
                         )
                         .clickable(enabled = !isLoading) {
                             if (title.isBlank()) {
-                                Toast.makeText(context, "Tiêu đề không được để trống", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, str(R.string.detail_title_required), Toast.LENGTH_SHORT).show()
                                 return@clickable
                             }
                             if (recurrence != "NONE" && dueAt == null) {
-                                Toast.makeText(context, "Vui lòng đặt hạn chót cho công việc lặp lại", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, str(R.string.detail_recurring_needs_due), Toast.LENGTH_SHORT).show()
                                 return@clickable
                             }
                             // Lời nhắc sát giờ nhất là lời nhắc chính (client cũ chỉ hiểu một lời nhắc)
@@ -313,14 +318,14 @@ fun TaskDetailScreen(
                                 ).copy(reminderOffsetMinutes = mainAndExtra.first),
                                 inMyDay
                             )
-                            if (dueAt != null) askNotificationPermission("Bật thông báo để được nhắc khi việc này đến hạn.")
+                            if (dueAt != null) askNotificationPermission(str(R.string.notif_rationale_due))
                         },
                     contentAlignment = Alignment.Center
                 ) {
                     if (isLoading) {
                         CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
                     } else {
-                        Text(if (isNewTask) "Tạo công việc" else "Lưu thay đổi", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        Text(stringResource(if (isNewTask) R.string.detail_create else R.string.detail_save_changes), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                     }
                 }
             }
@@ -336,11 +341,11 @@ fun TaskDetailScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             // ── Tên & Mô tả ──
-            DetailSection(emoji = "📝", title = "Tên & Mô tả") {
+            DetailSection(emoji = "📝", title = stringResource(R.string.detail_section_name)) {
                 OutlinedTextField(
                     value = title,
                     onValueChange = { title = it },
-                    label = { Text("Tiêu đề công việc") },
+                    label = { Text(stringResource(R.string.detail_title_label)) },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
                     colors = fieldColors(),
@@ -350,7 +355,7 @@ fun TaskDetailScreen(
                 OutlinedTextField(
                     value = description,
                     onValueChange = { description = it },
-                    label = { Text("Mô tả chi tiết (tùy chọn)") },
+                    label = { Text(stringResource(R.string.detail_description_label)) },
                     modifier = Modifier.fillMaxWidth().height(110.dp),
                     shape = RoundedCornerShape(12.dp),
                     colors = fieldColors()
@@ -370,15 +375,15 @@ fun TaskDetailScreen(
                     Icon(Icons.Outlined.WbSunny, contentDescription = null, tint = PriorityMediumColor)
                     Spacer(Modifier.width(10.dp))
                     Column(Modifier.weight(1f)) {
-                        Text(if (inMyDay) "Trong Ngày của tôi" else "Thêm vào Ngày của tôi", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
-                        Text("Danh sách việc bạn chọn làm hôm nay", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(stringResource(if (inMyDay) R.string.task_in_my_day else R.string.today_add_to_my_day), fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+                        Text(stringResource(R.string.detail_my_day_hint), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     Switch(checked = inMyDay, onCheckedChange = { inMyDay = it })
                 }
             }
 
             // ── Độ ưu tiên ──
-            DetailSection(emoji = "🎯", title = "Độ ưu tiên") {
+            DetailSection(emoji = "🎯", title = stringResource(R.string.detail_section_priority)) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     listOf(
                         Triple("LOW", priorityLabel("LOW"), PriorityLowColor),
@@ -402,15 +407,15 @@ fun TaskDetailScreen(
             }
 
             // ── Hạn chót: ngày + (tùy chọn) giờ ──
-            DetailSection(emoji = "📅", title = "Hạn chót") {
+            DetailSection(emoji = "📅", title = stringResource(R.string.sort_due)) {
                 val today = LocalDate.now(zone)
                 Row(
                     modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(bottom = 10.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     listOf(
-                        0 to "Hôm nay", 1 to "Ngày mai", 3 to "3 ngày sau",
-                        daysUntilSunday(today) to "Cuối tuần", -1 to "Không"
+                        0 to stringResource(R.string.day_today), 1 to stringResource(R.string.day_tomorrow), 3 to stringResource(R.string.quick_add_in_3_days),
+                        daysUntilSunday(today) to stringResource(R.string.postpone_weekend), -1 to stringResource(R.string.quick_add_no_date)
                     ).forEach { (offset, label) ->
                         val target = if (offset < 0) null else today.plusDays(offset.toLong())
                         StatusFilterChip(
@@ -423,7 +428,7 @@ fun TaskDetailScreen(
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     PickerField(
                         icon = Icons.Default.DateRange,
-                        text = dueAt?.let { formatDueLabel(it, allDay = true, today = today, zone = zone) } ?: "Chọn ngày...",
+                        text = dueAt?.let { formatDueLabel(it, allDay = true, today = today, zone = zone) } ?: stringResource(R.string.task_pick_date),
                         active = dueAt != null,
                         modifier = Modifier.weight(1f),
                         onClick = { showDatePicker = true },
@@ -431,7 +436,7 @@ fun TaskDetailScreen(
                     )
                     PickerField(
                         icon = Icons.Default.Schedule,
-                        text = dueTime?.let { "%02d:%02d".format(it.hour, it.minute) } ?: "Cả ngày",
+                        text = dueTime?.let { "%02d:%02d".format(it.hour, it.minute) } ?: stringResource(R.string.all_day),
                         active = dueTime != null,
                         enabled = dueAt != null,
                         modifier = Modifier.weight(1f),
@@ -444,7 +449,7 @@ fun TaskDetailScreen(
                     Spacer(Modifier.height(10.dp))
                     PickerField(
                         icon = Icons.Default.PlayArrow,
-                        text = startAt?.let { "Bắt đầu " + formatTime(it) + " → " + formatTime(dueAt!!) } ?: "Thêm giờ bắt đầu (khung giờ)",
+                        text = startAt?.let { stringResource(R.string.detail_start_range, formatTime(it), formatTime(dueAt!!)) } ?: stringResource(R.string.detail_add_start),
                         active = startAt != null,
                         modifier = Modifier.fillMaxWidth(),
                         onClick = { showStartPicker = true },
@@ -453,7 +458,7 @@ fun TaskDetailScreen(
                 }
                 if (dueAt != null && dueAllDay) {
                     Text(
-                        "Việc cả ngày: chỉ quá hạn khi sang ngày hôm sau; nhắc theo giờ mặc định trong Cài đặt.",
+                        stringResource(R.string.detail_all_day_hint),
                         fontSize = 11.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 6.dp)
@@ -462,13 +467,13 @@ fun TaskDetailScreen(
             }
 
             // ── Thời lượng ước tính ──
-            DetailSection(emoji = "⏱", title = "Thời lượng ước tính") {
+            DetailSection(emoji = "⏱", title = stringResource(R.string.detail_section_estimate)) {
                 Row(
                     modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     AiChip(
-                        label = "✨ AI gợi ý",
+                        label = stringResource(R.string.detail_ai_suggest),
                         working = aiWorking == TaskDetailViewModel.AiJob.ESTIMATE,
                         onClick = { taskDetailViewModel.requestEstimate(title, description) }
                     )
@@ -479,14 +484,14 @@ fun TaskDetailScreen(
                     }
                     presets.forEach { m ->
                         StatusFilterChip(
-                            text = if (m == 0) "Chưa rõ" else formatDuration(m),
+                            text = if (m == 0) stringResource(R.string.detail_estimate_unknown) else formatDuration(m),
                             selected = estimatedMinutes == m,
                             onClick = { estimatedMinutes = m }
                         )
                     }
                 }
                 Text(
-                    "Giúp AI xếp lịch trong ngày đúng độ dài của việc.",
+                    stringResource(R.string.detail_estimate_hint),
                     fontSize = 11.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 6.dp)
@@ -494,7 +499,7 @@ fun TaskDetailScreen(
             }
 
             // ── Danh mục ──
-            DetailSection(emoji = "🏷️", title = "Danh mục") {
+            DetailSection(emoji = "🏷️", title = stringResource(R.string.quick_add_list)) {
                 Row(modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     categories.forEach { c ->
                         StatusFilterChip(text = categoryLabel(c), selected = category == c, onClick = { category = c })
@@ -506,13 +511,13 @@ fun TaskDetailScreen(
                     OutlinedTextField(
                         value = newCategory,
                         onValueChange = { newCategory = it },
-                        label = { Text("Thêm danh mục mới") },
+                        label = { Text(stringResource(R.string.detail_new_list)) },
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(12.dp),
                         colors = fieldColors(),
                         singleLine = true
                     )
-                    SmallActionButton("Thêm") {
+                    SmallActionButton(stringResource(R.string.action_add)) {
                         taskDetailViewModel.addCategory(newCategory) { added -> category = added }
                         newCategory = ""
                     }
@@ -520,16 +525,16 @@ fun TaskDetailScreen(
                 // Mục (cột Kanban) của danh sách đang chọn
                 val sections = lists.firstOrNull { it.name == category }?.sections.orEmpty()
                 if (sections.isNotEmpty()) {
-                    Text("Mục", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 10.dp, bottom = 6.dp))
+                    Text(stringResource(R.string.detail_section_label), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 10.dp, bottom = 6.dp))
                     Row(modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        StatusFilterChip(text = "Chưa phân mục", selected = section !in sections, onClick = { section = "" })
+                        StatusFilterChip(text = stringResource(R.string.list_unsectioned), selected = section !in sections, onClick = { section = "" })
                         sections.forEach { s -> StatusFilterChip(text = s, selected = section == s, onClick = { section = s }) }
                     }
                 }
             }
 
             // ── Nhãn ──
-            DetailSection(emoji = "🔖", title = "Nhãn") {
+            DetailSection(emoji = "🔖", title = stringResource(R.string.detail_section_tags)) {
                 if (tags.isNotEmpty()) {
                     Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         tags.forEach { tag ->
@@ -537,7 +542,7 @@ fun TaskDetailScreen(
                                 selected = true,
                                 onClick = { tagsText = TagRules.encode(tags - tag) },
                                 label = { Text("@$tag") },
-                                trailingIcon = { Icon(Icons.Default.Close, contentDescription = "Bỏ nhãn", modifier = Modifier.size(14.dp)) }
+                                trailingIcon = { Icon(Icons.Default.Close, contentDescription = stringResource(R.string.detail_remove_tag), modifier = Modifier.size(14.dp)) }
                             )
                         }
                     }
@@ -548,13 +553,13 @@ fun TaskDetailScreen(
                     OutlinedTextField(
                         value = newTag,
                         onValueChange = { newTag = it },
-                        label = { Text("Thêm nhãn (vd: nhà, gấp)") },
+                        label = { Text(stringResource(R.string.detail_add_tag)) },
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(12.dp),
                         colors = fieldColors(),
                         singleLine = true
                     )
-                    SmallActionButton("Thêm") {
+                    SmallActionButton(stringResource(R.string.action_add)) {
                         tagsText = TagRules.encode(TagRules.normalize(tags + newTag.split(",")))
                         newTag = ""
                     }
@@ -570,36 +575,38 @@ fun TaskDetailScreen(
             }
 
             // ── Lặp lại ──
-            DetailSection(emoji = "🔁", title = "Lặp lại") {
+            DetailSection(emoji = "🔁", title = stringResource(R.string.templates_repeats)) {
                 Row(modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     RECURRENCE_OPTIONS.forEach { r ->
                         StatusFilterChip(text = recurrenceLabel(r), selected = recurrence == r, onClick = { recurrence = r })
                     }
                 }
                 if (recurrence != "NONE") {
-                    val unit = when (recurrence) {
-                        "DAILY" -> "ngày"
-                        "WEEKLY" -> "tuần"
-                        else -> "tháng"
-                    }
+                    val unit = stringResource(
+                        when (recurrence) {
+                            "DAILY" -> R.string.unit_days
+                            "WEEKLY" -> R.string.unit_weeks
+                            else -> R.string.unit_months
+                        }
+                    )
                     Spacer(Modifier.height(12.dp))
                     // Mỗi N ngày/tuần/tháng
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("Mỗi", color = MaterialTheme.colorScheme.onSurface)
+                        Text(stringResource(R.string.detail_every), color = MaterialTheme.colorScheme.onSurface)
                         IconButton(onClick = { recurrenceInterval = (recurrenceInterval - 1).coerceAtLeast(1) }) {
-                            Icon(Icons.Default.Remove, contentDescription = "Giảm")
+                            Icon(Icons.Default.Remove, contentDescription = stringResource(R.string.action_decrease))
                         }
                         Text("$recurrenceInterval", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurface)
                         IconButton(onClick = { recurrenceInterval = (recurrenceInterval + 1).coerceAtMost(RecurrenceRules.MAX_INTERVAL) }) {
-                            Icon(Icons.Default.Add, contentDescription = "Tăng")
+                            Icon(Icons.Default.Add, contentDescription = stringResource(R.string.action_increase))
                         }
                         Text(unit, color = MaterialTheme.colorScheme.onSurface)
                     }
                     if (recurrence == "WEEKLY") {
-                        Text("Vào các thứ", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(vertical = 6.dp))
+                        Text(stringResource(R.string.detail_on_days), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(vertical = 6.dp))
                         val selectedDays = recurrenceDays.split(",").map { it.trim() }.filter { it.isNotEmpty() }.toSet()
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            WEEKDAY_SHORT.forEach { (code, label) ->
+                            weekdayShortLabels().forEach { (code, label) ->
                                 val isSel = code in selectedDays
                                 Box(
                                     modifier = Modifier
@@ -609,7 +616,7 @@ fun TaskDetailScreen(
                                         .background(if (isSel) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant)
                                         .clickable {
                                             val ns = if (isSel) selectedDays - code else selectedDays + code
-                                            recurrenceDays = WEEKDAY_SHORT.keys.filter { it in ns }.joinToString(",")
+                                            recurrenceDays = WEEKDAY_CODES.filter { it in ns }.joinToString(",")
                                         },
                                     contentAlignment = Alignment.Center
                                 ) {
@@ -619,14 +626,13 @@ fun TaskDetailScreen(
                         }
                     }
                     // Theo lịch cố định hay tính từ ngày hoàn thành (Todoist "every" vs "every!")
-                    Text("Lần tiếp theo tính từ", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 10.dp, bottom = 6.dp))
+                    Text(stringResource(R.string.detail_next_from), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 10.dp, bottom = 6.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        StatusFilterChip("Lịch cố định", recurrenceMode == RecurrenceMode.SCHEDULE) { recurrenceMode = RecurrenceMode.SCHEDULE }
-                        StatusFilterChip("Ngày hoàn thành", recurrenceMode == RecurrenceMode.COMPLETION) { recurrenceMode = RecurrenceMode.COMPLETION }
+                        StatusFilterChip(stringResource(R.string.detail_mode_schedule), recurrenceMode == RecurrenceMode.SCHEDULE) { recurrenceMode = RecurrenceMode.SCHEDULE }
+                        StatusFilterChip(stringResource(R.string.detail_mode_completion), recurrenceMode == RecurrenceMode.COMPLETION) { recurrenceMode = RecurrenceMode.COMPLETION }
                     }
                     Text(
-                        if (recurrenceMode == RecurrenceMode.SCHEDULE) "VD: họp mỗi thứ 2 — làm trễ cũng không đổi lịch."
-                        else "VD: tưới cây 3 ngày sau lần tưới trước — làm trễ thì lần sau dời theo.",
+                        stringResource(if (recurrenceMode == RecurrenceMode.SCHEDULE) R.string.detail_mode_schedule_hint else R.string.detail_mode_completion_hint),
                         fontSize = 11.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 4.dp)
@@ -634,7 +640,7 @@ fun TaskDetailScreen(
                     Spacer(Modifier.height(10.dp))
                     PickerField(
                         icon = Icons.Default.EventBusy,
-                        text = recurrenceUntil?.let { "Kết thúc: " + formatDueLabel(it, allDay = true, zone = zone) } ?: "Lặp mãi (chọn ngày kết thúc)",
+                        text = recurrenceUntil?.let { stringResource(R.string.detail_ends, formatDueLabel(it, allDay = true, zone = zone)) } ?: stringResource(R.string.detail_repeat_forever),
                         active = recurrenceUntil != null,
                         modifier = Modifier.fillMaxWidth(),
                         onClick = { showUntilPicker = true },
@@ -648,18 +654,26 @@ fun TaskDetailScreen(
                         modifier = Modifier.padding(top = 8.dp)
                     )
                     if (dueAt == null) {
-                        Text("⚠ Cần đặt hạn chót để dùng lặp lại.", color = PriorityMediumColor, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
+                        Text(stringResource(R.string.detail_repeat_needs_due), color = PriorityMediumColor, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
                     }
                 }
             }
 
             // ── Lời nhắc ──
-            DetailSection(emoji = "🔔", title = "Lời nhắc") {
+            DetailSection(emoji = "🔔", title = stringResource(R.string.detail_section_reminders)) {
                 if (dueAt == null) {
-                    Text("Đặt hạn chót để bật nhắc nhở.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                    Text(stringResource(R.string.detail_reminders_need_due), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
                 } else {
-                    val options = if (dueAllDay) listOf(0 to "Buổi sáng của ngày đến hạn", 24 * 60 to "Trước 1 ngày")
-                    else listOf(0 to "Đúng giờ", 5 to "Trước 5 phút", 10 to "Trước 10 phút", 30 to "Trước 30 phút", 60 to "Trước 1 giờ", 24 * 60 to "Trước 1 ngày")
+                    val dayBefore = stringResource(R.string.reminder_1_day_before)
+                    val options = if (dueAllDay) listOf(0 to stringResource(R.string.reminder_morning_of), 24 * 60 to dayBefore)
+                    else listOf(
+                        0 to stringResource(R.string.reminder_on_time),
+                        5 to stringResource(R.string.reminder_minutes_before, 5),
+                        10 to stringResource(R.string.reminder_minutes_before, 10),
+                        30 to stringResource(R.string.reminder_minutes_before, 30),
+                        60 to stringResource(R.string.reminder_1_hour_before),
+                        24 * 60 to dayBefore
+                    )
                     // Chọn được nhiều lời nhắc (tối đa 5); luôn giữ ít nhất một
                     Row(modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         options.forEach { (mins, label) ->
@@ -672,7 +686,7 @@ fun TaskDetailScreen(
                         }
                     }
                     Text(
-                        if (startAt != null && !dueAllDay) "Chọn được nhiều lời nhắc · tính theo giờ bắt đầu" else "Chọn được nhiều lời nhắc",
+                        stringResource(if (startAt != null && !dueAllDay) R.string.detail_reminders_multi_start else R.string.detail_reminders_multi),
                         fontSize = 11.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 6.dp)
@@ -681,7 +695,7 @@ fun TaskDetailScreen(
             }
 
             // ── Nhắc theo địa điểm (Geofencing) ──
-            DetailSection(emoji = "📍", title = "Nhắc theo địa điểm") {
+            DetailSection(emoji = "📍", title = stringResource(R.string.detail_section_location)) {
                 LocationSection(
                     enabled = !isNewTask,
                     places = places,
@@ -692,7 +706,7 @@ fun TaskDetailScreen(
             }
 
             // ── Đính kèm (ảnh / tài liệu quét) ──
-            DetailSection(emoji = "📎", title = "Đính kèm") {
+            DetailSection(emoji = "📎", title = stringResource(R.string.detail_section_attachments)) {
                 AttachmentsSection(
                     attachments = attachments,
                     enabled = !isNewTask,
@@ -704,16 +718,16 @@ fun TaskDetailScreen(
 
             // ── Lịch sử tập trung ──
             if (focusHistory.isNotEmpty()) {
-                DetailSection(emoji = "🍅", title = "Đã tập trung") {
+                DetailSection(emoji = "🍅", title = stringResource(R.string.detail_section_focus)) {
                     val total = focusHistory.sumOf { it.minutes }
                     Text(
-                        "${focusHistory.size} phiên · ${formatDuration(total)}" +
-                            (if (estimatedMinutes > 0) " / ước tính ${formatDuration(estimatedMinutes)}" else ""),
+                        pluralStringResource(R.plurals.focus_sessions_done, focusHistory.size, focusHistory.size) + " · " + formatDuration(total) +
+                            (if (estimatedMinutes > 0) " / " + stringResource(R.string.detail_focus_estimate, formatDuration(estimatedMinutes)) else ""),
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
-                        "Gần nhất: " + formatDueLabel(focusHistory.first().startedAt, allDay = false, zone = zone),
+                        stringResource(R.string.detail_focus_latest, formatDueLabel(focusHistory.first().startedAt, allDay = false, zone = zone)),
                         fontSize = 12.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -721,7 +735,7 @@ fun TaskDetailScreen(
             }
 
             // ── Các bước con ──
-            DetailSection(emoji = "✅", title = "Các bước con") {
+            DetailSection(emoji = "✅", title = stringResource(R.string.detail_section_subtasks)) {
                 val doneCount = subtasks.count { it.isDone }
                 if (subtasks.isNotEmpty()) {
                     val fraction = doneCount.toFloat() / subtasks.size.toFloat()
@@ -766,11 +780,11 @@ fun TaskDetailScreen(
                             }
                         } else {
                             IconButton(onClick = { subtaskDuePicker = sub }, modifier = Modifier.size(32.dp)) {
-                                Icon(Icons.Default.Event, contentDescription = "Đặt hạn cho bước", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
+                                Icon(Icons.Default.Event, contentDescription = stringResource(R.string.detail_subtask_due), tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
                             }
                         }
                         IconButton(onClick = { taskDetailViewModel.deleteSubtask(sub) }, modifier = Modifier.size(32.dp)) {
-                            Icon(Icons.Default.Clear, contentDescription = "Xóa bước", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
+                            Icon(Icons.Default.Clear, contentDescription = stringResource(R.string.detail_subtask_delete), tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
                         }
                     }
                 }
@@ -779,20 +793,20 @@ fun TaskDetailScreen(
                     OutlinedTextField(
                         value = subtaskInput,
                         onValueChange = { subtaskInput = it },
-                        label = { Text("Thêm bước con") },
+                        label = { Text(stringResource(R.string.detail_subtask_add)) },
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(12.dp),
                         colors = fieldColors(),
                         singleLine = true
                     )
-                    SmallActionButton("Thêm") {
+                    SmallActionButton(stringResource(R.string.action_add)) {
                         taskDetailViewModel.addSubtask(subtaskInput)
                         subtaskInput = ""
                     }
                 }
                 Spacer(Modifier.height(8.dp))
                 AiChip(
-                    label = "✨ Nhờ AI chia nhỏ việc này",
+                    label = stringResource(R.string.detail_ai_breakdown),
                     working = aiWorking == TaskDetailViewModel.AiJob.BREAKDOWN,
                     onClick = { taskDetailViewModel.requestBreakdown(title, description) }
                 )
@@ -823,7 +837,7 @@ fun TaskDetailScreen(
             onPick = { time ->
                 showStartPicker = false
                 if (!time.isBefore(dueTime)) {
-                    Toast.makeText(context, "Giờ bắt đầu phải trước ${formatTime(dueAt!!)}", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, str(R.string.detail_start_before_due, formatTime(dueAt!!)), Toast.LENGTH_SHORT).show()
                 } else {
                     startAt = dueDate!!.atTime(time).atZone(zone).toInstant().toEpochMilli()
                     // Chưa ước tính thời lượng → lấy luôn độ dài khung giờ
@@ -894,7 +908,7 @@ private fun BreakdownDialog(
     var useEstimate by remember { mutableStateOf(canSetEstimate && estimatedMinutes > 0) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("AI gợi ý các bước") },
+        title = { Text(stringResource(R.string.detail_ai_steps_title)) },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState())) {
                 steps.forEachIndexed { i, step ->
@@ -913,7 +927,7 @@ private fun BreakdownDialog(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Checkbox(checked = useEstimate, onCheckedChange = { useEstimate = it })
-                        Text("Đặt thời lượng ước tính: ${formatDuration(estimatedMinutes)}", fontSize = 13.sp)
+                        Text(stringResource(R.string.detail_ai_set_estimate, formatDuration(estimatedMinutes)), fontSize = 13.sp)
                     }
                 }
             }
@@ -923,9 +937,9 @@ private fun BreakdownDialog(
             TextButton(
                 enabled = count > 0 || useEstimate,
                 onClick = { onConfirm(steps.filterIndexed { i, _ -> checked[i] }, useEstimate) }
-            ) { Text(if (count > 0) "Thêm $count bước" else "Áp dụng") }
+            ) { Text(if (count > 0) pluralStringResource(R.plurals.detail_add_steps, count, count) else stringResource(R.string.coach_apply)) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Hủy") } }
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } }
     )
 }
 
@@ -934,30 +948,30 @@ private fun DetailOverflowMenu(canSkip: Boolean, onSkip: () -> Unit, onDuplicate
     var expanded by remember { mutableStateOf(false) }
     Box {
         IconButton(onClick = { expanded = true }) {
-            Icon(Icons.Default.MoreVert, contentDescription = "Thêm", tint = MaterialTheme.colorScheme.onPrimary)
+            Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.action_more), tint = MaterialTheme.colorScheme.onPrimary)
         }
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             if (canSkip) {
                 DropdownMenuItem(
-                    text = { Text("Bỏ qua lần này") },
+                    text = { Text(stringResource(R.string.detail_skip_occurrence)) },
                     leadingIcon = { Icon(Icons.Default.SkipNext, contentDescription = null) },
                     onClick = { expanded = false; onSkip() }
                 )
             }
             if (onAddToCalendar != null) {
                 DropdownMenuItem(
-                    text = { Text("Thêm vào lịch của máy") },
+                    text = { Text(stringResource(R.string.detail_add_to_device_calendar)) },
                     leadingIcon = { Icon(Icons.Default.EventAvailable, contentDescription = null) },
                     onClick = { expanded = false; onAddToCalendar() }
                 )
             }
             DropdownMenuItem(
-                text = { Text("Nhân bản") },
+                text = { Text(stringResource(R.string.task_duplicate)) },
                 leadingIcon = { Icon(Icons.Default.ContentCopy, contentDescription = null) },
                 onClick = { expanded = false; onDuplicate() }
             )
             DropdownMenuItem(
-                text = { Text("Xóa", color = PriorityHighColor) },
+                text = { Text(stringResource(R.string.action_delete), color = PriorityHighColor) },
                 leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null, tint = PriorityHighColor) },
                 onClick = { expanded = false; onDelete() }
             )
@@ -992,7 +1006,7 @@ private fun PickerField(
             )
             if (onClear != null) {
                 IconButton(onClick = onClear, modifier = Modifier.size(28.dp)) {
-                    Icon(Icons.Default.Clear, contentDescription = "Xóa", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(14.dp))
+                    Icon(Icons.Default.Clear, contentDescription = stringResource(R.string.action_clear), tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(14.dp))
                 }
             }
         }
@@ -1023,9 +1037,9 @@ private fun DateDialog(initial: LocalDate, onDismiss: () -> Unit, onPick: (Local
         confirmButton = {
             TextButton(onClick = {
                 state.selectedDateMillis?.let { onPick(Instant.ofEpochMilli(it).atZone(ZoneOffset.UTC).toLocalDate()) } ?: onDismiss()
-            }) { Text("Chọn") }
+            }) { Text(stringResource(R.string.action_choose)) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Hủy") } }
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } }
     ) {
         DatePicker(state = state)
     }
@@ -1037,10 +1051,10 @@ private fun TimeDialog(initial: LocalTime, onDismiss: () -> Unit, onPick: (Local
     val state = rememberTimePickerState(initialHour = initial.hour, initialMinute = initial.minute, is24Hour = true)
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Chọn giờ") },
+        title = { Text(stringResource(R.string.detail_pick_time)) },
         text = { TimePicker(state = state) },
-        confirmButton = { TextButton(onClick = { onPick(LocalTime.of(state.hour, state.minute)) }) { Text("Chọn") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Hủy") } }
+        confirmButton = { TextButton(onClick = { onPick(LocalTime.of(state.hour, state.minute)) }) { Text(stringResource(R.string.action_choose)) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } }
     )
 }
 

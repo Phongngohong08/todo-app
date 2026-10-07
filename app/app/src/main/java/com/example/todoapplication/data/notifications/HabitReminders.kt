@@ -26,6 +26,7 @@ import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
 import java.util.concurrent.TimeUnit
+import com.example.todoapplication.i18n.str
 
 /**
  * Nhắc thói quen: mỗi thói quen có giờ nhắc → một job "habit_<id>" chạy vào giờ đó mỗi ngày. Worker chỉ hiện
@@ -107,10 +108,10 @@ class HabitReminderWorker(context: Context, params: WorkerParameters) : Coroutin
         val notification = NotificationCompat.Builder(ctx, Notifications.CHANNEL_REMINDERS)
             .setSmallIcon(R.drawable.ic_stat_task)
             .setContentTitle("${habit.emoji.ifBlank { "🌱" }} ${habit.name}")
-            .setContentText("Đến giờ duy trì thói quen của bạn")
+            .setContentText(str(R.string.habit_reminder_text))
             .setAutoCancel(true)
             .setContentIntent(Notifications.openApp(ctx, id, AppIntents.OPEN_HABITS))
-            .addAction(0, "Đã làm", doneIntent)
+            .addAction(0, str(R.string.habit_done), doneIntent)
             .build()
         NotificationManagerCompat.from(ctx).notify(id, notification)
     }

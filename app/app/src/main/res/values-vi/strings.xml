@@ -1,0 +1,948 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Tiếng Việt. Khóa giống hệt values/strings.xml (tiếng Anh, mặc định). -->
+<resources>
+    <!-- Ứng dụng, shortcut, widget, Quick Settings tile -->
+    <string name="app_name">TaskFlow AI</string>
+    <string name="shortcut_add_short">Thêm việc</string>
+    <string name="shortcut_add_long">Thêm công việc mới</string>
+    <string name="shortcut_today_short">Hôm nay</string>
+    <string name="shortcut_today_long">Ngày của tôi</string>
+    <string name="shortcut_focus_short">Tập trung</string>
+    <string name="shortcut_focus_long">Hẹn giờ tập trung 25 phút</string>
+    <string name="share_target_label">Thêm vào TaskFlow</string>
+    <string name="widget_compact_description">Tiến độ mục tiêu hôm nay và việc tiếp theo</string>
+    <string name="widget_tasks_description">Việc cần làm — tích hoàn thành ngay trên widget</string>
+    <string name="widget_habits_description">Thói quen hôm nay — bấm để đánh dấu</string>
+    <string name="tile_focus">Tập trung</string>
+    <string name="tile_quick_add">Thêm việc</string>
+
+    <!-- Ngày giờ, thời lượng (mẫu định dạng theo java.time DateTimeFormatter) -->
+    <string name="fmt_day_month">dd/MM</string>
+    <string name="fmt_day_month_year">dd/MM/yyyy</string>
+    <string name="fmt_date_time">dd/MM/yyyy HH:mm</string>
+    <string name="fmt_weekday_date">%1$s %2$s</string>
+    <string-array name="weekdays_short">
+        <item>T2</item>
+        <item>T3</item>
+        <item>T4</item>
+        <item>T5</item>
+        <item>T6</item>
+        <item>T7</item>
+        <item>CN</item>
+    </string-array>
+    <string name="day_today">Hôm nay</string>
+    <string name="day_tomorrow">Ngày mai</string>
+    <string name="day_yesterday">Hôm qua</string>
+    <string name="duration_minutes">%s phút</string>
+    <string name="duration_hours">%s giờ</string>
+    <string name="duration_hours_minutes">%1$s giờ %2$s phút</string>
+
+    <!-- Nhãn trạng thái, ưu tiên, lặp lại, danh sách có sẵn -->
+    <string name="status_all">Tất cả</string>
+    <string name="status_todo">Cần làm</string>
+    <string name="status_completed">Hoàn thành</string>
+    <string name="priority_high">Cao</string>
+    <string name="priority_medium">Trung bình</string>
+    <string name="priority_low">Thấp</string>
+    <string name="recurrence_daily">Hằng ngày</string>
+    <string name="recurrence_weekly">Hằng tuần</string>
+    <string name="recurrence_monthly">Hằng tháng</string>
+    <string name="recurrence_none">Không lặp</string>
+    <string name="recurrence_every_n_days">Mỗi %s ngày</string>
+    <string name="recurrence_every_n_weeks">Mỗi %s tuần</string>
+    <string name="recurrence_every_n_months">Mỗi %s tháng</string>
+    <string name="recurrence_from_completion">%s · tính từ lúc xong</string>
+    <string name="category_all">Tất cả</string>
+    <string name="category_personal">Cá nhân</string>
+    <string name="category_work">Công việc</string>
+    <string name="category_inbox">Hộp thư đến</string>
+
+    <!-- Danh sách việc: sắp xếp, bộ lọc nhanh, lý do gợi ý -->
+    <string name="sort_due">Hạn chót</string>
+    <string name="sort_priority">Ưu tiên</string>
+    <string name="sort_title">Tên (A-Z)</string>
+    <string name="sort_manual">Thủ công</string>
+    <string name="filter_all">Tất cả</string>
+    <string name="filter_overdue">Quá hạn</string>
+    <string name="filter_high_priority">Ưu tiên cao</string>
+    <string name="filter_no_date">Chưa có hạn</string>
+    <string name="filter_recurring">Việc lặp</string>
+    <plurals name="reason_overdue_days">
+        <item quantity="other">Quá hạn %s ngày</item>
+    </plurals>
+    <string name="reason_overdue_since">Quá hạn từ %s</string>
+    <string name="reason_due_today">Hạn hôm nay</string>
+    <plurals name="reason_due_in_hours">
+        <item quantity="other">Hạn trong %s giờ</item>
+    </plurals>
+    <string name="reason_due_tomorrow">Hạn ngày mai</string>
+    <plurals name="reason_due_in_days">
+        <item quantity="other">Hạn trong %s ngày</item>
+    </plurals>
+    <string name="reason_high_priority">Ưu tiên cao</string>
+    <string name="reason_medium_priority">Ưu tiên trung bình</string>
+    <string name="reason_waiting_long">Đang chờ lâu</string>
+    <string name="suggest_overdue">Quá hạn</string>
+    <string name="suggest_due_today">Đến hạn hôm nay</string>
+    <string name="suggest_step_overdue">Bước quá hạn: %s</string>
+    <string name="suggest_step_due">Bước đến hạn: %s</string>
+    <string name="suggest_unfinished_yesterday">Hôm qua chưa xong</string>
+    <string name="suggest_high_no_date">Ưu tiên cao, chưa có hạn</string>
+
+    <!-- Hoãn việc, nhắc lại (thông báo), ma trận Eisenhower -->
+    <string name="postpone_tomorrow">Ngày mai</string>
+    <string name="postpone_weekend">Cuối tuần</string>
+    <string name="postpone_next_monday">Thứ 2 tuần sau</string>
+    <string name="postpone_one_week">1 tuần nữa</string>
+    <string name="snooze_15_min">15 phút nữa</string>
+    <string name="snooze_1_hour">1 giờ nữa</string>
+    <string name="snooze_3_hours">3 giờ nữa</string>
+    <string name="snooze_tonight">Tối nay 20:00</string>
+    <string name="snooze_tomorrow_morning">Sáng mai 08:00</string>
+    <string name="snooze_next_monday">Thứ 2 tuần sau 08:00</string>
+    <string name="quadrant_do_first">Làm ngay</string>
+    <string name="quadrant_do_first_hint">Quan trọng · Gấp</string>
+    <string name="quadrant_schedule">Lên lịch</string>
+    <string name="quadrant_schedule_hint">Quan trọng · Chưa gấp</string>
+    <string name="quadrant_quick">Làm nhanh</string>
+    <string name="quadrant_quick_hint">Gấp · Ít quan trọng</string>
+    <string name="quadrant_later">Để sau</string>
+    <string name="quadrant_later_hint">Không gấp · Ít quan trọng</string>
+
+    <!-- Thói quen, tổng kết tuần gửi AI Coach -->
+    <plurals name="habit_streak_days">
+        <item quantity="other">%s ngày</item>
+    </plurals>
+    <plurals name="habit_streak_weeks">
+        <item quantity="other">%s tuần</item>
+    </plurals>
+    <plurals name="habit_times_per_week">
+        <item quantity="other">%s lần/tuần</item>
+    </plurals>
+    <string name="habit_every_day">Mỗi ngày</string>
+    <plurals name="coach_review_completed">
+        <item quantity="other">Đây là tổng kết 7 ngày qua của tôi: hoàn thành %s việc</item>
+    </plurals>
+    <string name="coach_review_change">(%s so với tuần trước)</string>
+    <string name="coach_review_goal_days">đạt mục tiêu ngày %s/7 ngày</string>
+    <plurals name="coach_review_late">
+        <item quantity="other">%s việc xong trễ hạn</item>
+    </plurals>
+    <plurals name="coach_review_overdue">
+        <item quantity="other">hiện còn %s việc quá hạn</item>
+    </plurals>
+    <string name="coach_review_neglected">danh mục còn tồn nhiều nhất là \"%s\"</string>
+    <string name="coach_review_ask">Hãy nhận xét ngắn gọn và giúp tôi lập kế hoạch cho tuần tới.</string>
+
+    <!-- Dùng chung: nút, tab, nhãn nhỏ -->
+    <string name="action_cancel">Hủy</string>
+    <string name="action_save">Lưu</string>
+    <string name="action_delete">Xóa</string>
+    <string name="action_later">Để sau</string>
+    <string name="action_turn_on">Bật</string>
+    <string name="action_undo">Hoàn tác</string>
+    <string name="action_edit">Sửa</string>
+    <string name="action_add">Thêm</string>
+    <string name="action_done">Xong</string>
+    <string name="action_back">Quay lại</string>
+    <string name="tab_today">Hôm nay</string>
+    <string name="tab_tasks">Việc làm</string>
+    <string name="tab_calendar">Lịch</string>
+    <string name="tab_me">Tôi</string>
+    <string name="pill_overdue">QUÁ HẠN</string>
+    <string name="pill_cancelled">ĐÃ HỦY</string>
+    <string name="notif_permission_title">Bật thông báo?</string>
+    <string name="link_no_app">Không có ứng dụng để mở liên kết này</string>
+
+    <!-- Quét tài liệu (ML Kit) -->
+    <string name="scan_cannot_open">Không mở được trình quét</string>
+    <string name="scan_unsupported">Máy chưa hỗ trợ quét tài liệu (cần Google Play services)</string>
+    <string name="scan_no_text">Không tìm thấy chữ nào trong ảnh</string>
+    <string name="scan_recognizing">Đang nhận chữ…</string>
+    <string name="scan_on_device">Chạy trên máy, không cần mạng</string>
+    <plurals name="scan_create_title">
+        <item quantity="other">Tạo %s việc từ ảnh</item>
+    </plurals>
+    <string name="scan_hint">Mỗi dòng thành một việc; ngày giờ, !ưu tiên, #danh sách trong dòng vẫn được hiểu.</string>
+    <string name="scan_create_tasks">Tạo việc</string>
+
+    <!-- Đăng nhập, đăng ký, khóa ứng dụng, báo thức -->
+    <string name="login_tagline">Quản lý công việc, thời gian và thói quen</string>
+    <string name="login_sign_in">Đăng nhập</string>
+    <string name="login_welcome">Chào mừng quay trở lại! 👋</string>
+    <string name="field_email">Email</string>
+    <string name="field_password">Mật khẩu</string>
+    <string name="field_full_name">Họ và tên</string>
+    <string name="field_password_min">Mật khẩu (ít nhất 6 ký tự)</string>
+    <string name="login_no_account">Chưa có tài khoản?</string>
+    <string name="login_register_now">Đăng ký ngay</string>
+    <string name="register_hero">Bắt đầu hành trình</string>
+    <string name="register_hero_sub">Quản lý công việc thông minh hơn</string>
+    <string name="register_create_account">Tạo tài khoản</string>
+    <string name="register_subtitle">Điền thông tin để bắt đầu ✨</string>
+    <string name="register_password_too_short">Mật khẩu phải dài ít nhất 6 ký tự</string>
+    <string name="register_have_account">Đã có tài khoản?</string>
+    <string name="auth_fill_all">Vui lòng điền đầy đủ thông tin</string>
+    <string name="auth_welcome_back">Chào mừng quay trở lại, %s!</string>
+    <string name="auth_wrong_credentials">Tài khoản hoặc mật khẩu không chính xác</string>
+    <string name="auth_login_rate_limited">Bạn đăng nhập sai quá nhiều lần. Vui lòng thử lại sau ít phút.</string>
+    <string name="error_cannot_reach_server">Không kết nối được máy chủ. Kiểm tra mạng rồi thử lại.</string>
+    <string name="auth_login_failed">Đăng nhập thất bại. Vui lòng thử lại sau.</string>
+    <string name="auth_register_success">Đăng ký thành công! Hãy đăng nhập.</string>
+    <string name="auth_email_taken">Email này đã được sử dụng.</string>
+    <string name="auth_invalid_input">Thông tin chưa hợp lệ. Kiểm tra email và mật khẩu (tối thiểu 6 ký tự).</string>
+    <string name="auth_register_rate_limited">Bạn đăng ký quá nhiều lần. Vui lòng thử lại sau ít phút.</string>
+    <string name="auth_register_failed">Đăng ký thất bại. Kiểm tra kết nối rồi thử lại.</string>
+    <string name="lock_prompt_title">Mở khóa TaskFlow</string>
+    <string name="lock_prompt_subtitle">Xác thực để xem công việc của bạn</string>
+    <string name="lock_locked">TaskFlow đang khóa</string>
+    <string name="lock_unlock">Mở khóa</string>
+    <string name="alarm_heading">⏰ Đến hạn việc quan trọng</string>
+    <string name="alarm_complete">✓ Hoàn thành</string>
+    <string name="alarm_snooze">Hoãn %s phút</string>
+    <string name="alarm_dismiss">Tắt báo thức</string>
+    <string name="snooze_title">Nhắc lại sau</string>
+
+    <!-- AI (chung), AI Coach -->
+    <string name="ai_rate_limited">Bạn đã dùng hết lượt AI hoặc thao tác quá nhanh. Vui lòng thử lại sau.</string>
+    <string name="ai_unavailable">Tính năng AI tạm thời chưa khả dụng.</string>
+    <string name="coach_title">AI Coach cá nhân</string>
+    <string name="coach_online">Đang hoạt động</string>
+    <string name="coach_input_hint">Nhắn tin cho AI Coach…</string>
+    <string name="coach_send">Gửi</string>
+    <string name="coach_thinking">Đang suy nghĩ…</string>
+    <string name="coach_suggestions">Đề xuất của AI</string>
+    <string name="coach_applied">✓ Đã áp dụng</string>
+    <string name="coach_apply">Áp dụng</string>
+    <string name="coach_greeting">Xin chào! Tôi là AI Coach của bạn. Tôi có thể giúp bạn sắp xếp kế hoạch, tìm động lực hoặc phân tích thói quen trì hoãn. Hôm nay bạn muốn chia sẻ điều gì?</string>
+    <string-array name="coach_suggested_prompts">
+        <item>Giúp tôi sắp xếp hôm nay</item>
+        <item>Tôi hay trì hoãn, sao khắc phục?</item>
+        <item>Lời khuyên giữ tập trung</item>
+        <item>Phân tích thói quen của tôi</item>
+    </string-array>
+    <string name="coach_connection_error">Tôi gặp sự cố kết nối tới máy chủ AI. Vui lòng thử lại sau.</string>
+    <string name="coach_apply_failed">Không áp dụng được đề xuất này (việc có thể đã bị xóa)</string>
+
+    <!-- Ma trận Eisenhower, trợ năng -->
+    <string name="matrix_title">Ma trận ưu tiên</string>
+    <string name="matrix_moved">Đã chuyển sang \"%s\"</string>
+    <string name="matrix_hint">Nhấn giữ một việc rồi kéo sang ô khác. Quan trọng = ưu tiên Cao · Gấp = hạn tới hết ngày mai.</string>
+    <string name="matrix_empty">Trống</string>
+    <string name="a11y_complete">Hoàn thành</string>
+    <string name="a11y_move_to">Chuyển sang %s</string>
+
+    <!-- Tập trung (Pomodoro) -->
+    <string name="focus_default_title">Phiên tập trung</string>
+    <string name="focus_notif_rationale">Bật thông báo để được báo khi hết phiên tập trung, kể cả khi bạn rời app.</string>
+    <string name="focus_title">Tập trung</string>
+    <string name="focus_ready">Sẵn sàng</string>
+    <string name="focus_time_up">Hết giờ</string>
+    <string name="focus_on_break">Đang nghỉ ☕</string>
+    <string name="focus_focusing">Đang tập trung</string>
+    <plurals name="focus_sessions_done">
+        <item quantity="other">%s phiên</item>
+    </plurals>
+    <string name="focus_start_minutes">Bắt đầu %s phút</string>
+    <string name="focus_break_minutes">Nghỉ %s phút</string>
+    <string name="focus_next_session">Phiên tiếp theo</string>
+    <string name="focus_stop">Dừng phiên</string>
+    <string name="focus_task_done">✓ Việc đã xong</string>
+    <string name="focus_flip_hint">📱 Úp máy xuống bàn để bắt đầu phiên mới</string>
+    <string name="focus_tip">Mẹo: tắt thông báo khác và chỉ làm đúng một việc này cho tới khi hết giờ.</string>
+    <string name="action_continue">Tiếp tục</string>
+    <string name="error_unknown">lỗi không rõ</string>
+
+    <!-- Đính kèm, nhắc theo địa điểm, lịch của máy -->
+    <string name="attach_save_first">Lưu việc trước để đính kèm ảnh hoặc tài liệu.</string>
+    <string name="attach_no_app">Không có ứng dụng để mở tệp này</string>
+    <string name="attach_recognize_text">Nhận chữ → thêm vào mô tả</string>
+    <string name="attach_no_text">Không thấy chữ trong ảnh</string>
+    <string name="attach_delete">Xóa đính kèm</string>
+    <string name="attach_scan">Quét tài liệu</string>
+    <string name="attach_pick_photo">Chọn ảnh</string>
+    <string name="attach_hint">Bấm để mở · giữ để nhận chữ hoặc xóa · chỉ lưu trên máy này</string>
+    <string name="attach_image">Ảnh đính kèm</string>
+    <string name="attach_file">Tệp đính kèm</string>
+    <string name="location_no_background">Chưa có quyền vị trí nền — nhắc chỉ hoạt động khi bạn cấp \"Luôn cho phép\"</string>
+    <string name="location_permission_needed">Cần quyền vị trí để nhắc theo địa điểm</string>
+    <string name="location_save_first">Lưu việc trước để đặt nhắc theo địa điểm.</string>
+    <string name="location_empty">Chưa có địa điểm nào. Lưu vị trí hiện tại thành \"Nhà\", \"Công ty\"…</string>
+    <string name="location_on_arrive">Khi đến</string>
+    <string name="location_on_leave">Khi rời</string>
+    <string name="location_clear">Bỏ nhắc theo địa điểm</string>
+    <string name="location_save_current">Lưu vị trí hiện tại thành địa điểm</string>
+    <string name="location_background_title">Cho phép vị trí khi đóng app?</string>
+    <string name="location_background_text">Để nhắc đúng lúc bạn đến / rời nơi này kể cả khi không mở app, hãy chọn \"Luôn cho phép\" ở màn tiếp theo. Vị trí chỉ dùng trên máy, không gửi lên máy chủ.</string>
+    <string name="location_new_place">Địa điểm mới</string>
+    <string name="location_name_hint">Tên (vd: Công ty)</string>
+    <string name="location_radius">Bán kính</string>
+    <string name="location_uses_current">Dùng vị trí hiện tại của bạn.</string>
+    <string name="location_unavailable">Không lấy được vị trí — bật GPS rồi thử lại</string>
+    <string name="location_arrived">📍 Đã đến %s</string>
+    <string name="location_left">📍 Vừa rời %s</string>
+    <string name="calendar_untitled">(Không tiêu đề)</string>
+
+    <!-- Sao lưu, khôi phục, xuất CSV -->
+    <string name="backup_failed">Thất bại: %s</string>
+    <plurals name="backup_done">
+        <item quantity="other">Đã sao lưu %s việc</item>
+    </plurals>
+    <plurals name="backup_csv_done">
+        <item quantity="other">Đã xuất %s việc ra CSV</item>
+    </plurals>
+    <string name="backup_intro">Sao lưu ra tệp do bạn chọn chỗ lưu (Drive, thẻ nhớ…), khôi phục trên máy mới, hoặc xuất bảng tính.</string>
+    <string name="backup_to_file">Sao lưu ra tệp (JSON)</string>
+    <string name="backup_export_csv">Xuất danh sách việc (CSV / Excel)</string>
+    <string name="backup_send">Gửi bản sao lưu</string>
+    <string name="backup_choose_target">Chọn nơi gửi bản sao lưu</string>
+    <string name="backup_send_long">Gửi bản sao lưu (email, Zalo, Drive…)</string>
+    <string name="backup_restore_from_file">Khôi phục từ tệp sao lưu…</string>
+    <string name="backup_restore_title">Khôi phục dữ liệu?</string>
+    <string name="backup_restore_text">Chỉ THÊM những việc, danh sách, thói quen chưa có trên máy — không ghi đè dữ liệu hiện tại. Sau đó sẽ đồng bộ lên máy chủ.</string>
+    <string name="backup_restored">Đã khôi phục %1$s việc, %2$s thói quen, %3$s danh sách</string>
+    <string name="backup_restore">Khôi phục</string>
+    <string name="backup_cannot_write">Không mở được tệp để ghi</string>
+    <string name="backup_cannot_read">Không đọc được tệp</string>
+    <string name="backup_not_taskflow">Không phải tệp sao lưu của TaskFlow</string>
+    <string name="backup_csv_header">Tiêu đề,Danh sách,Mục,Ưu tiên,Hạn,Cả ngày,Trạng thái,Nhãn,Thời lượng (phút),Mô tả</string>
+    <string name="backup_csv_done">Xong</string>
+    <string name="backup_csv_not_done">Chưa xong</string>
+
+    <!-- Tổng kết tuần, lịch sử, thùng rác -->
+    <plurals name="count_tasks">
+        <item quantity="other">%s việc</item>
+    </plurals>
+    <string name="review_title">Tổng kết tuần</string>
+    <string name="review_goal_days">Ngày đạt mục tiêu</string>
+    <string name="review_completed_late">Xong trễ hạn</string>
+    <string name="review_overdue_now">Đang quá hạn</string>
+    <string name="review_by_list">Đã làm theo danh mục</string>
+    <string name="review_attention">Cần để ý</string>
+    <string name="review_neglected">Danh mục \"%s\" đang tồn nhiều việc nhất. Cân nhắc dành một khoảng thời gian cho nó tuần tới.</string>
+    <string name="review_ask_coach">Nhờ AI Coach lập kế hoạch tuần tới</string>
+    <plurals name="review_completed">
+        <item quantity="other">%s việc hoàn thành</item>
+    </plurals>
+    <string name="review_no_previous">Tuần trước chưa có dữ liệu để so sánh</string>
+    <string name="review_change_up">▲ %1$s%% so với tuần trước (%2$s việc)</string>
+    <string name="review_change_down">▼ %1$s%% so với tuần trước (%2$s việc)</string>
+    <string name="review_same_as_last">Bằng tuần trước</string>
+    <string name="review_best_day">Ngày năng suất nhất: %1$s (%2$s việc)</string>
+    <string name="review_last_7_days">7 ngày qua</string>
+    <string name="history_title">Đã hoàn thành</string>
+    <string name="history_empty_title">Chưa có việc nào hoàn thành</string>
+    <string name="history_empty_subtitle">Việc bạn làm xong sẽ được lưu ở đây.</string>
+    <string name="history_reopen">Mở lại</string>
+    <string name="trash_title">Thùng rác</string>
+    <string name="trash_empty_action">Dọn sạch</string>
+    <string name="trash_empty_title">Thùng rác trống</string>
+    <string name="trash_empty_subtitle">Việc đã xóa được giữ ở đây 30 ngày để bạn khôi phục.</string>
+    <string name="trash_retention">Việc đã xóa được giữ 30 ngày rồi tự xóa hẳn.</string>
+    <string name="trash_deleted_at">Xóa %s</string>
+    <string name="trash_delete_forever">Xóa vĩnh viễn</string>
+    <string name="trash_confirm_title">Dọn sạch thùng rác?</string>
+    <string name="trash_confirm_text">Các việc trong thùng rác sẽ bị xóa vĩnh viễn, không khôi phục được.</string>
+    <string name="trash_restored">Đã khôi phục: %s</string>
+    <string name="trash_deleted_forever">Đã xóa vĩnh viễn</string>
+    <plurals name="trash_pending_offline">
+        <item quantity="other">%s mục sẽ được xóa hẳn sau khi đồng bộ (đang offline)</item>
+    </plurals>
+    <string name="all_day">Cả ngày</string>
+    <string name="day_today_lower">hôm nay</string>
+    <string name="day_tomorrow_lower">ngày mai</string>
+    <string name="day_yesterday_lower">hôm qua</string>
+    <string name="fmt_month_year">\'Tháng\' M, yyyy</string>
+    <string name="duration_compact_minutes">%sp</string>
+    <string name="duration_compact_hours">%sg</string>
+    <string name="duration_compact_hours_minutes">%1$sg%2$s</string>
+
+    <!-- Lịch -->
+    <string name="calendar_mode_month">Tháng</string>
+    <string name="calendar_mode_week">Tuần</string>
+    <string name="calendar_mode_agenda">Lịch trình</string>
+    <string name="calendar_permission_needed">Cần quyền đọc lịch để hiện sự kiện của máy</string>
+    <string name="calendar_moved_to">Đã dời sang %s</string>
+    <string name="calendar_title">Lịch công việc</string>
+    <string name="calendar_device_chip">📆 Lịch của máy</string>
+    <string name="calendar_prev_month">Tháng trước</string>
+    <string name="calendar_next_month">Tháng sau</string>
+    <string name="calendar_tasks_on">Công việc %s</string>
+    <string name="calendar_no_tasks">Không có công việc nào</string>
+    <string name="calendar_prev_week">Tuần trước</string>
+    <string name="calendar_next_week">Tuần sau</string>
+    <string name="calendar_this_week">Về tuần này</string>
+    <string name="calendar_week_hint">Nhấn giữ một việc rồi kéo sang ngày khác để dời hạn.</string>
+    <string name="calendar_projected_short">dự kiến</string>
+    <string name="calendar_projected">Lần lặp dự kiến</string>
+    <string name="calendar_agenda_empty">%s ngày tới chưa có việc nào có hạn</string>
+
+    <!-- Mẫu nhiệm vụ -->
+    <string name="templates_title">Mẫu nhiệm vụ</string>
+    <string name="templates_repeats">Lặp lại</string>
+    <string name="tpl_group_health">Sức khỏe</string>
+    <string name="tpl_drink_water">Uống nước</string>
+    <string name="tpl_brush_teeth">Đánh răng</string>
+    <string name="tpl_shower">Tắm</string>
+    <string name="tpl_sleep_early">Đi ngủ sớm</string>
+    <string name="tpl_wake_early">Dậy sớm</string>
+    <string name="tpl_take_medicine">Uống thuốc</string>
+    <string name="tpl_take_break">Nghỉ ngơi một lát</string>
+    <string name="tpl_eat_fruit">Ăn trái cây</string>
+    <string name="tpl_exercise">Tập thể dục</string>
+    <string name="tpl_group_life">Cuộc sống</string>
+    <string name="tpl_shopping">Đi mua sắm</string>
+    <string name="tpl_clean_house">Dọn dẹp nhà</string>
+    <string name="tpl_cook">Nấu ăn</string>
+    <string name="tpl_call_family">Gọi điện gia đình</string>
+    <string name="tpl_feed_pet">Cho thú cưng ăn</string>
+    <string name="tpl_birthday">Sinh nhật</string>
+    <string name="tpl_group_work">Công việc</string>
+    <string name="tpl_send_email">Gửi email</string>
+    <string name="tpl_write_report">Viết báo cáo</string>
+    <string name="tpl_team_meeting">Họp nhóm</string>
+    <string name="tpl_plan_day">Lập kế hoạch ngày</string>
+    <string name="tpl_group_study">Học tập</string>
+    <string name="tpl_read_book">Đọc sách</string>
+    <string name="tpl_learn_language">Học ngoại ngữ</string>
+    <string name="tpl_homework">Làm bài tập</string>
+
+    <!-- Thói quen -->
+    <string name="habits_title">Thói quen</string>
+    <string name="habit_deleted">Đã xóa thói quen \"%s\"</string>
+    <string name="habit_add">Thêm thói quen</string>
+    <string name="habits_empty_title">Chưa có thói quen nào</string>
+    <string name="habits_empty_subtitle">Nhấn + để bắt đầu một thói quen nhỏ: uống nước, đọc sách 10 phút…</string>
+    <plurals name="habits_show_archived">
+        <item quantity="other">Xem %s thói quen đã lưu trữ</item>
+    </plurals>
+    <plurals name="habits_hide_archived">
+        <item quantity="other">Ẩn %s thói quen đã lưu trữ</item>
+    </plurals>
+    <string name="habits_none_today">Không có thói quen nào cần làm hôm nay</string>
+    <string name="habits_all_done">Đã xong hết — tuyệt vời! 🎉</string>
+    <plurals name="habits_left_today">
+        <item quantity="other">Còn %s thói quen cần làm</item>
+    </plurals>
+    <string name="habit_this_week">tuần này %1$s/%2$s</string>
+    <string name="habit_day_done">%s: đã làm</string>
+    <string name="habit_day_not_done">%s: chưa làm</string>
+    <string name="habit_day_not_scheduled">%s: không cần làm</string>
+    <string name="habit_rate_30">30 ngày qua: %s%%</string>
+    <string name="habit_new">Thói quen mới</string>
+    <string name="habit_edit">Sửa thói quen</string>
+    <string name="habit_name">Tên thói quen</string>
+    <string name="habit_name_hint">VD: Uống 2 lít nước</string>
+    <string name="habit_frequency">Tần suất</string>
+    <string name="habit_freq_weekdays">Các thứ</string>
+    <string name="habit_freq_per_week">Số lần/tuần</string>
+    <plurals name="habit_times_each_week">
+        <item quantity="other">%s lần mỗi tuần</item>
+    </plurals>
+    <string name="habit_remind_daily">Nhắc mỗi ngày</string>
+    <string name="habit_remind_hint">Chỉ nhắc vào ngày còn cần làm và chưa đánh dấu</string>
+    <string name="habit_notif_rationale">Bật thông báo để được nhắc thói quen.</string>
+    <string name="habit_remind_time">Giờ nhắc</string>
+    <string name="habit_archive">Lưu trữ</string>
+    <string name="habit_archive_hint">Tạm dừng: ẩn khỏi Hôm nay, giữ nguyên lịch sử</string>
+    <string name="habit_done">Đã làm</string>
+    <string-array name="months_short">
+        <item>Th1</item>
+        <item>Th2</item>
+        <item>Th3</item>
+        <item>Th4</item>
+        <item>Th5</item>
+        <item>Th6</item>
+        <item>Th7</item>
+        <item>Th8</item>
+        <item>Th9</item>
+        <item>Th10</item>
+        <item>Th11</item>
+        <item>Th12</item>
+    </string-array>
+
+    <!-- Tôi (thống kê, mục tiêu, trí nhớ AI) -->
+    <string-array name="stats_tabs">
+        <item>📊 Thống kê</item>
+        <item>📈 Biểu đồ</item>
+        <item>🧠 Trí nhớ AI</item>
+    </string-array>
+    <string name="stats_title">Của tôi</string>
+    <string name="settings_title">Thiết lập</string>
+    <string name="stats_default_name">bạn</string>
+    <string name="stats_on_track">Bạn đang đi đúng kế hoạch! 🎯</string>
+    <string name="lists_title">Danh sách</string>
+    <string name="coach_short_title">AI Coach</string>
+    <string name="shortcut_habits_sub">Đánh dấu mỗi ngày, giữ chuỗi</string>
+    <string name="shortcut_lists_sub">Màu, biểu tượng, mục &amp; bảng Kanban</string>
+    <string name="shortcut_review_sub">So với tuần trước, lập kế hoạch tuần tới</string>
+    <string name="shortcut_coach_sub">Hỏi cách sắp xếp, vượt trì hoãn</string>
+    <string name="shortcut_history_sub">Lịch sử việc đã xong</string>
+    <string name="shortcut_trash_sub">Khôi phục việc đã xóa trong 30 ngày</string>
+    <string name="stats_completed">Hoàn thành</string>
+    <string name="stats_pending">Đang chờ</string>
+    <string name="stats_heatmap_title">Bản đồ nhiệt %s</string>
+    <string name="stats_pending_by_list">Việc đang chờ theo danh mục</string>
+    <string name="stats_nothing_pending">Không còn việc nào đang chờ!</string>
+    <string name="stats_analyze_ai">Phân tích thói quen bằng AI</string>
+    <string name="stats_ai_observations">Quan sát của AI về bạn</string>
+    <string name="stats_no_memories">AI chưa ghi nhận thói quen nào.</string>
+    <string name="stats_tap_analyze">Nhấn phân tích để bắt đầu.</string>
+    <string name="stats_week_completed">Hoàn thành tuần</string>
+    <string name="stats_best_day">Ngày năng suất nhất</string>
+    <string name="stats_completed_7_days">Công việc hoàn thành 7 ngày qua</string>
+    <string name="stats_per_day">Chi tiết từng ngày</string>
+    <string name="stats_less">Ít</string>
+    <string name="stats_more">Nhiều</string>
+    <plurals name="goal_streak">
+        <item quantity="other">🔥 Chuỗi %s ngày</item>
+    </plurals>
+    <plurals name="goal_best_streak">
+        <item quantity="other">Kỷ lục: %s ngày</item>
+    </plurals>
+    <string name="goal_met_today">Hôm nay đã đạt mục tiêu 🎉</string>
+    <plurals name="goal_remaining_today">
+        <item quantity="other">Còn %s việc để đạt mục tiêu hôm nay</item>
+    </plurals>
+    <string name="stats_focus_title">🍅 Tập trung</string>
+    <string name="stats_focus_summary">Hôm nay %1$s · 7 ngày %2$s (%3$s)</string>
+    <string name="memory_extracted">Đã phân tích %1$s hoạt động và rút ra %2$s thói quen mới.</string>
+    <string name="memory_nothing_to_analyze">Chưa có hoạt động nào trong 30 ngày để phân tích.</string>
+    <string name="memory_nothing_new">Đã phân tích %s hoạt động nhưng chưa rút ra thói quen mới.</string>
+    <string name="memory_analyze_failed">Phân tích thất bại</string>
+    <string name="memory_deleted">Đã xóa trí nhớ</string>
+    <string name="action_rename">Đổi tên</string>
+
+    <!-- Danh sách, Kanban -->
+    <string name="list_add">Thêm danh sách</string>
+    <string name="list_overdue_count">%s quá hạn</string>
+    <plurals name="list_section_count">
+        <item quantity="other">%s mục</item>
+    </plurals>
+    <string name="list_edit">Sửa danh sách</string>
+    <string name="list_delete">Xóa danh sách</string>
+    <string name="list_delete_title">Xóa danh sách \"%s\"?</string>
+    <string name="list_delete_text">Các việc trong danh sách vẫn được giữ, chỉ bỏ danh sách khỏi bộ lọc.</string>
+    <string name="list_new">Danh sách mới</string>
+    <string name="list_name">Tên danh sách</string>
+    <string name="list_icon">Biểu tượng</string>
+    <string name="list_color">Màu</string>
+    <string name="list_unsectioned">Chưa phân mục</string>
+    <string name="list_view_list">Xem dạng danh sách</string>
+    <string name="list_view_kanban">Xem dạng Kanban</string>
+    <string name="list_add_section">Thêm mục</string>
+    <string name="list_appearance">Màu &amp; biểu tượng</string>
+    <plurals name="list_completed_count">
+        <item quantity="other">✓ %s việc đã xong</item>
+    </plurals>
+    <string name="list_section_hint">VD: Cần làm, Đang làm, Chờ phản hồi</string>
+    <string name="list_rename_section">Đổi tên mục</string>
+    <string name="list_add_section_plus">+ Thêm mục</string>
+    <string name="list_section_options">Tùy chọn mục</string>
+    <string name="list_move_left">Chuyển sang trái</string>
+    <string name="list_move_right">Chuyển sang phải</string>
+    <string name="list_delete_section">Xóa mục (giữ việc)</string>
+    <string name="list_drop_here">Kéo việc vào đây</string>
+    <string name="list_add_task_plus">+ Thêm việc</string>
+    <string name="list_name_taken">Tên \"%s\" đã có hoặc không hợp lệ</string>
+    <string name="list_max_sections">Tối đa %s mục</string>
+    <string name="action_open">Mở</string>
+    <string name="notif_rationale_due">Bật thông báo để được nhắc khi việc đến hạn.</string>
+    <string name="task_added">Đã thêm: %s</string>
+    <string name="focus_resting">Đang nghỉ</string>
+
+    <!-- Hôm nay, lịch trình AI -->
+    <string name="today_completed">Đã hoàn thành: %s</string>
+    <string name="today_postponed_to">Đã hoãn sang %s</string>
+    <string name="today_duplicated">Đã nhân bản: %s</string>
+    <string name="today_add_task">Thêm việc cho hôm nay</string>
+    <string name="today_device_events">📆 Lịch hôm nay</string>
+    <string name="today_my_day">☀ Ngày của tôi</string>
+    <string name="today_my_day_empty">Chọn vài việc bạn cam kết làm hôm nay — từ gợi ý bên dưới, hoặc nhấn + để thêm. Danh sách tự làm mới mỗi sáng.</string>
+    <string name="today_habits">🌱 Thói quen hôm nay</string>
+    <string name="today_see_all">Tất cả</string>
+    <string name="today_suggestions">Gợi ý cho hôm nay</string>
+    <string name="today_add_all">Thêm tất cả</string>
+    <string name="greeting_morning">Chào buổi sáng, %s!</string>
+    <string name="greeting_noon">Chào buổi trưa, %s!</string>
+    <string name="greeting_afternoon">Chào buổi chiều, %s!</string>
+    <string name="greeting_evening">Chào buổi tối, %s!</string>
+    <string name="today_goal_met">Đạt mục tiêu hôm nay! 🎉</string>
+    <string name="today_day_off">Hôm nay là ngày nghỉ — làm được gì cũng là thêm</string>
+    <plurals name="today_goal_remaining">
+        <item quantity="other">Còn %s việc để đạt mục tiêu</item>
+    </plurals>
+    <plurals name="today_streak">
+        <item quantity="other">🔥 Chuỗi %1$s ngày · kỷ lục %2$s</item>
+    </plurals>
+    <string name="today_start_streak">Đạt mục tiêu hôm nay để bắt đầu chuỗi 🔥</string>
+    <string name="today_add_to_my_day">Thêm vào Ngày của tôi</string>
+    <plurals name="today_scan_added">
+        <item quantity="other">Đã thêm %s việc từ ảnh vào Ngày của tôi 📷</item>
+    </plurals>
+    <string name="plan_title">🗓 Lịch trình AI</string>
+    <string name="plan_generate">Xếp lịch</string>
+    <string name="plan_regenerate">Xếp lại</string>
+    <string name="plan_stale">Danh sách việc đã thay đổi so với lịch — nhấn để xếp lại</string>
+    <string name="plan_empty">Chưa có lịch. Chọn việc cho Ngày của tôi rồi nhấn \"Xếp lịch\" — AI sẽ xếp khung giờ theo thời lượng ước tính và thói quen của bạn.</string>
+    <string name="plan_start_focus">Bắt đầu tập trung</string>
+    <string name="plan_change_time">Đổi giờ: %s</string>
+    <string name="plan_shift_hint">Các khung phía sau bị trùng sẽ được dời xuống.</string>
+    <string name="plan_remove_slot">Bỏ khỏi lịch</string>
+    <string name="plan_load_failed">Không tải được lịch trình (cần mạng).</string>
+    <string name="plan_generate_failed">Tạo lịch trình thất bại. Kiểm tra kết nối rồi thử lại.</string>
+    <string name="plan_no_slots">Chưa xếp được khung giờ nào — hãy thêm việc vào Ngày của tôi, hoặc nới giờ kết thúc trong Cài đặt.</string>
+    <string name="plan_generated">Đã xếp lịch cho hôm nay</string>
+    <string name="plan_no_room">Không đủ chỗ trong ngày cho giờ đó</string>
+    <string name="plan_save_failed">Không lưu được lịch trình (cần mạng)</string>
+    <string name="action_choose">Chọn</string>
+    <string name="action_more">Thêm</string>
+
+    <!-- Thẻ việc, chọn nhiều, đồng bộ, tạo nhanh -->
+    <string name="task_state_done">Đã xong</string>
+    <string name="task_state_overdue">Quá hạn</string>
+    <string name="task_state_open">Chưa xong</string>
+    <string name="a11y_postpone">Hoãn sang ngày khác</string>
+    <string name="task_remove_from_my_day">Bỏ khỏi Ngày của tôi</string>
+    <string name="task_duplicate">Nhân bản</string>
+    <string name="task_do_first">Nên làm trước · %s</string>
+    <string name="task_drag">Kéo</string>
+    <string name="task_selected">Đã chọn</string>
+    <string name="task_in_my_day">Trong Ngày của tôi</string>
+    <string name="task_not_synced">Chưa đồng bộ</string>
+    <string name="task_from_time">(từ %s)</string>
+    <string name="task_change_priority">Đổi ưu tiên</string>
+    <string name="task_focus_25">Bắt đầu tập trung 25\'</string>
+    <string name="task_edit">Chỉnh sửa</string>
+    <string name="task_swipe_postpone">Hoãn</string>
+    <string name="task_postpone_to">Hoãn sang…</string>
+    <string name="task_pick_date">Chọn ngày…</string>
+    <string name="selection_exit">Thoát chọn</string>
+    <string name="selection_count">Đã chọn %s</string>
+    <string name="selection_all">Chọn tất cả</string>
+    <string name="selection_move">Dời</string>
+    <plurals name="sync_offline_pending">
+        <item quantity="other">Đang offline — %s thay đổi đã lưu trên máy, sẽ tự đồng bộ khi có mạng</item>
+    </plurals>
+    <string name="sync_offline">Đang offline — bạn vẫn thêm/sửa công việc bình thường</string>
+    <plurals name="sync_pending">
+        <item quantity="other">Đang đồng bộ %s thay đổi…</item>
+    </plurals>
+    <string name="voice_prompt">Nói việc cần làm, vd: \"Gọi mẹ 8h tối mai\"</string>
+    <string name="voice_unavailable">Máy chưa có dịch vụ nhận giọng nói</string>
+    <string name="voice_input">Nhập bằng giọng nói</string>
+    <string name="quick_add_hint">VD: Nộp báo cáo mai 3h chiều !cao #Công việc @gấp</string>
+    <string name="quick_add_understood">Hiểu là:</string>
+    <string name="quick_add_new_list">(mới)</string>
+    <string name="quick_add_due">Hạn</string>
+    <string name="quick_add_in_3_days">3 ngày sau</string>
+    <string name="quick_add_no_date">Không</string>
+    <string name="quick_add_list">Danh mục</string>
+    <string name="quick_add_my_day">☀ Thêm vào Ngày của tôi</string>
+    <string name="quick_add_templates">Mẫu</string>
+    <string name="quick_add_scan">Quét</string>
+    <string name="quick_add_details">Chi tiết</string>
+    <string name="ai_parse_title">Phân tích bằng AI</string>
+    <string name="ai_parse_subtitle">Dành cho câu dài/phức tạp — cần mạng</string>
+    <string name="ai_parse_hint">VD: Họp với sếp thứ 6 lúc 3h chiều, khoảng 1 tiếng</string>
+    <string name="action_clear">Xóa</string>
+
+    <!-- Danh sách việc (tab Việc làm) -->
+    <string name="tasks_completed_spawned">Đã hoàn thành · đã tạo lần lặp kế tiếp</string>
+    <string name="tasks_moved_to_trash">Đã chuyển vào Thùng rác: %s</string>
+    <plurals name="tasks_rescheduled">
+        <item quantity="other">Đã dời %s việc</item>
+    </plurals>
+    <plurals name="tasks_bulk_completed">
+        <item quantity="other">Đã hoàn thành %s việc</item>
+    </plurals>
+    <plurals name="tasks_bulk_trashed">
+        <item quantity="other">Đã chuyển %s việc vào Thùng rác</item>
+    </plurals>
+    <string name="tasks_add">Thêm công việc</string>
+    <string name="filter_save_chip">💾 Lưu bộ lọc</string>
+    <string name="filter_clear_chip">✕ Bỏ lọc</string>
+    <string name="filter_all_lists">Mọi danh sách</string>
+    <string name="filter_all_tags">Mọi nhãn</string>
+    <string name="tasks_empty_filtered">Không có công việc phù hợp</string>
+    <string name="tasks_empty">Chưa có công việc nào</string>
+    <string name="tasks_empty_filtered_sub">Thử bộ lọc hoặc từ khóa khác nhé.</string>
+    <string name="tasks_empty_sub">Nhấn + rồi gõ tự nhiên, VD: \"Nộp báo cáo mai 3h chiều !cao\"</string>
+    <string name="tasks_sort_hint">☰ Giữ và kéo để sắp xếp thứ tự</string>
+    <string name="tasks_upcoming">Sắp tới</string>
+    <string name="tasks_done_today">Đã xong hôm nay</string>
+    <string name="tasks_pick_one">Chọn một việc để xem chi tiết</string>
+    <string name="filter_save">Lưu bộ lọc</string>
+    <string name="filter_save_hint">VD: Việc nhà gấp</string>
+    <string name="filter_delete_title">Xóa bộ lọc \"%s\"?</string>
+    <string name="filter_saved">Đã lưu bộ lọc \"%s\"</string>
+    <plurals name="tasks_selected">
+        <item quantity="other">%s việc đã chọn</item>
+    </plurals>
+    <string name="tasks_reschedule_all">Dời tất cả</string>
+    <string name="tasks_to_today">Sang hôm nay</string>
+    <string name="tasks_to_tomorrow">Sang ngày mai</string>
+    <string name="tasks_search">Tìm công việc…</string>
+    <string name="tasks_sort_by">Sắp xếp: %s</string>
+    <string name="tasks_hero_title">Tất cả việc của %s</string>
+    <plurals name="tasks_pending">
+        <item quantity="other">%s việc đang chờ</item>
+    </plurals>
+    <string name="tasks_none_pending">Không còn việc nào đang chờ 🎉</string>
+    <string name="tasks_matrix">Ma trận Eisenhower</string>
+    <string name="tasks_ai_add">Thêm bằng AI</string>
+    <string name="tasks_manual_sort">Sắp xếp thủ công</string>
+    <string name="sync_no_network">Không có mạng — thay đổi sẽ tự đồng bộ khi có mạng</string>
+    <string name="sync_server_busy">Máy chủ đang bận, sẽ thử đồng bộ lại sau</string>
+    <string name="my_day_added">Đã thêm vào Ngày của tôi ☀</string>
+    <string name="my_day_removed">Đã bỏ khỏi Ngày của tôi</string>
+    <plurals name="my_day_added_count">
+        <item quantity="other">Đã thêm %s việc vào Ngày của tôi ☀</item>
+    </plurals>
+    <plurals name="priority_changed_count">
+        <item quantity="other">Đã đổi ưu tiên %s việc</item>
+    </plurals>
+    <plurals name="scan_created_count">
+        <item quantity="other">Đã tạo %s việc từ ảnh 📷</item>
+    </plurals>
+    <string name="ai_parse_failed">Không phân tích được. Hãy thử mô tả rõ hơn.</string>
+    <string name="action_decrease">Giảm</string>
+    <string name="action_increase">Tăng</string>
+    <string name="unit_days">ngày</string>
+    <string name="unit_weeks">tuần</string>
+    <string name="unit_months">tháng</string>
+
+    <!-- Chi tiết việc -->
+    <string name="detail_saved">Đã lưu công việc</string>
+    <string name="detail_trashed">Đã chuyển vào Thùng rác</string>
+    <string name="detail_ai_estimate">AI gợi ý: %s</string>
+    <string name="detail_duplicated">Đã nhân bản — đang mở bản sao</string>
+    <string name="detail_new_title">Công việc mới ✨</string>
+    <string name="detail_edit_title">Chỉnh sửa công việc</string>
+    <string name="detail_no_calendar_app">Máy chưa có ứng dụng Lịch</string>
+    <string name="detail_title_required">Tiêu đề không được để trống</string>
+    <string name="detail_recurring_needs_due">Vui lòng đặt hạn chót cho công việc lặp lại</string>
+    <string name="detail_create">Tạo công việc</string>
+    <string name="detail_save_changes">Lưu thay đổi</string>
+    <string name="detail_section_name">Tên &amp; Mô tả</string>
+    <string name="detail_title_label">Tiêu đề công việc</string>
+    <string name="detail_description_label">Mô tả chi tiết (tùy chọn)</string>
+    <string name="detail_my_day_hint">Danh sách việc bạn chọn làm hôm nay</string>
+    <string name="detail_section_priority">Độ ưu tiên</string>
+    <string name="detail_start_range">Bắt đầu %1$s → %2$s</string>
+    <string name="detail_add_start">Thêm giờ bắt đầu (khung giờ)</string>
+    <string name="detail_all_day_hint">Việc cả ngày: chỉ quá hạn khi sang ngày hôm sau; nhắc theo giờ mặc định trong Cài đặt.</string>
+    <string name="detail_section_estimate">Thời lượng ước tính</string>
+    <string name="detail_ai_suggest">✨ AI gợi ý</string>
+    <string name="detail_estimate_unknown">Chưa rõ</string>
+    <string name="detail_estimate_hint">Giúp AI xếp lịch trong ngày đúng độ dài của việc.</string>
+    <string name="detail_new_list">Thêm danh mục mới</string>
+    <string name="detail_section_label">Mục</string>
+    <string name="detail_section_tags">Nhãn</string>
+    <string name="detail_remove_tag">Bỏ nhãn</string>
+    <string name="detail_add_tag">Thêm nhãn (vd: nhà, gấp)</string>
+    <string name="detail_every">Mỗi</string>
+    <string name="detail_on_days">Vào các thứ</string>
+    <string name="detail_next_from">Lần tiếp theo tính từ</string>
+    <string name="detail_mode_schedule">Lịch cố định</string>
+    <string name="detail_mode_completion">Ngày hoàn thành</string>
+    <string name="detail_mode_schedule_hint">VD: họp mỗi thứ 2 — làm trễ cũng không đổi lịch.</string>
+    <string name="detail_mode_completion_hint">VD: tưới cây 3 ngày sau lần tưới trước — làm trễ thì lần sau dời theo.</string>
+    <string name="detail_ends">Kết thúc: %s</string>
+    <string name="detail_repeat_forever">Lặp mãi (chọn ngày kết thúc)</string>
+    <string name="detail_repeat_needs_due">⚠ Cần đặt hạn chót để dùng lặp lại.</string>
+    <string name="detail_section_reminders">Lời nhắc</string>
+    <string name="detail_reminders_need_due">Đặt hạn chót để bật nhắc nhở.</string>
+    <string name="reminder_morning_of">Buổi sáng của ngày đến hạn</string>
+    <string name="reminder_1_day_before">Trước 1 ngày</string>
+    <string name="reminder_on_time">Đúng giờ</string>
+    <string name="reminder_minutes_before">Trước %s phút</string>
+    <string name="reminder_1_hour_before">Trước 1 giờ</string>
+    <string name="detail_reminders_multi_start">Chọn được nhiều lời nhắc · tính theo giờ bắt đầu</string>
+    <string name="detail_reminders_multi">Chọn được nhiều lời nhắc</string>
+    <string name="detail_section_location">Nhắc theo địa điểm</string>
+    <string name="detail_section_attachments">Đính kèm</string>
+    <string name="detail_section_focus">Đã tập trung</string>
+    <string name="detail_focus_estimate">ước tính %s</string>
+    <string name="detail_focus_latest">Gần nhất: %s</string>
+    <string name="detail_section_subtasks">Các bước con</string>
+    <string name="detail_subtask_due">Đặt hạn cho bước</string>
+    <string name="detail_subtask_delete">Xóa bước</string>
+    <string name="detail_subtask_add">Thêm bước con</string>
+    <string name="detail_ai_breakdown">✨ Nhờ AI chia nhỏ việc này</string>
+    <string name="detail_start_before_due">Giờ bắt đầu phải trước %s</string>
+    <string name="detail_ai_steps_title">AI gợi ý các bước</string>
+    <string name="detail_ai_set_estimate">Đặt thời lượng ước tính: %s</string>
+    <plurals name="detail_add_steps">
+        <item quantity="other">Thêm %s bước</item>
+    </plurals>
+    <string name="detail_skip_occurrence">Bỏ qua lần này</string>
+    <string name="detail_add_to_device_calendar">Thêm vào lịch của máy</string>
+    <string name="detail_pick_time">Chọn giờ</string>
+    <plurals name="attach_copy_failed">
+        <item quantity="other">Không chép được %s tệp</item>
+    </plurals>
+    <string name="detail_task_gone">Công việc không còn tồn tại (có thể đã bị xóa trên thiết bị khác)</string>
+    <string name="detail_save_gone">Không thể lưu: công việc đã bị xóa trên thiết bị khác</string>
+    <string name="detail_skipped">Đã bỏ qua lần này — chuyển sang lần kế tiếp</string>
+    <string name="detail_series_ended">Đây là lần lặp cuối cùng (đã tới ngày kết thúc)</string>
+    <string name="detail_skip_needs_recurring">Chỉ bỏ qua được việc lặp lại có hạn chót</string>
+    <string name="detail_task_gone_short">Công việc không còn tồn tại</string>
+    <string name="detail_ai_no_steps">AI chưa nghĩ ra bước nào mới — thử viết mô tả rõ hơn</string>
+    <string name="detail_ai_breakdown_failed">Không nhờ AI chia nhỏ được, thử lại sau</string>
+    <string name="detail_ai_no_estimate">AI chưa ước tính được việc này</string>
+    <string name="detail_ai_estimate_failed">Không lấy được gợi ý thời lượng</string>
+    <string name="detail_ai_needs_title">Nhập tiêu đề trước để AI hiểu việc cần làm</string>
+    <string name="unit_tasks">việc</string>
+
+    <!-- Thiết lập -->
+    <string name="logout_unsynced_title">Đăng xuất khi chưa đồng bộ?</string>
+    <plurals name="logout_unsynced_text">
+        <item quantity="other">Còn %s thay đổi chưa gửi được lên máy chủ (đang offline). Đăng xuất bây giờ sẽ làm mất các thay đổi này.</item>
+    </plurals>
+    <string name="logout_anyway">Vẫn đăng xuất</string>
+    <string name="logout_stay">Ở lại</string>
+    <string name="settings_appearance">🌗 Giao diện</string>
+    <string name="theme_light">☀️ Sáng</string>
+    <string name="theme_dark">🌙 Tối</string>
+    <string name="theme_system">📱 Hệ thống</string>
+    <string name="settings_language">🌐 Ngôn ngữ</string>
+    <string name="language_system">Theo máy</string>
+    <string name="language_hint">Áp dụng cho toàn bộ app. Android 13+ cũng đổi được trong Cài đặt hệ thống › Ứng dụng › TaskFlow AI › Ngôn ngữ.</string>
+    <string name="settings_rhythm">🕐 Nhịp sinh hoạt</string>
+    <string name="settings_rhythm_hint">AI dùng các thông số này để sắp xếp lịch trình phù hợp với bạn.</string>
+    <string name="settings_morning_start">Bắt đầu buổi sáng</string>
+    <string name="settings_evening_end">Kết thúc buổi tối</string>
+    <string name="settings_work_duration">Thời lượng phiên làm việc (phút)</string>
+    <string name="settings_daily_goal">🎯 Mục tiêu hằng ngày</string>
+    <string name="settings_daily_goal_hint">Chuỗi ngày 🔥 chỉ tăng khi bạn hoàn thành đủ số việc này. Ngày nghỉ không làm đứt chuỗi.</string>
+    <string name="settings_complete_each_day">Mỗi ngày hoàn thành</string>
+    <string name="settings_days_off">Ngày nghỉ</string>
+    <string name="settings_lists">🏷️ Danh mục</string>
+    <string name="settings_lists_hint">Danh mục dùng khi tạo công việc. Bạn có thể thêm danh mục riêng và xoá danh mục tự thêm.</string>
+    <string name="settings_default_list">Mặc định</string>
+    <string name="settings_save">Lưu thiết lập</string>
+    <string name="settings_notifications">🔔 Thông báo</string>
+    <string name="settings_morning_digest">Tóm tắt buổi sáng</string>
+    <string name="settings_morning_digest_sub">Số việc đến hạn, quá hạn và trong Ngày của tôi</string>
+    <string name="settings_digest_rationale">Bật thông báo để nhận tóm tắt việc cần làm mỗi sáng.</string>
+    <string name="settings_digest_time">Giờ gửi tóm tắt</string>
+    <string name="settings_weekly_review_sub">Tối Chủ nhật 19:00 — xem lại tuần và lập kế hoạch tuần tới</string>
+    <string name="settings_all_day_time">Giờ nhắc cho việc \"cả ngày\"</string>
+    <string name="settings_system">📲 Tiện ích hệ thống</string>
+    <string name="settings_focus_dnd">Bật Không làm phiền khi tập trung</string>
+    <string name="settings_focus_dnd_sub">Tắt thông báo của mọi app trong phiên Pomodoro, tự bật lại khi xong</string>
+    <string name="settings_dnd_grant">Cho phép TaskFlow quản lý \"Không làm phiền\"</string>
+    <string name="settings_quick_add_notif">Ô \"Thêm việc nhanh\" trên thanh thông báo</string>
+    <string name="settings_quick_add_notif_sub">Gõ việc ngay trên thông báo, không cần mở app</string>
+    <string name="settings_quick_add_rationale">Bật thông báo để dùng ô thêm việc nhanh.</string>
+    <string name="settings_qs_tiles">Ô cài đặt nhanh</string>
+    <string name="settings_qs_tiles_sub">Thêm ô \"Tập trung\" / \"Thêm việc\" vào bảng kéo xuống từ đỉnh màn hình</string>
+    <string name="settings_planning">🗓 Kế hoạch</string>
+    <string name="settings_capacity">Số giờ làm việc mỗi ngày</string>
+    <string name="settings_capacity_hint">Lịch tuần cộng thời lượng ước tính của từng ngày và tô đỏ ngày vượt mức này.</string>
+    <string name="settings_advanced_reminders">⏰ Nhắc hẹn nâng cao</string>
+    <string name="settings_nag">Nhắc lại tới khi xong</string>
+    <string name="settings_nag_hint">Việc đến hạn mà chưa tích xong sẽ được nhắc lại (tối đa %s lần).</string>
+    <string name="settings_off">Tắt</string>
+    <string name="settings_nag_high_only">Chỉ việc ưu tiên Cao</string>
+    <string name="settings_nag_high_only_sub">Tắt để nhắc lại mọi việc có hạn</string>
+    <string name="settings_alarm_high">Báo thức cho việc ưu tiên Cao</string>
+    <string name="settings_alarm_high_sub">Đổ chuông + hiện toàn màn hình kể cả khi khóa máy, như đồng hồ báo thức</string>
+    <string name="settings_alarm_rationale">Bật thông báo để báo thức cho việc quan trọng hoạt động.</string>
+    <string name="settings_quiet_hours">Giờ yên lặng</string>
+    <string name="settings_quiet_hours_sub">Nhắc rơi vào khung giờ này sẽ dời tới lúc hết giờ yên lặng (báo thức vẫn kêu)</string>
+    <string name="settings_from">Từ</string>
+    <string name="settings_to">Đến</string>
+    <string name="settings_security">🔒 Bảo mật</string>
+    <string name="settings_app_lock">Khóa ứng dụng</string>
+    <string name="settings_app_lock_sub">Dùng vân tay / khuôn mặt / mã PIN máy khi mở app hoặc quay lại sau %s giây</string>
+    <string name="settings_no_lock_screen">Máy chưa cài vân tay hoặc mã khóa màn hình</string>
+    <string name="settings_data">💾 Dữ liệu</string>
+    <string name="settings_account">👤 Tài khoản</string>
+    <string name="settings_logout">Đăng xuất khỏi máy này</string>
+    <string name="settings_logout_all">Đăng xuất khỏi mọi thiết bị</string>
+    <string name="settings_logout_all_hint">Dùng khi mất điện thoại hoặc đăng nhập nhầm ở máy lạ.</string>
+    <string name="settings_about">ℹ️ Giới thiệu</string>
+    <string name="settings_version">Phiên bản %s</string>
+    <string name="settings_about_text">Ứng dụng quản lý công việc cá nhân tích hợp AI: công việc theo danh sách, mục / Kanban và nhãn; lịch tháng / tuần; thói quen; tập trung Pomodoro; mục tiêu &amp; thống kê; lịch trình AI hằng ngày và AI Coach có trí nhớ dài hạn. Dùng được khi offline, đồng bộ giữa các máy.</string>
+    <string name="settings_faq">Hỏi đáp nhanh</string>
+    <string name="settings_faq_text">• Không nhận thông báo? Hãy cấp quyền thông báo và đặt hạn chót cho việc.\n• Thêm danh sách mới? Ngay tại mục Danh mục ở trên, ở Tôi → Danh sách, hoặc trong màn chi tiết công việc.\n• Chia việc theo giai đoạn? Mở một danh sách → thêm mục → kéo thẻ giữa các cột Kanban.\n• AI hiểu sai khi thêm nhanh? Mô tả rõ thời gian/độ ưu tiên hơn, rồi chỉnh tay trước khi lưu.</string>
+    <string name="settings_exact_alarm_missing">Chưa cho phép hẹn giờ chính xác — báo thức có thể kêu trễ vài phút.</string>
+    <string name="settings_full_screen_missing">Chưa cho phép hiện toàn màn hình — báo thức chỉ hiện thành thông báo.</string>
+    <string name="settings_grant">Cấp quyền</string>
+    <string name="settings_tile_added">Đã thêm ô \"%s\"</string>
+    <string name="settings_tile_exists">Ô \"%s\" đã có sẵn</string>
+    <string name="settings_saved">Đã lưu thiết lập!</string>
+    <string name="settings_invalid">Thiết lập chưa hợp lệ: giờ dạng HH:mm, giờ kết thúc sau giờ bắt đầu, thời lượng 15–480 phút.</string>
+    <string name="settings_save_offline">Chưa lưu được lên máy chủ (mục tiêu vẫn áp dụng trên máy này)</string>
+
+    <!-- Thông báo, kênh thông báo -->
+    <plurals name="digest_due_today">
+        <item quantity="other">%s việc đến hạn</item>
+    </plurals>
+    <plurals name="digest_overdue">
+        <item quantity="other">%s việc quá hạn</item>
+    </plurals>
+    <plurals name="digest_my_day">
+        <item quantity="other">%s việc trong Ngày của tôi</item>
+    </plurals>
+    <string name="digest_title">Chào buổi sáng! Hôm nay của bạn</string>
+    <string name="weekly_review_ready">Tổng kết tuần đã sẵn sàng</string>
+    <string name="weekly_review_ready_text">Xem tuần qua bạn làm được gì và lập kế hoạch cho tuần tới</string>
+    <string name="focus_notif_focusing">🍅 Đang tập trung</string>
+    <string name="focus_notif_break">☕ Đang nghỉ</string>
+    <string name="focus_notif_stop">Dừng</string>
+    <string name="focus_done_title">Hết %s phút tập trung 🍅</string>
+    <string name="focus_break_over">Hết giờ nghỉ</string>
+    <string name="focus_done_text">\"%1$s\" — nghỉ %2$s phút rồi làm tiếp nhé</string>
+    <string name="focus_next_ready">Sẵn sàng cho phiên tiếp theo: \"%s\"</string>
+    <string name="focus_notif_task_done">Việc đã xong</string>
+    <string name="habit_reminder_text">Đến giờ duy trì thói quen của bạn</string>
+    <string name="snooze_reply_ok">Sẽ nhắc lại lúc %s</string>
+    <string name="snooze_reply_unknown">Không hiểu \"%s\" — hoãn 1 giờ</string>
+    <string name="channel_reminders">Nhắc việc</string>
+    <string name="channel_reminders_desc">Thông báo khi công việc đến hạn</string>
+    <string name="channel_digest">Tóm tắt &amp; tổng kết</string>
+    <string name="channel_digest_desc">Tóm tắt việc cần làm buổi sáng và tổng kết cuối tuần</string>
+    <string name="channel_focus">Hẹn giờ tập trung</string>
+    <string name="channel_focus_desc">Báo khi hết phiên tập trung hoặc giờ nghỉ</string>
+    <string name="channel_focus_ongoing">Đang tập trung</string>
+    <string name="channel_focus_ongoing_desc">Đồng hồ đếm ngược của phiên tập trung đang chạy</string>
+    <string name="channel_quick_add">Thêm việc nhanh</string>
+    <string name="channel_quick_add_desc">Ô thêm việc cố định trên thanh thông báo</string>
+    <string name="channel_alarm">Báo thức việc quan trọng</string>
+    <string name="channel_alarm_desc">Đổ chuông toàn màn hình khi việc ưu tiên cao đến hạn</string>
+    <string name="quick_add_notif_hint">VD: Gọi khách hàng mai 9h !cao</string>
+    <string name="quick_add_notif_text">Gõ việc cần làm ngay tại đây</string>
+    <string name="reminder_default_title">Công việc đến hạn</string>
+    <string name="snooze_reply_label">Hoãn tới… (vd: mai 9h)</string>
+    <string-array name="snooze_reply_choices">
+        <item>30 phút</item>
+        <item>1 giờ</item>
+        <item>Tối nay</item>
+        <item>Sáng mai</item>
+    </string-array>
+    <string name="reminder_nag_title">Nhắc lại (lần %s): việc chưa xong</string>
+    <string name="reminder_due_title">Đến hạn công việc</string>
+    <string name="reminder_snooze_more">Hoãn…</string>
+
+    <!-- AI Coach áp dụng đề xuất, widget, ô Quick Settings -->
+    <plurals name="coach_subtasks_added">
+        <item quantity="other">Đã thêm %s bước con</item>
+    </plurals>
+    <string name="coach_task_created">Đã tạo: %s</string>
+    <string name="coach_priority_changed">Đã đổi độ ưu tiên</string>
+    <plurals name="coach_my_day_added">
+        <item quantity="other">Đã thêm %s việc vào Ngày của tôi</item>
+    </plurals>
+    <string name="task_copy_title">%s (bản sao)</string>
+    <string name="tile_focus_running">Đang chạy · bấm để dừng</string>
+    <string name="widget_tasks_title">Việc cần làm</string>
+    <string name="widget_no_tasks">🎉 Không còn việc nào!</string>
+    <string name="widget_done_today">việc xong hôm nay</string>
+    <string name="widget_next">Tiếp theo</string>
+    <string name="widget_nothing_left">Không còn việc nào</string>
+    <string name="widget_config_title">Widget hiển thị việc nào?</string>
+    <string name="widget_source_all">📋 Tất cả việc cần làm</string>
+</resources>

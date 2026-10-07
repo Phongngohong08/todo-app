@@ -23,6 +23,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import com.example.todoapplication.i18n.str
 
 /**
  * [TẦNG DATA · SERVICE] Foreground Service của phiên tập trung (Pomodoro):
@@ -84,8 +85,8 @@ class FocusService : Service() {
 
     private fun buildNotification(s: FocusSession.State) = NotificationCompat.Builder(this, Notifications.CHANNEL_FOCUS_ONGOING)
         .setSmallIcon(R.drawable.ic_stat_task)
-        .setContentTitle(if (s.phase == FocusSession.Phase.FOCUS) "🍅 Đang tập trung" else "☕ Đang nghỉ")
-        .setContentText(s.title.ifBlank { "Phiên tập trung" })
+        .setContentTitle(str(if (s.phase == FocusSession.Phase.FOCUS) R.string.focus_notif_focusing else R.string.focus_notif_break))
+        .setContentText(s.title.ifBlank { str(R.string.focus_default_title) })
         .setOngoing(true)
         .setOnlyAlertOnce(true)
         .setCategory(NotificationCompat.CATEGORY_STOPWATCH)
@@ -97,7 +98,7 @@ class FocusService : Service() {
         .setShowWhen(true)
         .setContentIntent(Notifications.openApp(this, Notifications.ID_FOCUS_ONGOING, AppIntents.OPEN_FOCUS))
         .addAction(
-            0, "Dừng",
+            0, str(R.string.focus_notif_stop),
             PendingIntent.getService(
                 this, 0, Intent(this, FocusService::class.java).setAction(ACTION_STOP),
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE

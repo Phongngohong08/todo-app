@@ -8,6 +8,10 @@ import java.time.LocalTime
 import java.time.ZoneId
 import java.time.temporal.TemporalAdjusters
 import kotlin.math.roundToInt
+import androidx.annotation.StringRes
+import com.example.todoapplication.R
+import com.example.todoapplication.i18n.str
+import com.example.todoapplication.i18n.plural
 
 /*
  * [TẦNG DOMAIN] Logic nghiệp vụ THUẦN cho danh sách công việc (quá hạn, nhóm, sắp xếp, gợi ý...).
@@ -88,21 +92,23 @@ private fun priorityRank(priority: String) = when (priority) {
 }
 
 fun sortLabel(sortBy: String): String = when (sortBy) {
-    "DUE" -> "Hạn chót"
-    "PRIORITY" -> "Ưu tiên"
-    "TITLE" -> "Tên (A-Z)"
-    else -> "Thủ công"
+    "DUE" -> str(R.string.sort_due)
+    "PRIORITY" -> str(R.string.sort_priority)
+    "TITLE" -> str(R.string.sort_title)
+    else -> str(R.string.sort_manual)
 }
 
 // ── Bộ lọc thông minh ────────────────────────────────────────────────────────
 
 /** Bộ lọc nhanh bên cạnh bộ lọc danh mục (như "Bộ lọc" của Todoist / "Danh sách thông minh" của TickTick). */
-enum class SmartFilter(val label: String) {
-    NONE("Tất cả"),
-    OVERDUE("Quá hạn"),
-    HIGH_PRIORITY("Ưu tiên cao"),
-    NO_DATE("Chưa có hạn"),
-    RECURRING("Việc lặp");
+enum class SmartFilter(@StringRes private val labelRes: Int) {
+    NONE(R.string.filter_all),
+    OVERDUE(R.string.filter_overdue),
+    HIGH_PRIORITY(R.string.filter_high_priority),
+    NO_DATE(R.string.filter_no_date),
+    RECURRING(R.string.filter_recurring);
+
+    val label: String get() = str(labelRes)
 
     fun matches(task: Task, now: Long): Boolean = when (this) {
         NONE -> true
@@ -168,22 +174,22 @@ fun recommendationReason(task: Task, now: Long, zone: ZoneId = ZoneId.systemDefa
         val dueDay = Instant.ofEpochMilli(due).atZone(zone).toLocalDate()
         val days = (dueDay.toEpochDay() - today.toEpochDay()).toInt()
         parts += when {
-            due < now && days < 0 -> "Quá hạn ${-days} ngày"
-            due < now -> "Quá hạn từ ${formatHourMinute(due, zone)}"
-            days == 0 && task.dueAllDay -> "Hạn hôm nay"
+            due < now && days < 0 -> plural(R.plurals.reason_overdue_days, -days)
+            due < now -> str(R.string.reason_overdue_since, formatHourMinute(due, zone))
+            days == 0 && task.dueAllDay -> str(R.string.reason_due_today)
             days == 0 -> {
                 val hours = ((due - now) / 3_600_000.0).roundToInt()
-                if (hours <= 1) "Hạn trong 1 giờ" else "Hạn trong $hours giờ"
+                plural(R.plurals.reason_due_in_hours, hours.coerceAtLeast(1))
             }
-            days == 1 -> "Hạn ngày mai"
-            else -> "Hạn trong $days ngày"
+            days == 1 -> str(R.string.reason_due_tomorrow)
+            else -> plural(R.plurals.reason_due_in_days, days)
         }
     }
     when (task.priority) {
-        "HIGH" -> parts += "Ưu tiên cao"
-        "MEDIUM" -> if (parts.isEmpty()) parts += "Ưu tiên trung bình"
+        "HIGH" -> parts += str(R.string.reason_high_priority)
+        "MEDIUM" -> if (parts.isEmpty()) parts += str(R.string.reason_medium_priority)
     }
-    return parts.joinToString(" · ").ifEmpty { "Đang chờ lâu" }
+    return parts.joinToString(" · ").ifEmpty { str(R.string.reason_waiting_long) }
 }
 
 private fun formatHourMinute(millis: Long, zone: ZoneId): String {
@@ -216,11 +222,14 @@ fun myDaySuggestions(
     fun stepDue(t: Task): Boolean = t.nextStepDue != null && t.nextStepDue <= todayKey
 
     fun reasonFor(t: Task): Pair<Int, String>? = when {
-        t.isOverdue(now) -> 0 to "Quá hạn"
-        t.dueAt != null && t.dueAt <= end -> 1 to "Đến hạn hôm nay"
-        stepDue(t) -> 1 to (if (t.nextStepDue!! < todayKey) "Bước quá hạn: " else "Bước đến hạn: ") + t.nextStepTitle.orEmpty()
-        t.myDay == yesterdayKey -> 2 to "Hôm qua chưa xong"
-        t.dueAt == null && t.priority == "HIGH" -> 3 to "Ưu tiên cao, chưa có hạn"
+        t.isOverdue(now) -> 0 to str(R.string.suggest_overdue)
+        t.dueAt != null && t.dueAt <= end -> 1 to str(R.string.suggest_due_today)
+        stepDue(t) -> 1 to str(
+            if (t.nextStepDue!! < todayKey) R.string.suggest_step_overdue else R.string.suggest_step_due,
+            t.nextStepTitle.orEmpty()
+        )
+        t.myDay == yesterdayKey -> 2 to str(R.string.suggest_unfinished_yesterday)
+        t.dueAt == null && t.priority == "HIGH" -> 3 to str(R.string.suggest_high_no_date)
         else -> null
     }
 

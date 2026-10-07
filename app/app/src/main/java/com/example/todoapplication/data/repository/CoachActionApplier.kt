@@ -6,6 +6,9 @@ import com.example.todoapplication.domain.model.TaskDraft
 import com.example.todoapplication.ui.utils.parseIsoMillis
 import java.time.Instant
 import java.time.ZoneId
+import com.example.todoapplication.R
+import com.example.todoapplication.i18n.str
+import com.example.todoapplication.i18n.plural
 
 /**
  * Áp dụng một hành động AI Coach đề xuất, SAU KHI người dùng bấm xác nhận. Đi qua [TaskRepository] như mọi
@@ -23,12 +26,12 @@ class CoachActionApplier(
             CoachAction.RESCHEDULE -> {
                 val due = dueOf(action) ?: return null
                 if (ids.isEmpty() || !repo.reschedule(ids, due, action.allDay)) null
-                else "Đã dời ${ids.size} việc"
+                else plural(R.plurals.tasks_rescheduled, ids.size)
             }
             CoachAction.ADD_SUBTASKS -> {
                 val taskId = ids.singleOrNull() ?: return null
                 val steps = action.subtasks.orEmpty()
-                if (!repo.addSubtasks(taskId, steps)) null else "Đã thêm ${steps.count { it.isNotBlank() }} bước con"
+                if (!repo.addSubtasks(taskId, steps)) null else plural(R.plurals.coach_subtasks_added, steps.count { it.isNotBlank() })
             }
             CoachAction.CREATE_TASK -> {
                 val title = action.title?.trim().orEmpty()
@@ -41,15 +44,15 @@ class CoachActionApplier(
                         dueAllDay = action.allDay
                     )
                 )
-                "Đã tạo: ${created.title}"
+                str(R.string.coach_task_created, created.title)
             }
             CoachAction.SET_PRIORITY -> {
                 val p = action.priority?.takeIf { it in setOf("LOW", "MEDIUM", "HIGH") } ?: return null
-                if (ids.isEmpty() || !repo.setPriority(ids, p)) null else "Đã đổi độ ưu tiên"
+                if (ids.isEmpty() || !repo.setPriority(ids, p)) null else str(R.string.coach_priority_changed)
             }
             CoachAction.ADD_TO_MY_DAY -> {
                 val today = Instant.ofEpochMilli(clock()).atZone(zone()).toLocalDate().toString()
-                if (ids.isEmpty() || !repo.setMyDay(ids, today)) null else "Đã thêm ${ids.size} việc vào Ngày của tôi"
+                if (ids.isEmpty() || !repo.setMyDay(ids, today)) null else plural(R.plurals.coach_my_day_added, ids.size)
             }
             else -> null
         }

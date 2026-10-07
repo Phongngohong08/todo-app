@@ -23,6 +23,8 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import com.example.todoapplication.R
+import com.example.todoapplication.i18n.str
 
 // ─── Tổng quan các danh sách ─────────────────────────────────────────────────
 
@@ -71,7 +73,7 @@ class ListsViewModel(
             val wanted = edited.name.trim()
             if (wanted != original.name) {
                 if (!categories.isNameAvailable(wanted, except = original.name)) {
-                    _messages.emit("Tên \"$wanted\" đã có hoặc không hợp lệ")
+                    _messages.emit(str(R.string.list_name_taken, wanted))
                     return@launch
                 }
                 tasks.renameCategory(original.name, wanted)
@@ -168,7 +170,7 @@ class ListBoardViewModel(
         val info = uiState.value.info
         if (clean.isEmpty() || info.sections.any { it.equals(clean, ignoreCase = true) }) return
         if (info.sections.size >= CategoryRepository.MAX_SECTIONS) {
-            viewModelScope.launch { _events.emit(ListBoardEvent.Message("Tối đa ${CategoryRepository.MAX_SECTIONS} mục")) }
+            viewModelScope.launch { _events.emit(ListBoardEvent.Message(str(R.string.list_max_sections, CategoryRepository.MAX_SECTIONS))) }
             return
         }
         viewModelScope.launch { categories.saveListInfo(info.copy(sections = info.sections + clean)) }

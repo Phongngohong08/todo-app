@@ -1,5 +1,6 @@
 package com.example.todoapplication.data.repository
 
+import com.example.todoapplication.TestStrings
 import com.example.todoapplication.data.model.CoachAction
 import com.example.todoapplication.domain.model.Task
 import com.example.todoapplication.domain.model.TaskDraft
@@ -17,6 +18,9 @@ import java.time.ZoneId
 import java.time.ZonedDateTime
 
 class CoachActionApplierTest {
+    // Chuỗi giao diện tiếng Việt từ values-vi/strings.xml (JVM không có Android Resources)
+    init { TestStrings.install() }
+
     private val zone = ZoneId.of("Asia/Ho_Chi_Minh")
     private val now = ZonedDateTime.of(2026, 7, 8, 10, 0, 0, 0, zone).toInstant().toEpochMilli()
     private val repo: TaskRepository = mock()

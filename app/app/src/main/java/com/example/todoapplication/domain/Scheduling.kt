@@ -8,6 +8,9 @@ import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.ZoneId
 import java.time.temporal.TemporalAdjusters
+import androidx.annotation.StringRes
+import com.example.todoapplication.R
+import com.example.todoapplication.i18n.str
 
 /*
  * [TẦNG DOMAIN] Các quy tắc thời gian dùng ở nhiều nơi: giờ yên tĩnh, dời việc sang ngày khác
@@ -55,10 +58,10 @@ object Reschedule {
     /** Ngày mai · Cuối tuần (nếu chưa tới) · Thứ 2 tuần sau · 1 tuần nữa (trùng ngày thì bỏ). */
     fun postponeOptions(today: LocalDate): List<Option> {
         val candidates = listOf(
-            Option("Ngày mai", today.plusDays(1)),
-            Option("Cuối tuần", today.with(TemporalAdjusters.nextOrSame(DayOfWeek.SATURDAY))),
-            Option("Thứ 2 tuần sau", today.with(TemporalAdjusters.next(DayOfWeek.MONDAY))),
-            Option("1 tuần nữa", today.plusWeeks(1))
+            Option(str(R.string.postpone_tomorrow), today.plusDays(1)),
+            Option(str(R.string.postpone_weekend), today.with(TemporalAdjusters.nextOrSame(DayOfWeek.SATURDAY))),
+            Option(str(R.string.postpone_next_monday), today.with(TemporalAdjusters.next(DayOfWeek.MONDAY))),
+            Option(str(R.string.postpone_one_week), today.plusWeeks(1))
         )
         return candidates
             .filter { it.date.isAfter(today) }
@@ -74,11 +77,14 @@ object Reschedule {
  */
 object Eisenhower {
 
-    enum class Quadrant(val title: String, val hint: String, val important: Boolean, val urgent: Boolean) {
-        DO_FIRST("Làm ngay", "Quan trọng · Gấp", important = true, urgent = true),
-        SCHEDULE("Lên lịch", "Quan trọng · Chưa gấp", important = true, urgent = false),
-        QUICK("Làm nhanh", "Gấp · Ít quan trọng", important = false, urgent = true),
-        LATER("Để sau", "Không gấp · Ít quan trọng", important = false, urgent = false)
+    enum class Quadrant(@StringRes private val titleRes: Int, @StringRes private val hintRes: Int, val important: Boolean, val urgent: Boolean) {
+        DO_FIRST(R.string.quadrant_do_first, R.string.quadrant_do_first_hint, important = true, urgent = true),
+        SCHEDULE(R.string.quadrant_schedule, R.string.quadrant_schedule_hint, important = true, urgent = false),
+        QUICK(R.string.quadrant_quick, R.string.quadrant_quick_hint, important = false, urgent = true),
+        LATER(R.string.quadrant_later, R.string.quadrant_later_hint, important = false, urgent = false);
+
+        val title: String get() = str(titleRes)
+        val hint: String get() = str(hintRes)
     }
 
     /** Một ô không còn gấp nữa → hạn được dời thêm chừng này ngày. */

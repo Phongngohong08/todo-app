@@ -43,12 +43,18 @@ import com.example.todoapplication.ui.utils.categoryLabel
 import com.example.todoapplication.ui.utils.formatDueLabel
 import com.example.todoapplication.ui.utils.formatTime
 import com.example.todoapplication.ui.utils.weekdayShort
+import com.example.todoapplication.ui.utils.shortDate
 import com.example.todoapplication.ui.viewmodel.HistoryViewModel
 import com.example.todoapplication.ui.viewmodel.TrashViewModel
 import com.example.todoapplication.ui.viewmodel.WeeklyReviewViewModel
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.pluralStringResource
+import com.example.todoapplication.R
+import com.example.todoapplication.i18n.str
+import com.example.todoapplication.i18n.localizedFormatter
 
 /*
  * [TẦNG UI · MÀN HÌNH] Tổng kết tuần · Lịch sử hoàn thành · Thùng rác.
@@ -69,7 +75,7 @@ private fun BackScaffold(
                 title = { Text(title, fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Quay lại")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.action_back))
                     }
                 },
                 actions = actions
@@ -81,14 +87,13 @@ private fun BackScaffold(
     )
 }
 
-private val DAY_MONTH = DateTimeFormatter.ofPattern("dd/MM")
 
 // ─── Tổng kết tuần ───────────────────────────────────────────────────────────
 
 @Composable
 fun WeeklyReviewScreen(navController: NavController, viewModel: WeeklyReviewViewModel = viewModel(factory = WeeklyReviewViewModel.Factory)) {
     val review by viewModel.review.collectAsStateWithLifecycle()
-    BackScaffold("Tổng kết tuần", navController) { padding ->
+    BackScaffold(stringResource(R.string.review_title), navController) { padding ->
         val r = review
         if (r == null) {
             Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) { LoadingState() }
@@ -101,7 +106,7 @@ fun WeeklyReviewScreen(navController: NavController, viewModel: WeeklyReviewView
         ) {
             item {
                 Text(
-                    "${r.from.format(DAY_MONTH)} – ${r.to.format(DAY_MONTH)}",
+                    localizedFormatter(R.string.fmt_day_month).let { f -> "${r.from.format(f)} – ${r.to.format(f)}" },
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
@@ -109,18 +114,18 @@ fun WeeklyReviewScreen(navController: NavController, viewModel: WeeklyReviewView
             item { WeekBars(r) }
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    ReviewStat("Ngày đạt mục tiêu", "${r.goalDaysMet}/7", Modifier.weight(1f))
-                    ReviewStat("Xong trễ hạn", r.completedLate.toString(), Modifier.weight(1f), if (r.completedLate > 0) StateOverdue else null)
-                    ReviewStat("Đang quá hạn", r.overdueNow.toString(), Modifier.weight(1f), if (r.overdueNow > 0) StateOverdue else null)
+                    ReviewStat(stringResource(R.string.review_goal_days), "${r.goalDaysMet}/7", Modifier.weight(1f))
+                    ReviewStat(stringResource(R.string.review_completed_late), r.completedLate.toString(), Modifier.weight(1f), if (r.completedLate > 0) StateOverdue else null)
+                    ReviewStat(stringResource(R.string.review_overdue_now), r.overdueNow.toString(), Modifier.weight(1f), if (r.overdueNow > 0) StateOverdue else null)
                 }
             }
             if (r.byCategory.isNotEmpty()) {
                 item {
-                    ReviewCard("Đã làm theo danh mục") {
+                    ReviewCard(stringResource(R.string.review_by_list)) {
                         r.byCategory.entries.sortedByDescending { it.value }.forEach { (cat, n) ->
                             Row(Modifier.fillMaxWidth().padding(vertical = 3.dp)) {
                                 Text(categoryLabel(cat), modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.onSurface)
-                                Text("$n việc", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+                                Text(pluralStringResource(R.plurals.count_tasks, n, n), fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
                             }
                         }
                     }
@@ -128,9 +133,9 @@ fun WeeklyReviewScreen(navController: NavController, viewModel: WeeklyReviewView
             }
             r.mostNeglectedCategory?.let { cat ->
                 item {
-                    ReviewCard("Cần để ý") {
+                    ReviewCard(stringResource(R.string.review_attention)) {
                         Text(
-                            "Danh mục \"${categoryLabel(cat)}\" đang tồn nhiều việc nhất. Cân nhắc dành một khoảng thời gian cho nó tuần tới.",
+                            stringResource(R.string.review_neglected, categoryLabel(cat)),
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontSize = 13.sp
                         )
@@ -147,7 +152,7 @@ fun WeeklyReviewScreen(navController: NavController, viewModel: WeeklyReviewView
                 ) {
                     Icon(Icons.Default.SmartToy, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
-                    Text("Nhờ AI Coach lập kế hoạch tuần tới")
+                    Text(stringResource(R.string.review_ask_coach))
                 }
             }
         }
@@ -157,15 +162,15 @@ fun WeeklyReviewScreen(navController: NavController, viewModel: WeeklyReviewView
 @Composable
 private fun ReviewHeadline(r: WeeklyReview) {
     ReviewCard(null) {
-        Text("${r.completed} việc hoàn thành", fontSize = 24.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.onSurface)
+        Text(pluralStringResource(R.plurals.review_completed, r.completed, r.completed), fontSize = 24.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.onSurface)
         val change = r.changePercent
         Text(
             when {
-                change == null && r.completedPreviousWeek == 0 -> "Tuần trước chưa có dữ liệu để so sánh"
+                change == null && r.completedPreviousWeek == 0 -> stringResource(R.string.review_no_previous)
                 change == null -> ""
-                change > 0 -> "▲ $change% so với tuần trước (${r.completedPreviousWeek} việc)"
-                change < 0 -> "▼ ${-change}% so với tuần trước (${r.completedPreviousWeek} việc)"
-                else -> "Bằng tuần trước"
+                change > 0 -> stringResource(R.string.review_change_up, change, r.completedPreviousWeek)
+                change < 0 -> stringResource(R.string.review_change_down, -change, r.completedPreviousWeek)
+                else -> stringResource(R.string.review_same_as_last)
             },
             color = when {
                 change == null -> MaterialTheme.colorScheme.onSurfaceVariant
@@ -175,14 +180,14 @@ private fun ReviewHeadline(r: WeeklyReview) {
             fontSize = 13.sp
         )
         r.bestDay?.let {
-            Text("Ngày năng suất nhất: ${weekdayShort(it)} ${it.format(DAY_MONTH)} (${r.bestDayCount} việc)", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(stringResource(R.string.review_best_day, shortDate(it), r.bestDayCount), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
 
 @Composable
 private fun WeekBars(r: WeeklyReview) {
-    ReviewCard("7 ngày qua") {
+    ReviewCard(stringResource(R.string.review_last_7_days)) {
         val max = (r.dailyCounts.maxOrNull() ?: 0).coerceAtLeast(1)
         Row(Modifier.fillMaxWidth().height(110.dp), verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.SpaceEvenly) {
             r.dailyCounts.forEachIndexed { i, n ->
@@ -229,13 +234,13 @@ private fun ReviewCard(title: String?, content: @Composable ColumnScope.() -> Un
 fun HistoryScreen(navController: NavController, viewModel: HistoryViewModel = viewModel(factory = HistoryViewModel.Factory)) {
     // Paging 3: chỉ đọc từng trang 40 việc khi cuộn tới — lịch sử bao lâu cũng mở nhanh
     val items = viewModel.history.collectAsLazyPagingItems()
-    BackScaffold("Đã hoàn thành", navController) { padding ->
+    BackScaffold(stringResource(R.string.history_title), navController) { padding ->
         val refresh = items.loadState.refresh
         when {
             refresh is LoadState.Loading && items.itemCount == 0 ->
                 Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) { LoadingState() }
             refresh is LoadState.NotLoading && items.itemCount == 0 -> Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                EmptyState(emoji = "📜", title = "Chưa có việc nào hoàn thành", subtitle = "Việc bạn làm xong sẽ được lưu ở đây.")
+                EmptyState(emoji = "📜", title = stringResource(R.string.history_empty_title), subtitle = stringResource(R.string.history_empty_subtitle))
             }
             else -> LazyColumn(
                 modifier = Modifier.fillMaxSize().padding(padding),
@@ -260,7 +265,7 @@ fun HistoryScreen(navController: NavController, viewModel: HistoryViewModel = vi
                         is HistoryItem.Row -> HistoryRow(
                             task = item.task,
                             trailing = item.task.completedAt?.let { formatTime(it) }.orEmpty(),
-                            actionIcon = { Icon(Icons.Default.Restore, contentDescription = "Mở lại") },
+                            actionIcon = { Icon(Icons.Default.Restore, contentDescription = stringResource(R.string.history_reopen)) },
                             onAction = { viewModel.reopen(item.task) },
                             onClick = { navController.navigate(Screen.TaskDetail.createRoute(item.task.id)) }
                         )
@@ -282,9 +287,9 @@ fun HistoryScreen(navController: NavController, viewModel: HistoryViewModel = vi
 private fun dayTitle(day: LocalDate): String {
     val today = LocalDate.now()
     return when (day) {
-        today -> "Hôm nay"
-        today.minusDays(1) -> "Hôm qua"
-        else -> "${weekdayShort(day)} ${day.format(if (day.year == today.year) DAY_MONTH else DateTimeFormatter.ofPattern("dd/MM/yyyy"))}"
+        today -> str(R.string.day_today)
+        today.minusDays(1) -> str(R.string.day_yesterday)
+        else -> shortDate(day, today)
     }
 }
 
@@ -339,10 +344,10 @@ fun TrashScreen(navController: NavController, viewModel: TrashViewModel = viewMo
     LaunchedEffect(Unit) { viewModel.messages.collect { scope.launch { snackbar.showSnackbar(it) } } }
 
     BackScaffold(
-        "Thùng rác", navController, snackbar,
+        stringResource(R.string.trash_title), navController, snackbar,
         actions = {
             if (!items.isNullOrEmpty()) {
-                TextButton(onClick = { confirmEmpty = true }) { Text("Dọn sạch", color = PriorityHighColor) }
+                TextButton(onClick = { confirmEmpty = true }) { Text(stringResource(R.string.trash_empty_action), color = PriorityHighColor) }
             }
         }
     ) { padding ->
@@ -350,7 +355,7 @@ fun TrashScreen(navController: NavController, viewModel: TrashViewModel = viewMo
         when {
             list == null -> Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) { LoadingState() }
             list.isEmpty() -> Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                EmptyState(emoji = "🗑️", title = "Thùng rác trống", subtitle = "Việc đã xóa được giữ ở đây 30 ngày để bạn khôi phục.")
+                EmptyState(emoji = "🗑️", title = stringResource(R.string.trash_empty_title), subtitle = stringResource(R.string.trash_empty_subtitle))
             }
             else -> LazyColumn(
                 modifier = Modifier.fillMaxSize().padding(padding),
@@ -358,18 +363,18 @@ fun TrashScreen(navController: NavController, viewModel: TrashViewModel = viewMo
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 item {
-                    Text("Việc đã xóa được giữ 30 ngày rồi tự xóa hẳn.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(stringResource(R.string.trash_retention), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 items(list, key = { it.id }) { task ->
                     HistoryRow(
                         task = task,
-                        trailing = task.deletedAt?.let { "Xóa " + formatDueLabel(it, allDay = false) }.orEmpty(),
-                        actionIcon = { Icon(Icons.Default.Restore, contentDescription = "Khôi phục", tint = MaterialTheme.colorScheme.primary) },
+                        trailing = task.deletedAt?.let { stringResource(R.string.trash_deleted_at, formatDueLabel(it, allDay = false)) }.orEmpty(),
+                        actionIcon = { Icon(Icons.Default.Restore, contentDescription = stringResource(R.string.backup_restore), tint = MaterialTheme.colorScheme.primary) },
                         onAction = { viewModel.restore(task) },
                         struck = false,
                         extraAction = {
                             IconButton(onClick = { viewModel.deleteForever(listOf(task.id)) }) {
-                                Icon(Icons.Default.DeleteForever, contentDescription = "Xóa vĩnh viễn", tint = PriorityHighColor)
+                                Icon(Icons.Default.DeleteForever, contentDescription = stringResource(R.string.trash_delete_forever), tint = PriorityHighColor)
                             }
                         }
                     )
@@ -381,15 +386,15 @@ fun TrashScreen(navController: NavController, viewModel: TrashViewModel = viewMo
     if (confirmEmpty) {
         AlertDialog(
             onDismissRequest = { confirmEmpty = false },
-            title = { Text("Dọn sạch thùng rác?") },
-            text = { Text("Các việc trong thùng rác sẽ bị xóa vĩnh viễn, không khôi phục được.") },
+            title = { Text(stringResource(R.string.trash_confirm_title)) },
+            text = { Text(stringResource(R.string.trash_confirm_text)) },
             confirmButton = {
                 TextButton(onClick = {
                     confirmEmpty = false
                     viewModel.deleteForever(items.orEmpty().map { it.id })
-                }) { Text("Xóa vĩnh viễn", color = PriorityHighColor) }
+                }) { Text(stringResource(R.string.trash_delete_forever), color = PriorityHighColor) }
             },
-            dismissButton = { TextButton(onClick = { confirmEmpty = false }) { Text("Hủy") } }
+            dismissButton = { TextButton(onClick = { confirmEmpty = false }) { Text(stringResource(R.string.action_cancel)) } }
         )
     }
 }

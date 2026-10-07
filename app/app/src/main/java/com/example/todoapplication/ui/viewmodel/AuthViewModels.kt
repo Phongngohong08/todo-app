@@ -14,6 +14,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import com.example.todoapplication.R
+import com.example.todoapplication.i18n.str
 
 /*
  * [TẦNG VIEWMODEL] Nghiệp vụ cho hai màn Đăng nhập / Đăng ký.
@@ -39,7 +41,7 @@ class LoginViewModel(private val authRepository: AuthRepository) : ViewModel() {
     fun login(email: String, password: String) {
         // 1. Kiểm tra đầu vào ngay tại client (chưa gọi mạng nếu bỏ trống).
         if (email.isBlank() || password.isBlank()) {
-            viewModelScope.launch { _events.emit(AuthEvent.Error("Vui lòng điền đầy đủ thông tin")) }
+            viewModelScope.launch { _events.emit(AuthEvent.Error(str(R.string.auth_fill_all))) }
             return
         }
         _isLoading.value = true                              // 2. bật spinner
@@ -48,13 +50,13 @@ class LoginViewModel(private val authRepository: AuthRepository) : ViewModel() {
             _isLoading.value = false                         // 4. tắt spinner (dù thành công hay lỗi)
             // 5. fold: tách 2 nhánh của Result — thành công có data (it), thất bại có exception.
             result.fold(
-                onSuccess = { _events.emit(AuthEvent.Success("Chào mừng quay trở lại, ${it.user.name}!")) },
+                onSuccess = { _events.emit(AuthEvent.Success(str(R.string.auth_welcome_back, it.user.name))) },
                 onFailure = { error ->
                     val msg = when ((error as? ApiException)?.code) {
-                        401, 400 -> "Tài khoản hoặc mật khẩu không chính xác"
-                        429 -> "Bạn đăng nhập sai quá nhiều lần. Vui lòng thử lại sau ít phút."
-                        null -> "Không kết nối được máy chủ. Kiểm tra mạng rồi thử lại."
-                        else -> "Đăng nhập thất bại. Vui lòng thử lại sau."
+                        401, 400 -> str(R.string.auth_wrong_credentials)
+                        429 -> str(R.string.auth_login_rate_limited)
+                        null -> str(R.string.error_cannot_reach_server)
+                        else -> str(R.string.auth_login_failed)
                     }
                     _events.emit(AuthEvent.Error(msg))
                 }
@@ -79,7 +81,7 @@ class RegisterViewModel(private val authRepository: AuthRepository) : ViewModel(
 
     fun register(name: String, email: String, password: String) {
         if (name.isBlank() || email.isBlank() || password.isBlank()) {
-            viewModelScope.launch { _events.emit(AuthEvent.Error("Vui lòng điền đầy đủ thông tin")) }
+            viewModelScope.launch { _events.emit(AuthEvent.Error(str(R.string.auth_fill_all))) }
             return
         }
         _isLoading.value = true
@@ -87,14 +89,14 @@ class RegisterViewModel(private val authRepository: AuthRepository) : ViewModel(
             val result = authRepository.register(name.trim(), email.trim(), password)
             _isLoading.value = false
             result.fold(
-                onSuccess = { _events.emit(AuthEvent.Success("Đăng ký thành công! Hãy đăng nhập.")) },
+                onSuccess = { _events.emit(AuthEvent.Success(str(R.string.auth_register_success))) },
                 onFailure = { error ->
                     // Backend: 409 = email đã dùng, 400 = dữ liệu không hợp lệ, 429 = đăng ký quá nhiều lần
                     val msg = when ((error as? ApiException)?.code) {
-                        409 -> "Email này đã được sử dụng."
-                        400 -> "Thông tin chưa hợp lệ. Kiểm tra email và mật khẩu (tối thiểu 6 ký tự)."
-                        429 -> "Bạn đăng ký quá nhiều lần. Vui lòng thử lại sau ít phút."
-                        else -> "Đăng ký thất bại. Kiểm tra kết nối rồi thử lại."
+                        409 -> str(R.string.auth_email_taken)
+                        400 -> str(R.string.auth_invalid_input)
+                        429 -> str(R.string.auth_register_rate_limited)
+                        else -> str(R.string.auth_register_failed)
                     }
                     _events.emit(AuthEvent.Error(msg))
                 }

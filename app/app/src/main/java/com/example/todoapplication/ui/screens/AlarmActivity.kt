@@ -1,6 +1,7 @@
 package com.example.todoapplication.ui.screens
 
 import android.content.Context
+import com.example.todoapplication.i18n.AppLanguage
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -29,12 +30,16 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
+import androidx.compose.ui.res.stringResource
+import com.example.todoapplication.R
 
 /**
  * Màn báo thức toàn màn hình (hiện cả trên màn hình khóa, tự bật màn hình) cho việc ưu tiên cao đến hạn.
  * Chuông do thông báo phát (lặp tới khi tắt); mọi nút ở đây đều tắt thông báo đó.
  */
 class AlarmActivity : ComponentActivity() {
+
+    override fun attachBaseContext(newBase: Context) = super.attachBaseContext(AppLanguage.wrap(newBase))
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -103,7 +108,7 @@ private fun AlarmContent(title: String, onComplete: () -> Unit, onSnooze: () -> 
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Text(now.format(DateTimeFormatter.ofPattern("HH:mm")), color = Color.White, fontSize = 64.sp, fontWeight = FontWeight.Bold)
-            Text("⏰ Đến hạn việc quan trọng", color = Color.White.copy(alpha = 0.85f), fontSize = 16.sp)
+            Text(stringResource(R.string.alarm_heading), color = Color.White.copy(alpha = 0.85f), fontSize = 16.sp)
             Text(title, color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center)
             Spacer(Modifier.height(24.dp))
             Button(
@@ -111,14 +116,14 @@ private fun AlarmContent(title: String, onComplete: () -> Unit, onSnooze: () -> 
                 modifier = Modifier.fillMaxWidth().height(56.dp),
                 shape = RoundedCornerShape(16.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = primary)
-            ) { Text("✓ Hoàn thành", fontWeight = FontWeight.Bold, fontSize = 16.sp) }
+            ) { Text(stringResource(R.string.alarm_complete), fontWeight = FontWeight.Bold, fontSize = 16.sp) }
             OutlinedButton(
                 onClick = onSnooze,
                 modifier = Modifier.fillMaxWidth().height(52.dp),
                 shape = RoundedCornerShape(16.dp),
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
-            ) { Text("Hoãn ${AlarmScheduler.SNOOZE_MINUTES} phút", fontSize = 15.sp) }
-            TextButton(onClick = onDismiss) { Text("Tắt báo thức", color = Color.White.copy(alpha = 0.85f)) }
+            ) { Text(stringResource(R.string.alarm_snooze, AlarmScheduler.SNOOZE_MINUTES), fontSize = 15.sp) }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.alarm_dismiss), color = Color.White.copy(alpha = 0.85f)) }
         }
     }
 }

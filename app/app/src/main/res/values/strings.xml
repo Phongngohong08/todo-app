@@ -1,17 +1,994 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Tiếng Anh (mặc định). Bản tiếng Việt: values-vi/strings.xml — hai file phải có cùng bộ khóa. -->
 <resources>
+    <!-- Ứng dụng, shortcut, widget, Quick Settings tile -->
     <string name="app_name">TaskFlow AI</string>
+    <string name="shortcut_add_short">Add task</string>
+    <string name="shortcut_add_long">Add a new task</string>
+    <string name="shortcut_today_short">Today</string>
+    <string name="shortcut_today_long">My Day</string>
+    <string name="shortcut_focus_short">Focus</string>
+    <string name="shortcut_focus_long">25-minute focus timer</string>
+    <string name="share_target_label">Add to TaskFlow</string>
+    <string name="widget_compact_description">Today\'s goal progress and next task</string>
+    <string name="widget_tasks_description">Tasks to do — check them off right on the widget</string>
+    <string name="widget_habits_description">Today\'s habits — tap to check in</string>
+    <string name="tile_focus">Focus</string>
+    <string name="tile_quick_add">Add task</string>
 
-    <!-- App shortcut (nhấn giữ icon app) -->
-    <string name="shortcut_add_short">Thêm việc</string>
-    <string name="shortcut_add_long">Thêm công việc mới</string>
-    <string name="shortcut_today_short">Hôm nay</string>
-    <string name="shortcut_today_long">Ngày của tôi</string>
-    <string name="shortcut_focus_short">Tập trung</string>
-    <string name="shortcut_focus_long">Hẹn giờ tập trung 25 phút</string>
+    <!-- Ngày giờ, thời lượng (mẫu định dạng theo java.time DateTimeFormatter) -->
+    <string name="fmt_day_month">MMM d</string>
+    <string name="fmt_day_month_year">MMM d, yyyy</string>
+    <string name="fmt_date_time">MMM d, yyyy HH:mm</string>
+    <string name="fmt_weekday_date">%1$s, %2$s</string>
+    <string-array name="weekdays_short">
+        <item>Mon</item>
+        <item>Tue</item>
+        <item>Wed</item>
+        <item>Thu</item>
+        <item>Fri</item>
+        <item>Sat</item>
+        <item>Sun</item>
+    </string-array>
+    <string name="day_today">Today</string>
+    <string name="day_tomorrow">Tomorrow</string>
+    <string name="day_yesterday">Yesterday</string>
+    <string name="duration_minutes">%s min</string>
+    <string name="duration_hours">%s h</string>
+    <string name="duration_hours_minutes">%1$s h %2$s min</string>
 
-    <!-- Tên hiện trong bảng "Chia sẻ" của app khác -->
-    <string name="share_target_label">Thêm vào TaskFlow</string>
-    <string name="widget_compact_description">Tiến độ mục tiêu hôm nay và việc tiếp theo</string>
-    <string name="widget_tasks_description">Việc cần làm — tích hoàn thành ngay trên widget</string>
-    <string name="widget_habits_description">Thói quen hôm nay — bấm để đánh dấu</string>
+    <!-- Nhãn trạng thái, ưu tiên, lặp lại, danh sách có sẵn -->
+    <string name="status_all">All</string>
+    <string name="status_todo">To do</string>
+    <string name="status_completed">Completed</string>
+    <string name="priority_high">High</string>
+    <string name="priority_medium">Medium</string>
+    <string name="priority_low">Low</string>
+    <string name="recurrence_daily">Daily</string>
+    <string name="recurrence_weekly">Weekly</string>
+    <string name="recurrence_monthly">Monthly</string>
+    <string name="recurrence_none">Does not repeat</string>
+    <string name="recurrence_every_n_days">Every %s days</string>
+    <string name="recurrence_every_n_weeks">Every %s weeks</string>
+    <string name="recurrence_every_n_months">Every %s months</string>
+    <string name="recurrence_from_completion">%s · from completion</string>
+    <string name="category_all">All</string>
+    <string name="category_personal">Personal</string>
+    <string name="category_work">Work</string>
+    <string name="category_inbox">Inbox</string>
+
+    <!-- Danh sách việc: sắp xếp, bộ lọc nhanh, lý do gợi ý -->
+    <string name="sort_due">Due date</string>
+    <string name="sort_priority">Priority</string>
+    <string name="sort_title">Name (A–Z)</string>
+    <string name="sort_manual">Manual</string>
+    <string name="filter_all">All</string>
+    <string name="filter_overdue">Overdue</string>
+    <string name="filter_high_priority">High priority</string>
+    <string name="filter_no_date">No due date</string>
+    <string name="filter_recurring">Recurring</string>
+    <plurals name="reason_overdue_days">
+        <item quantity="one">Overdue by %s day</item>
+        <item quantity="other">Overdue by %s days</item>
+    </plurals>
+    <string name="reason_overdue_since">Overdue since %s</string>
+    <string name="reason_due_today">Due today</string>
+    <plurals name="reason_due_in_hours">
+        <item quantity="one">Due within %s hour</item>
+        <item quantity="other">Due in %s hours</item>
+    </plurals>
+    <string name="reason_due_tomorrow">Due tomorrow</string>
+    <plurals name="reason_due_in_days">
+        <item quantity="one">Due in %s day</item>
+        <item quantity="other">Due in %s days</item>
+    </plurals>
+    <string name="reason_high_priority">High priority</string>
+    <string name="reason_medium_priority">Medium priority</string>
+    <string name="reason_waiting_long">Waiting for a while</string>
+    <string name="suggest_overdue">Overdue</string>
+    <string name="suggest_due_today">Due today</string>
+    <string name="suggest_step_overdue">Step overdue: %s</string>
+    <string name="suggest_step_due">Step due: %s</string>
+    <string name="suggest_unfinished_yesterday">Not finished yesterday</string>
+    <string name="suggest_high_no_date">High priority, no due date</string>
+
+    <!-- Hoãn việc, nhắc lại (thông báo), ma trận Eisenhower -->
+    <string name="postpone_tomorrow">Tomorrow</string>
+    <string name="postpone_weekend">This weekend</string>
+    <string name="postpone_next_monday">Next Monday</string>
+    <string name="postpone_one_week">In 1 week</string>
+    <string name="snooze_15_min">In 15 minutes</string>
+    <string name="snooze_1_hour">In 1 hour</string>
+    <string name="snooze_3_hours">In 3 hours</string>
+    <string name="snooze_tonight">Tonight 20:00</string>
+    <string name="snooze_tomorrow_morning">Tomorrow morning 08:00</string>
+    <string name="snooze_next_monday">Next Monday 08:00</string>
+    <string name="quadrant_do_first">Do now</string>
+    <string name="quadrant_do_first_hint">Important · Urgent</string>
+    <string name="quadrant_schedule">Schedule</string>
+    <string name="quadrant_schedule_hint">Important · Not urgent</string>
+    <string name="quadrant_quick">Do quickly</string>
+    <string name="quadrant_quick_hint">Urgent · Less important</string>
+    <string name="quadrant_later">Later</string>
+    <string name="quadrant_later_hint">Not urgent · Less important</string>
+
+    <!-- Thói quen, tổng kết tuần gửi AI Coach -->
+    <plurals name="habit_streak_days">
+        <item quantity="one">%s day</item>
+        <item quantity="other">%s days</item>
+    </plurals>
+    <plurals name="habit_streak_weeks">
+        <item quantity="one">%s week</item>
+        <item quantity="other">%s weeks</item>
+    </plurals>
+    <plurals name="habit_times_per_week">
+        <item quantity="one">%s time/week</item>
+        <item quantity="other">%s times/week</item>
+    </plurals>
+    <string name="habit_every_day">Every day</string>
+    <plurals name="coach_review_completed">
+        <item quantity="one">Here is my summary of the last 7 days: I completed %s task</item>
+        <item quantity="other">Here is my summary of the last 7 days: I completed %s tasks</item>
+    </plurals>
+    <string name="coach_review_change">(%s vs. last week)</string>
+    <string name="coach_review_goal_days">met my daily goal on %s/7 days</string>
+    <plurals name="coach_review_late">
+        <item quantity="one">%s task finished late</item>
+        <item quantity="other">%s tasks finished late</item>
+    </plurals>
+    <plurals name="coach_review_overdue">
+        <item quantity="one">%s task still overdue</item>
+        <item quantity="other">%s tasks still overdue</item>
+    </plurals>
+    <string name="coach_review_neglected">the list with the most open tasks is \"%s\"</string>
+    <string name="coach_review_ask">Please give a short comment and help me plan next week.</string>
+
+    <!-- Dùng chung: nút, tab, nhãn nhỏ -->
+    <string name="action_cancel">Cancel</string>
+    <string name="action_save">Save</string>
+    <string name="action_delete">Delete</string>
+    <string name="action_later">Later</string>
+    <string name="action_turn_on">Turn on</string>
+    <string name="action_undo">Undo</string>
+    <string name="action_edit">Edit</string>
+    <string name="action_add">Add</string>
+    <string name="action_done">Done</string>
+    <string name="action_back">Back</string>
+    <string name="tab_today">Today</string>
+    <string name="tab_tasks">Tasks</string>
+    <string name="tab_calendar">Calendar</string>
+    <string name="tab_me">Me</string>
+    <string name="pill_overdue">OVERDUE</string>
+    <string name="pill_cancelled">CANCELLED</string>
+    <string name="notif_permission_title">Turn on notifications?</string>
+    <string name="link_no_app">No app can open this link</string>
+
+    <!-- Quét tài liệu (ML Kit) -->
+    <string name="scan_cannot_open">Can\'t open the scanner</string>
+    <string name="scan_unsupported">This device doesn\'t support document scanning (needs Google Play services)</string>
+    <string name="scan_no_text">No text found in the image</string>
+    <string name="scan_recognizing">Recognizing text…</string>
+    <string name="scan_on_device">Runs on your device, no internet needed</string>
+    <plurals name="scan_create_title">
+        <item quantity="one">Create %s task from the image</item>
+        <item quantity="other">Create %s tasks from the image</item>
+    </plurals>
+    <string name="scan_hint">Each line becomes a task; dates, times, !priority and #list in a line are still understood.</string>
+    <string name="scan_create_tasks">Create tasks</string>
+
+    <!-- Đăng nhập, đăng ký, khóa ứng dụng, báo thức -->
+    <string name="login_tagline">Manage your work, time and habits</string>
+    <string name="login_sign_in">Sign in</string>
+    <string name="login_welcome">Welcome back! 👋</string>
+    <string name="field_email">Email</string>
+    <string name="field_password">Password</string>
+    <string name="field_full_name">Full name</string>
+    <string name="field_password_min">Password (at least 6 characters)</string>
+    <string name="login_no_account">No account yet?</string>
+    <string name="login_register_now">Sign up now</string>
+    <string name="register_hero">Start your journey</string>
+    <string name="register_hero_sub">Manage your work smarter</string>
+    <string name="register_create_account">Create account</string>
+    <string name="register_subtitle">Fill in your details to get started ✨</string>
+    <string name="register_password_too_short">Password must be at least 6 characters</string>
+    <string name="register_have_account">Already have an account?</string>
+    <string name="auth_fill_all">Please fill in all fields</string>
+    <string name="auth_welcome_back">Welcome back, %s!</string>
+    <string name="auth_wrong_credentials">Incorrect email or password</string>
+    <string name="auth_login_rate_limited">Too many failed sign-in attempts. Please try again in a few minutes.</string>
+    <string name="error_cannot_reach_server">Can\'t reach the server. Check your connection and try again.</string>
+    <string name="auth_login_failed">Sign-in failed. Please try again later.</string>
+    <string name="auth_register_success">Account created! Please sign in.</string>
+    <string name="auth_email_taken">This email is already in use.</string>
+    <string name="auth_invalid_input">Invalid details. Check your email and password (at least 6 characters).</string>
+    <string name="auth_register_rate_limited">Too many sign-up attempts. Please try again in a few minutes.</string>
+    <string name="auth_register_failed">Sign-up failed. Check your connection and try again.</string>
+    <string name="lock_prompt_title">Unlock TaskFlow</string>
+    <string name="lock_prompt_subtitle">Authenticate to see your tasks</string>
+    <string name="lock_locked">TaskFlow is locked</string>
+    <string name="lock_unlock">Unlock</string>
+    <string name="alarm_heading">⏰ An important task is due</string>
+    <string name="alarm_complete">✓ Complete</string>
+    <string name="alarm_snooze">Snooze %s min</string>
+    <string name="alarm_dismiss">Dismiss alarm</string>
+    <string name="snooze_title">Remind me later</string>
+
+    <!-- AI (chung), AI Coach -->
+    <string name="ai_rate_limited">You\'ve used up your AI requests or are going too fast. Please try again later.</string>
+    <string name="ai_unavailable">AI features are temporarily unavailable.</string>
+    <string name="coach_title">Personal AI Coach</string>
+    <string name="coach_online">Online</string>
+    <string name="coach_input_hint">Message AI Coach…</string>
+    <string name="coach_send">Send</string>
+    <string name="coach_thinking">Thinking…</string>
+    <string name="coach_suggestions">AI suggestions</string>
+    <string name="coach_applied">✓ Applied</string>
+    <string name="coach_apply">Apply</string>
+    <string name="coach_greeting">Hi! I\'m your AI Coach. I can help you plan your work, find motivation or look into procrastination habits. What would you like to talk about today?</string>
+    <string-array name="coach_suggested_prompts">
+        <item>Help me plan today</item>
+        <item>I procrastinate a lot, how do I fix it?</item>
+        <item>Tips for staying focused</item>
+        <item>Analyze my habits</item>
+    </string-array>
+    <string name="coach_connection_error">I\'m having trouble reaching the AI server. Please try again later.</string>
+    <string name="coach_apply_failed">Couldn\'t apply this suggestion (the task may have been deleted)</string>
+
+    <!-- Ma trận Eisenhower, trợ năng -->
+    <string name="matrix_title">Priority matrix</string>
+    <string name="matrix_moved">Moved to \"%s\"</string>
+    <string name="matrix_hint">Long-press a task and drag it to another box. Important = High priority · Urgent = due by the end of tomorrow.</string>
+    <string name="matrix_empty">Empty</string>
+    <string name="a11y_complete">Complete</string>
+    <string name="a11y_move_to">Move to %s</string>
+
+    <!-- Tập trung (Pomodoro) -->
+    <string name="focus_default_title">Focus session</string>
+    <string name="focus_notif_rationale">Turn on notifications to be told when a focus session ends, even if you leave the app.</string>
+    <string name="focus_title">Focus</string>
+    <string name="focus_ready">Ready</string>
+    <string name="focus_time_up">Time\'s up</string>
+    <string name="focus_on_break">On a break ☕</string>
+    <string name="focus_focusing">Focusing</string>
+    <plurals name="focus_sessions_done">
+        <item quantity="one">%s session</item>
+        <item quantity="other">%s sessions</item>
+    </plurals>
+    <string name="focus_start_minutes">Start %s min</string>
+    <string name="focus_break_minutes">Break %s min</string>
+    <string name="focus_next_session">Next session</string>
+    <string name="focus_stop">Stop session</string>
+    <string name="focus_task_done">✓ Task done</string>
+    <string name="focus_flip_hint">📱 Place your phone face down to start a new session</string>
+    <string name="focus_tip">Tip: silence other notifications and work only on this one task until the timer ends.</string>
+    <string name="action_continue">Continue</string>
+    <string name="error_unknown">unknown error</string>
+
+    <!-- Đính kèm, nhắc theo địa điểm, lịch của máy -->
+    <string name="attach_save_first">Save the task first to attach photos or documents.</string>
+    <string name="attach_no_app">No app can open this file</string>
+    <string name="attach_recognize_text">Recognize text → add to description</string>
+    <string name="attach_no_text">No text found in the image</string>
+    <string name="attach_delete">Remove attachment</string>
+    <string name="attach_scan">Scan document</string>
+    <string name="attach_pick_photo">Choose photo</string>
+    <string name="attach_hint">Tap to open · hold to recognize text or remove · stored on this device only</string>
+    <string name="attach_image">Attached photo</string>
+    <string name="attach_file">Attached file</string>
+    <string name="location_no_background">No background location permission — reminders only work if you allow \"All the time\"</string>
+    <string name="location_permission_needed">Location permission is needed for location reminders</string>
+    <string name="location_save_first">Save the task first to set a location reminder.</string>
+    <string name="location_empty">No places yet. Save your current location as \"Home\", \"Office\"…</string>
+    <string name="location_on_arrive">On arrival</string>
+    <string name="location_on_leave">On leaving</string>
+    <string name="location_clear">Remove location reminder</string>
+    <string name="location_save_current">Save current location as a place</string>
+    <string name="location_background_title">Allow location while the app is closed?</string>
+    <string name="location_background_text">To remind you when you arrive at / leave this place even when the app isn\'t open, choose \"Allow all the time\" on the next screen. Your location is only used on this device and never sent to the server.</string>
+    <string name="location_new_place">New place</string>
+    <string name="location_name_hint">Name (e.g. Office)</string>
+    <string name="location_radius">Radius</string>
+    <string name="location_uses_current">Uses your current location.</string>
+    <string name="location_unavailable">Couldn\'t get your location — turn on GPS and try again</string>
+    <string name="location_arrived">📍 Arrived at %s</string>
+    <string name="location_left">📍 Just left %s</string>
+    <string name="calendar_untitled">(No title)</string>
+
+    <!-- Sao lưu, khôi phục, xuất CSV -->
+    <string name="backup_failed">Failed: %s</string>
+    <plurals name="backup_done">
+        <item quantity="one">Backed up %s task</item>
+        <item quantity="other">Backed up %s tasks</item>
+    </plurals>
+    <plurals name="backup_csv_done">
+        <item quantity="one">Exported %s task to CSV</item>
+        <item quantity="other">Exported %s tasks to CSV</item>
+    </plurals>
+    <string name="backup_intro">Back up to a file in a place you choose (Drive, SD card…), restore on a new phone, or export a spreadsheet.</string>
+    <string name="backup_to_file">Back up to file (JSON)</string>
+    <string name="backup_export_csv">Export tasks (CSV / Excel)</string>
+    <string name="backup_send">Send backup</string>
+    <string name="backup_choose_target">Choose where to send the backup</string>
+    <string name="backup_send_long">Send backup (email, chat apps, Drive…)</string>
+    <string name="backup_restore_from_file">Restore from a backup file…</string>
+    <string name="backup_restore_title">Restore data?</string>
+    <string name="backup_restore_text">Only ADDS tasks, lists and habits that aren\'t on this device yet — your current data is not overwritten. It will then sync to the server.</string>
+    <string name="backup_restored">Restored %1$s tasks, %2$s habits, %3$s lists</string>
+    <string name="backup_restore">Restore</string>
+    <string name="backup_cannot_write">Can\'t open the file for writing</string>
+    <string name="backup_cannot_read">Can\'t read the file</string>
+    <string name="backup_not_taskflow">This isn\'t a TaskFlow backup file</string>
+    <string name="backup_csv_header">Title,List,Section,Priority,Due,All day,Status,Tags,Duration (min),Description</string>
+    <string name="backup_csv_done">Done</string>
+    <string name="backup_csv_not_done">Not done</string>
+
+    <!-- Tổng kết tuần, lịch sử, thùng rác -->
+    <plurals name="count_tasks">
+        <item quantity="one">%s task</item>
+        <item quantity="other">%s tasks</item>
+    </plurals>
+    <string name="review_title">Weekly review</string>
+    <string name="review_goal_days">Goal days</string>
+    <string name="review_completed_late">Finished late</string>
+    <string name="review_overdue_now">Overdue now</string>
+    <string name="review_by_list">Done by list</string>
+    <string name="review_attention">Needs attention</string>
+    <string name="review_neglected">\"%s\" has the most open tasks. Consider setting aside some time for it next week.</string>
+    <string name="review_ask_coach">Ask AI Coach to plan next week</string>
+    <plurals name="review_completed">
+        <item quantity="one">%s task completed</item>
+        <item quantity="other">%s tasks completed</item>
+    </plurals>
+    <string name="review_no_previous">No data from last week to compare</string>
+    <string name="review_change_up">▲ %1$s%% vs. last week (%2$s tasks)</string>
+    <string name="review_change_down">▼ %1$s%% vs. last week (%2$s tasks)</string>
+    <string name="review_same_as_last">Same as last week</string>
+    <string name="review_best_day">Most productive day: %1$s (%2$s tasks)</string>
+    <string name="review_last_7_days">Last 7 days</string>
+    <string name="history_title">Completed</string>
+    <string name="history_empty_title">Nothing completed yet</string>
+    <string name="history_empty_subtitle">Tasks you finish will be kept here.</string>
+    <string name="history_reopen">Reopen</string>
+    <string name="trash_title">Trash</string>
+    <string name="trash_empty_action">Empty</string>
+    <string name="trash_empty_title">Trash is empty</string>
+    <string name="trash_empty_subtitle">Deleted tasks are kept here for 30 days so you can restore them.</string>
+    <string name="trash_retention">Deleted tasks are kept for 30 days, then removed for good.</string>
+    <string name="trash_deleted_at">Deleted %s</string>
+    <string name="trash_delete_forever">Delete forever</string>
+    <string name="trash_confirm_title">Empty the trash?</string>
+    <string name="trash_confirm_text">Tasks in the trash will be deleted forever and can\'t be restored.</string>
+    <string name="trash_restored">Restored: %s</string>
+    <string name="trash_deleted_forever">Deleted forever</string>
+    <plurals name="trash_pending_offline">
+        <item quantity="one">%s item will be removed for good after syncing (offline)</item>
+        <item quantity="other">%s items will be removed for good after syncing (offline)</item>
+    </plurals>
+    <string name="all_day">All day</string>
+    <string name="day_today_lower">today</string>
+    <string name="day_tomorrow_lower">tomorrow</string>
+    <string name="day_yesterday_lower">yesterday</string>
+    <string name="fmt_month_year">MMMM yyyy</string>
+    <string name="duration_compact_minutes">%sm</string>
+    <string name="duration_compact_hours">%sh</string>
+    <string name="duration_compact_hours_minutes">%1$sh%2$s</string>
+
+    <!-- Lịch -->
+    <string name="calendar_mode_month">Month</string>
+    <string name="calendar_mode_week">Week</string>
+    <string name="calendar_mode_agenda">Agenda</string>
+    <string name="calendar_permission_needed">Calendar permission is needed to show your device\'s events</string>
+    <string name="calendar_moved_to">Moved to %s</string>
+    <string name="calendar_title">Calendar</string>
+    <string name="calendar_device_chip">📆 Device calendar</string>
+    <string name="calendar_prev_month">Previous month</string>
+    <string name="calendar_next_month">Next month</string>
+    <string name="calendar_tasks_on">Tasks for %s</string>
+    <string name="calendar_no_tasks">No tasks</string>
+    <string name="calendar_prev_week">Previous week</string>
+    <string name="calendar_next_week">Next week</string>
+    <string name="calendar_this_week">Back to this week</string>
+    <string name="calendar_week_hint">Long-press a task and drag it to another day to change its due date.</string>
+    <string name="calendar_projected_short">projected</string>
+    <string name="calendar_projected">Projected repeat</string>
+    <string name="calendar_agenda_empty">No tasks due in the next %s days</string>
+
+    <!-- Mẫu nhiệm vụ -->
+    <string name="templates_title">Task templates</string>
+    <string name="templates_repeats">Repeats</string>
+    <string name="tpl_group_health">Health</string>
+    <string name="tpl_drink_water">Drink water</string>
+    <string name="tpl_brush_teeth">Brush teeth</string>
+    <string name="tpl_shower">Take a shower</string>
+    <string name="tpl_sleep_early">Go to bed early</string>
+    <string name="tpl_wake_early">Wake up early</string>
+    <string name="tpl_take_medicine">Take medicine</string>
+    <string name="tpl_take_break">Take a short break</string>
+    <string name="tpl_eat_fruit">Eat some fruit</string>
+    <string name="tpl_exercise">Exercise</string>
+    <string name="tpl_group_life">Life</string>
+    <string name="tpl_shopping">Go shopping</string>
+    <string name="tpl_clean_house">Clean the house</string>
+    <string name="tpl_cook">Cook</string>
+    <string name="tpl_call_family">Call family</string>
+    <string name="tpl_feed_pet">Feed the pet</string>
+    <string name="tpl_birthday">Birthday</string>
+    <string name="tpl_group_work">Work</string>
+    <string name="tpl_send_email">Send email</string>
+    <string name="tpl_write_report">Write report</string>
+    <string name="tpl_team_meeting">Team meeting</string>
+    <string name="tpl_plan_day">Plan the day</string>
+    <string name="tpl_group_study">Study</string>
+    <string name="tpl_read_book">Read a book</string>
+    <string name="tpl_learn_language">Learn a language</string>
+    <string name="tpl_homework">Do homework</string>
+
+    <!-- Thói quen -->
+    <string name="habits_title">Habits</string>
+    <string name="habit_deleted">Deleted habit \"%s\"</string>
+    <string name="habit_add">Add habit</string>
+    <string name="habits_empty_title">No habits yet</string>
+    <string name="habits_empty_subtitle">Tap + to start a small habit: drink water, read for 10 minutes…</string>
+    <plurals name="habits_show_archived">
+        <item quantity="one">Show %s archived habit</item>
+        <item quantity="other">Show %s archived habits</item>
+    </plurals>
+    <plurals name="habits_hide_archived">
+        <item quantity="one">Hide %s archived habit</item>
+        <item quantity="other">Hide %s archived habits</item>
+    </plurals>
+    <string name="habits_none_today">No habits to do today</string>
+    <string name="habits_all_done">All done — great job! 🎉</string>
+    <plurals name="habits_left_today">
+        <item quantity="one">%s habit left to do</item>
+        <item quantity="other">%s habits left to do</item>
+    </plurals>
+    <string name="habit_this_week">this week %1$s/%2$s</string>
+    <string name="habit_day_done">%s: done</string>
+    <string name="habit_day_not_done">%s: not done</string>
+    <string name="habit_day_not_scheduled">%s: not scheduled</string>
+    <string name="habit_rate_30">Last 30 days: %s%%</string>
+    <string name="habit_new">New habit</string>
+    <string name="habit_edit">Edit habit</string>
+    <string name="habit_name">Habit name</string>
+    <string name="habit_name_hint">e.g. Drink 2 liters of water</string>
+    <string name="habit_frequency">Frequency</string>
+    <string name="habit_freq_weekdays">Specific days</string>
+    <string name="habit_freq_per_week">Times/week</string>
+    <plurals name="habit_times_each_week">
+        <item quantity="one">%s time a week</item>
+        <item quantity="other">%s times a week</item>
+    </plurals>
+    <string name="habit_remind_daily">Daily reminder</string>
+    <string name="habit_remind_hint">Only reminds on days it\'s still due and not checked off</string>
+    <string name="habit_notif_rationale">Turn on notifications to get habit reminders.</string>
+    <string name="habit_remind_time">Reminder time</string>
+    <string name="habit_archive">Archive</string>
+    <string name="habit_archive_hint">Pause: hide from Today and keep the history</string>
+    <string name="habit_done">Done</string>
+    <string-array name="months_short">
+        <item>Jan</item>
+        <item>Feb</item>
+        <item>Mar</item>
+        <item>Apr</item>
+        <item>May</item>
+        <item>Jun</item>
+        <item>Jul</item>
+        <item>Aug</item>
+        <item>Sep</item>
+        <item>Oct</item>
+        <item>Nov</item>
+        <item>Dec</item>
+    </string-array>
+
+    <!-- Tôi (thống kê, mục tiêu, trí nhớ AI) -->
+    <string-array name="stats_tabs">
+        <item>📊 Stats</item>
+        <item>📈 Charts</item>
+        <item>🧠 AI memory</item>
+    </string-array>
+    <string name="stats_title">Me</string>
+    <string name="settings_title">Settings</string>
+    <string name="stats_default_name">you</string>
+    <string name="stats_on_track">You\'re on track! 🎯</string>
+    <string name="lists_title">Lists</string>
+    <string name="coach_short_title">AI Coach</string>
+    <string name="shortcut_habits_sub">Check in daily, keep your streak</string>
+    <string name="shortcut_lists_sub">Colors, icons, sections &amp; Kanban boards</string>
+    <string name="shortcut_review_sub">Compare with last week, plan the next one</string>
+    <string name="shortcut_coach_sub">Ask how to organize, beat procrastination</string>
+    <string name="shortcut_history_sub">History of finished tasks</string>
+    <string name="shortcut_trash_sub">Restore tasks deleted in the last 30 days</string>
+    <string name="stats_completed">Completed</string>
+    <string name="stats_pending">Pending</string>
+    <string name="stats_heatmap_title">%s heatmap</string>
+    <string name="stats_pending_by_list">Pending tasks by list</string>
+    <string name="stats_nothing_pending">Nothing pending!</string>
+    <string name="stats_analyze_ai">Analyze habits with AI</string>
+    <string name="stats_ai_observations">What AI has noticed about you</string>
+    <string name="stats_no_memories">AI hasn\'t noted any habits yet.</string>
+    <string name="stats_tap_analyze">Tap analyze to get started.</string>
+    <string name="stats_week_completed">Done this week</string>
+    <string name="stats_best_day">Most productive day</string>
+    <string name="stats_completed_7_days">Tasks completed in the last 7 days</string>
+    <string name="stats_per_day">Day by day</string>
+    <string name="stats_less">Less</string>
+    <string name="stats_more">More</string>
+    <plurals name="goal_streak">
+        <item quantity="one">🔥 %s-day streak</item>
+        <item quantity="other">🔥 %s-day streak</item>
+    </plurals>
+    <plurals name="goal_best_streak">
+        <item quantity="one">Best: %s day</item>
+        <item quantity="other">Best: %s days</item>
+    </plurals>
+    <string name="goal_met_today">Today\'s goal reached 🎉</string>
+    <plurals name="goal_remaining_today">
+        <item quantity="one">%s more task to reach today\'s goal</item>
+        <item quantity="other">%s more tasks to reach today\'s goal</item>
+    </plurals>
+    <string name="stats_focus_title">🍅 Focus</string>
+    <string name="stats_focus_summary">Today %1$s · 7 days %2$s (%3$s)</string>
+    <string name="memory_extracted">Analyzed %1$s activities and found %2$s new habits.</string>
+    <string name="memory_nothing_to_analyze">No activity in the last 30 days to analyze.</string>
+    <string name="memory_nothing_new">Analyzed %s activities but found no new habits.</string>
+    <string name="memory_analyze_failed">Analysis failed</string>
+    <string name="memory_deleted">Memory deleted</string>
+    <string name="action_rename">Rename</string>
+
+    <!-- Danh sách, Kanban -->
+    <string name="list_add">Add list</string>
+    <string name="list_overdue_count">%s overdue</string>
+    <plurals name="list_section_count">
+        <item quantity="one">%s section</item>
+        <item quantity="other">%s sections</item>
+    </plurals>
+    <string name="list_edit">Edit list</string>
+    <string name="list_delete">Delete list</string>
+    <string name="list_delete_title">Delete list \"%s\"?</string>
+    <string name="list_delete_text">Tasks in this list are kept; the list is only removed from the filters.</string>
+    <string name="list_new">New list</string>
+    <string name="list_name">List name</string>
+    <string name="list_icon">Icon</string>
+    <string name="list_color">Color</string>
+    <string name="list_unsectioned">No section</string>
+    <string name="list_view_list">Show as list</string>
+    <string name="list_view_kanban">Show as Kanban</string>
+    <string name="list_add_section">Add section</string>
+    <string name="list_appearance">Color &amp; icon</string>
+    <plurals name="list_completed_count">
+        <item quantity="one">✓ %s task done</item>
+        <item quantity="other">✓ %s tasks done</item>
+    </plurals>
+    <string name="list_section_hint">e.g. To do, Doing, Waiting for reply</string>
+    <string name="list_rename_section">Rename section</string>
+    <string name="list_add_section_plus">+ Add section</string>
+    <string name="list_section_options">Section options</string>
+    <string name="list_move_left">Move left</string>
+    <string name="list_move_right">Move right</string>
+    <string name="list_delete_section">Delete section (keep tasks)</string>
+    <string name="list_drop_here">Drag tasks here</string>
+    <string name="list_add_task_plus">+ Add task</string>
+    <string name="list_name_taken">The name \"%s\" is already used or invalid</string>
+    <string name="list_max_sections">At most %s sections</string>
+    <string name="action_open">Open</string>
+    <string name="notif_rationale_due">Turn on notifications to be reminded when tasks are due.</string>
+    <string name="task_added">Added: %s</string>
+    <string name="focus_resting">On a break</string>
+
+    <!-- Hôm nay, lịch trình AI -->
+    <string name="today_completed">Completed: %s</string>
+    <string name="today_postponed_to">Postponed to %s</string>
+    <string name="today_duplicated">Duplicated: %s</string>
+    <string name="today_add_task">Add a task for today</string>
+    <string name="today_device_events">📆 Today\'s calendar</string>
+    <string name="today_my_day">☀ My Day</string>
+    <string name="today_my_day_empty">Pick a few tasks you commit to doing today — from the suggestions below, or tap + to add one. The list starts fresh every morning.</string>
+    <string name="today_habits">🌱 Today\'s habits</string>
+    <string name="today_see_all">See all</string>
+    <string name="today_suggestions">Suggested for today</string>
+    <string name="today_add_all">Add all</string>
+    <string name="greeting_morning">Good morning, %s!</string>
+    <string name="greeting_noon">Good day, %s!</string>
+    <string name="greeting_afternoon">Good afternoon, %s!</string>
+    <string name="greeting_evening">Good evening, %s!</string>
+    <string name="today_goal_met">Today\'s goal reached! 🎉</string>
+    <string name="today_day_off">Today is a day off — anything you do is a bonus</string>
+    <plurals name="today_goal_remaining">
+        <item quantity="one">%s more task to reach your goal</item>
+        <item quantity="other">%s more tasks to reach your goal</item>
+    </plurals>
+    <plurals name="today_streak">
+        <item quantity="one">🔥 %1$s-day streak · best %2$s</item>
+        <item quantity="other">🔥 %1$s-day streak · best %2$s</item>
+    </plurals>
+    <string name="today_start_streak">Reach today\'s goal to start a streak 🔥</string>
+    <string name="today_add_to_my_day">Add to My Day</string>
+    <plurals name="today_scan_added">
+        <item quantity="one">Added %s task from the photo to My Day 📷</item>
+        <item quantity="other">Added %s tasks from the photo to My Day 📷</item>
+    </plurals>
+    <string name="plan_title">🗓 AI schedule</string>
+    <string name="plan_generate">Schedule</string>
+    <string name="plan_regenerate">Reschedule</string>
+    <string name="plan_stale">Your tasks changed since this schedule — tap to reschedule</string>
+    <string name="plan_empty">No schedule yet. Pick tasks for My Day, then tap \"Schedule\" — AI will fit them into time slots based on their estimated duration and your habits.</string>
+    <string name="plan_start_focus">Start focusing</string>
+    <string name="plan_change_time">Change time: %s</string>
+    <string name="plan_shift_hint">Overlapping slots after this one will be moved down.</string>
+    <string name="plan_remove_slot">Remove from schedule</string>
+    <string name="plan_load_failed">Couldn\'t load the schedule (needs internet).</string>
+    <string name="plan_generate_failed">Couldn\'t create the schedule. Check your connection and try again.</string>
+    <string name="plan_no_slots">No time slots could be scheduled — add tasks to My Day, or extend your end time in Settings.</string>
+    <string name="plan_generated">Today\'s schedule is ready</string>
+    <string name="plan_no_room">Not enough room left in the day for that time</string>
+    <string name="plan_save_failed">Couldn\'t save the schedule (needs internet)</string>
+    <string name="action_choose">Choose</string>
+    <string name="action_more">More</string>
+
+    <!-- Thẻ việc, chọn nhiều, đồng bộ, tạo nhanh -->
+    <string name="task_state_done">Done</string>
+    <string name="task_state_overdue">Overdue</string>
+    <string name="task_state_open">Not done</string>
+    <string name="a11y_postpone">Postpone to another day</string>
+    <string name="task_remove_from_my_day">Remove from My Day</string>
+    <string name="task_duplicate">Duplicate</string>
+    <string name="task_do_first">Do first · %s</string>
+    <string name="task_drag">Drag</string>
+    <string name="task_selected">Selected</string>
+    <string name="task_in_my_day">In My Day</string>
+    <string name="task_not_synced">Not synced yet</string>
+    <string name="task_from_time">(from %s)</string>
+    <string name="task_change_priority">Change priority</string>
+    <string name="task_focus_25">Start a 25\' focus session</string>
+    <string name="task_edit">Edit</string>
+    <string name="task_swipe_postpone">Postpone</string>
+    <string name="task_postpone_to">Postpone to…</string>
+    <string name="task_pick_date">Pick a date…</string>
+    <string name="selection_exit">Exit selection</string>
+    <string name="selection_count">%s selected</string>
+    <string name="selection_all">Select all</string>
+    <string name="selection_move">Move</string>
+    <plurals name="sync_offline_pending">
+        <item quantity="one">Offline — %s change saved on this device, it will sync when you\'re back online</item>
+        <item quantity="other">Offline — %s changes saved on this device, they will sync when you\'re back online</item>
+    </plurals>
+    <string name="sync_offline">Offline — you can still add and edit tasks as usual</string>
+    <plurals name="sync_pending">
+        <item quantity="one">Syncing %s change…</item>
+        <item quantity="other">Syncing %s changes…</item>
+    </plurals>
+    <string name="voice_prompt">Say a task, e.g. \"Call mom tomorrow at 8pm\"</string>
+    <string name="voice_unavailable">This device has no speech recognition service</string>
+    <string name="voice_input">Voice input</string>
+    <string name="quick_add_hint">e.g. Submit report tomorrow 3pm !high #Work @urgent</string>
+    <string name="quick_add_understood">Understood as:</string>
+    <string name="quick_add_new_list">(new)</string>
+    <string name="quick_add_due">Due</string>
+    <string name="quick_add_in_3_days">In 3 days</string>
+    <string name="quick_add_no_date">None</string>
+    <string name="quick_add_list">List</string>
+    <string name="quick_add_my_day">☀ Add to My Day</string>
+    <string name="quick_add_templates">Templates</string>
+    <string name="quick_add_scan">Scan</string>
+    <string name="quick_add_details">Details</string>
+    <string name="ai_parse_title">Analyze with AI</string>
+    <string name="ai_parse_subtitle">For long or complex sentences — needs internet</string>
+    <string name="ai_parse_hint">e.g. Meeting with my boss Friday at 3pm, about 1 hour</string>
+    <string name="action_clear">Clear</string>
+
+    <!-- Danh sách việc (tab Việc làm) -->
+    <string name="tasks_completed_spawned">Completed · next repeat created</string>
+    <string name="tasks_moved_to_trash">Moved to Trash: %s</string>
+    <plurals name="tasks_rescheduled">
+        <item quantity="one">Moved %s task</item>
+        <item quantity="other">Moved %s tasks</item>
+    </plurals>
+    <plurals name="tasks_bulk_completed">
+        <item quantity="one">Completed %s task</item>
+        <item quantity="other">Completed %s tasks</item>
+    </plurals>
+    <plurals name="tasks_bulk_trashed">
+        <item quantity="one">Moved %s task to Trash</item>
+        <item quantity="other">Moved %s tasks to Trash</item>
+    </plurals>
+    <string name="tasks_add">Add task</string>
+    <string name="filter_save_chip">💾 Save filter</string>
+    <string name="filter_clear_chip">✕ Clear filters</string>
+    <string name="filter_all_lists">All lists</string>
+    <string name="filter_all_tags">All tags</string>
+    <string name="tasks_empty_filtered">No matching tasks</string>
+    <string name="tasks_empty">No tasks yet</string>
+    <string name="tasks_empty_filtered_sub">Try a different filter or keyword.</string>
+    <string name="tasks_empty_sub">Tap + and type naturally, e.g. \"Submit report tomorrow 3pm !high\"</string>
+    <string name="tasks_sort_hint">☰ Hold and drag to reorder</string>
+    <string name="tasks_upcoming">Upcoming</string>
+    <string name="tasks_done_today">Done today</string>
+    <string name="tasks_pick_one">Pick a task to see its details</string>
+    <string name="filter_save">Save filter</string>
+    <string name="filter_save_hint">e.g. Urgent chores</string>
+    <string name="filter_delete_title">Delete filter \"%s\"?</string>
+    <string name="filter_saved">Saved filter \"%s\"</string>
+    <plurals name="tasks_selected">
+        <item quantity="one">%s task selected</item>
+        <item quantity="other">%s tasks selected</item>
+    </plurals>
+    <string name="tasks_reschedule_all">Move all</string>
+    <string name="tasks_to_today">To today</string>
+    <string name="tasks_to_tomorrow">To tomorrow</string>
+    <string name="tasks_search">Search tasks…</string>
+    <string name="tasks_sort_by">Sort: %s</string>
+    <string name="tasks_hero_title">All of %s\'s tasks</string>
+    <plurals name="tasks_pending">
+        <item quantity="one">%s task pending</item>
+        <item quantity="other">%s tasks pending</item>
+    </plurals>
+    <string name="tasks_none_pending">Nothing pending 🎉</string>
+    <string name="tasks_matrix">Eisenhower matrix</string>
+    <string name="tasks_ai_add">Add with AI</string>
+    <string name="tasks_manual_sort">Manual sort</string>
+    <string name="sync_no_network">No connection — changes will sync when you\'re back online</string>
+    <string name="sync_server_busy">The server is busy, will retry syncing later</string>
+    <string name="my_day_added">Added to My Day ☀</string>
+    <string name="my_day_removed">Removed from My Day</string>
+    <plurals name="my_day_added_count">
+        <item quantity="one">Added %s task to My Day ☀</item>
+        <item quantity="other">Added %s tasks to My Day ☀</item>
+    </plurals>
+    <plurals name="priority_changed_count">
+        <item quantity="one">Changed priority of %s task</item>
+        <item quantity="other">Changed priority of %s tasks</item>
+    </plurals>
+    <plurals name="scan_created_count">
+        <item quantity="one">Created %s task from the photo 📷</item>
+        <item quantity="other">Created %s tasks from the photo 📷</item>
+    </plurals>
+    <string name="ai_parse_failed">Couldn\'t understand that. Try describing it more clearly.</string>
+    <string name="action_decrease">Decrease</string>
+    <string name="action_increase">Increase</string>
+    <string name="unit_days">days</string>
+    <string name="unit_weeks">weeks</string>
+    <string name="unit_months">months</string>
+
+    <!-- Chi tiết việc -->
+    <string name="detail_saved">Task saved</string>
+    <string name="detail_trashed">Moved to Trash</string>
+    <string name="detail_ai_estimate">AI suggests: %s</string>
+    <string name="detail_duplicated">Duplicated — opening the copy</string>
+    <string name="detail_new_title">New task ✨</string>
+    <string name="detail_edit_title">Edit task</string>
+    <string name="detail_no_calendar_app">No calendar app on this device</string>
+    <string name="detail_title_required">The title can\'t be empty</string>
+    <string name="detail_recurring_needs_due">Please set a due date for a recurring task</string>
+    <string name="detail_create">Create task</string>
+    <string name="detail_save_changes">Save changes</string>
+    <string name="detail_section_name">Title &amp; description</string>
+    <string name="detail_title_label">Task title</string>
+    <string name="detail_description_label">Description (optional)</string>
+    <string name="detail_my_day_hint">The tasks you chose to do today</string>
+    <string name="detail_section_priority">Priority</string>
+    <string name="detail_start_range">Starts %1$s → %2$s</string>
+    <string name="detail_add_start">Add a start time (time block)</string>
+    <string name="detail_all_day_hint">All-day task: only overdue once the day is over; reminded at the default time in Settings.</string>
+    <string name="detail_section_estimate">Estimated duration</string>
+    <string name="detail_ai_suggest">✨ AI suggestion</string>
+    <string name="detail_estimate_unknown">Unknown</string>
+    <string name="detail_estimate_hint">Helps AI fit the task into your day with the right length.</string>
+    <string name="detail_new_list">Add a new list</string>
+    <string name="detail_section_label">Section</string>
+    <string name="detail_section_tags">Tags</string>
+    <string name="detail_remove_tag">Remove tag</string>
+    <string name="detail_add_tag">Add tag (e.g. home, urgent)</string>
+    <string name="detail_every">Every</string>
+    <string name="detail_on_days">On these days</string>
+    <string name="detail_next_from">Next occurrence counts from</string>
+    <string name="detail_mode_schedule">Fixed schedule</string>
+    <string name="detail_mode_completion">Completion date</string>
+    <string name="detail_mode_schedule_hint">e.g. a meeting every Monday — finishing late doesn\'t change the schedule.</string>
+    <string name="detail_mode_completion_hint">e.g. water the plants 3 days after the last time — finishing late moves the next one too.</string>
+    <string name="detail_ends">Ends: %s</string>
+    <string name="detail_repeat_forever">Repeats forever (pick an end date)</string>
+    <string name="detail_repeat_needs_due">⚠ Set a due date to use repeating.</string>
+    <string name="detail_section_reminders">Reminders</string>
+    <string name="detail_reminders_need_due">Set a due date to enable reminders.</string>
+    <string name="reminder_morning_of">Morning of the due date</string>
+    <string name="reminder_1_day_before">1 day before</string>
+    <string name="reminder_on_time">On time</string>
+    <string name="reminder_minutes_before">%s min before</string>
+    <string name="reminder_1_hour_before">1 hour before</string>
+    <string name="detail_reminders_multi_start">You can pick several reminders · counted from the start time</string>
+    <string name="detail_reminders_multi">You can pick several reminders</string>
+    <string name="detail_section_location">Location reminder</string>
+    <string name="detail_section_attachments">Attachments</string>
+    <string name="detail_section_focus">Focus time</string>
+    <string name="detail_focus_estimate">estimate %s</string>
+    <string name="detail_focus_latest">Latest: %s</string>
+    <string name="detail_section_subtasks">Subtasks</string>
+    <string name="detail_subtask_due">Set a due date for this step</string>
+    <string name="detail_subtask_delete">Delete step</string>
+    <string name="detail_subtask_add">Add a subtask</string>
+    <string name="detail_ai_breakdown">✨ Ask AI to break this down</string>
+    <string name="detail_start_before_due">The start time must be before %s</string>
+    <string name="detail_ai_steps_title">Steps suggested by AI</string>
+    <string name="detail_ai_set_estimate">Set estimated duration: %s</string>
+    <plurals name="detail_add_steps">
+        <item quantity="one">Add %s step</item>
+        <item quantity="other">Add %s steps</item>
+    </plurals>
+    <string name="detail_skip_occurrence">Skip this occurrence</string>
+    <string name="detail_add_to_device_calendar">Add to device calendar</string>
+    <string name="detail_pick_time">Pick a time</string>
+    <plurals name="attach_copy_failed">
+        <item quantity="one">Couldn\'t copy %s file</item>
+        <item quantity="other">Couldn\'t copy %s files</item>
+    </plurals>
+    <string name="detail_task_gone">This task no longer exists (it may have been deleted on another device)</string>
+    <string name="detail_save_gone">Can\'t save: the task was deleted on another device</string>
+    <string name="detail_skipped">Skipped this occurrence — moved to the next one</string>
+    <string name="detail_series_ended">This is the last occurrence (the end date has been reached)</string>
+    <string name="detail_skip_needs_recurring">Only recurring tasks with a due date can be skipped</string>
+    <string name="detail_task_gone_short">This task no longer exists</string>
+    <string name="detail_ai_no_steps">AI couldn\'t come up with new steps — try a clearer description</string>
+    <string name="detail_ai_breakdown_failed">Couldn\'t get AI to break this down, try again later</string>
+    <string name="detail_ai_no_estimate">AI couldn\'t estimate this task</string>
+    <string name="detail_ai_estimate_failed">Couldn\'t get a duration suggestion</string>
+    <string name="detail_ai_needs_title">Enter a title first so AI understands the task</string>
+    <string name="unit_tasks">tasks</string>
+
+    <!-- Thiết lập -->
+    <string name="logout_unsynced_title">Sign out before syncing?</string>
+    <plurals name="logout_unsynced_text">
+        <item quantity="one">%s change hasn\'t been sent to the server yet (offline). Signing out now will lose it.</item>
+        <item quantity="other">%s changes haven\'t been sent to the server yet (offline). Signing out now will lose them.</item>
+    </plurals>
+    <string name="logout_anyway">Sign out anyway</string>
+    <string name="logout_stay">Stay</string>
+    <string name="settings_appearance">🌗 Appearance</string>
+    <string name="theme_light">☀️ Light</string>
+    <string name="theme_dark">🌙 Dark</string>
+    <string name="theme_system">📱 System</string>
+    <string name="settings_language">🌐 Language</string>
+    <string name="language_system">System default</string>
+    <string name="language_hint">Applies to the whole app. On Android 13+ you can also change it in system Settings › Apps › TaskFlow AI › Language.</string>
+    <string name="settings_rhythm">🕐 Daily rhythm</string>
+    <string name="settings_rhythm_hint">AI uses these settings to build a schedule that suits you.</string>
+    <string name="settings_morning_start">Morning start</string>
+    <string name="settings_evening_end">Evening end</string>
+    <string name="settings_work_duration">Work session length (minutes)</string>
+    <string name="settings_daily_goal">🎯 Daily goal</string>
+    <string name="settings_daily_goal_hint">Your 🔥 streak only grows when you complete this many tasks. Days off don\'t break the streak.</string>
+    <string name="settings_complete_each_day">Complete each day</string>
+    <string name="settings_days_off">Days off</string>
+    <string name="settings_lists">🏷️ Lists</string>
+    <string name="settings_lists_hint">Lists you can use when creating tasks. You can add your own and delete the ones you added.</string>
+    <string name="settings_default_list">Default</string>
+    <string name="settings_save">Save settings</string>
+    <string name="settings_notifications">🔔 Notifications</string>
+    <string name="settings_morning_digest">Morning summary</string>
+    <string name="settings_morning_digest_sub">Tasks due, overdue and in My Day</string>
+    <string name="settings_digest_rationale">Turn on notifications to get a summary of your tasks every morning.</string>
+    <string name="settings_digest_time">Summary time</string>
+    <string name="settings_weekly_review_sub">Sunday 19:00 — look back at the week and plan the next one</string>
+    <string name="settings_all_day_time">Reminder time for \"all day\" tasks</string>
+    <string name="settings_system">📲 System features</string>
+    <string name="settings_focus_dnd">Turn on Do Not Disturb while focusing</string>
+    <string name="settings_focus_dnd_sub">Silences notifications from all apps during a Pomodoro, turns back on afterwards</string>
+    <string name="settings_dnd_grant">Allow TaskFlow to manage \"Do Not Disturb\"</string>
+    <string name="settings_quick_add_notif">\"Quick add\" box in the notification shade</string>
+    <string name="settings_quick_add_notif_sub">Type a task right in the notification, no need to open the app</string>
+    <string name="settings_quick_add_rationale">Turn on notifications to use the quick add box.</string>
+    <string name="settings_qs_tiles">Quick Settings tiles</string>
+    <string name="settings_qs_tiles_sub">Add \"Focus\" / \"Add task\" tiles to the panel you pull down from the top of the screen</string>
+    <string name="settings_planning">🗓 Planning</string>
+    <string name="settings_capacity">Working hours per day</string>
+    <string name="settings_capacity_hint">The week view adds up each day\'s estimated durations and marks days over this limit in red.</string>
+    <string name="settings_advanced_reminders">⏰ Advanced reminders</string>
+    <string name="settings_nag">Remind again until done</string>
+    <string name="settings_nag_hint">Due tasks that aren\'t checked off are reminded again (up to %s times).</string>
+    <string name="settings_off">Off</string>
+    <string name="settings_nag_high_only">High priority only</string>
+    <string name="settings_nag_high_only_sub">Turn off to repeat reminders for every task with a due date</string>
+    <string name="settings_alarm_high">Alarm for high priority tasks</string>
+    <string name="settings_alarm_high_sub">Rings and shows full screen even when locked, like an alarm clock</string>
+    <string name="settings_alarm_rationale">Turn on notifications so alarms for important tasks work.</string>
+    <string name="settings_quiet_hours">Quiet hours</string>
+    <string name="settings_quiet_hours_sub">Reminders that fall in this window are moved to when it ends (alarms still ring)</string>
+    <string name="settings_from">From</string>
+    <string name="settings_to">To</string>
+    <string name="settings_security">🔒 Security</string>
+    <string name="settings_app_lock">App lock</string>
+    <string name="settings_app_lock_sub">Use fingerprint / face / device PIN when opening the app or returning after %s seconds</string>
+    <string name="settings_no_lock_screen">No fingerprint or screen lock set up on this device</string>
+    <string name="settings_data">💾 Data</string>
+    <string name="settings_account">👤 Account</string>
+    <string name="settings_logout">Sign out of this device</string>
+    <string name="settings_logout_all">Sign out of all devices</string>
+    <string name="settings_logout_all_hint">Use this if you lose your phone or signed in on someone else\'s device.</string>
+    <string name="settings_about">ℹ️ About</string>
+    <string name="settings_version">Version %s</string>
+    <string name="settings_about_text">A personal work-management app with AI: tasks in lists, sections / Kanban and tags; month / week calendar; habits; Pomodoro focus; goals &amp; stats; a daily AI schedule and an AI Coach with long-term memory. Works offline and syncs across devices.</string>
+    <string name="settings_faq">Quick FAQ</string>
+    <string name="settings_faq_text">• Not getting notifications? Allow notifications and set a due date on the task.\n• Add a new list? Right in the Lists section above, under Me → Lists, or in the task detail screen.\n• Split work into stages? Open a list → add sections → drag cards between the Kanban columns.\n• AI misunderstood a quick add? Describe the time/priority more clearly, then adjust before saving.</string>
+    <string name="settings_exact_alarm_missing">Exact alarms aren\'t allowed — alarms may ring a few minutes late.</string>
+    <string name="settings_full_screen_missing">Full-screen display isn\'t allowed — alarms only show as a notification.</string>
+    <string name="settings_grant">Grant</string>
+    <string name="settings_tile_added">Added the \"%s\" tile</string>
+    <string name="settings_tile_exists">The \"%s\" tile is already there</string>
+    <string name="settings_saved">Settings saved!</string>
+    <string name="settings_invalid">Invalid settings: times must be HH:mm, the end time after the start time, and the duration 15–480 minutes.</string>
+    <string name="settings_save_offline">Couldn\'t save to the server (your goal still applies on this device)</string>
+
+    <!-- Thông báo, kênh thông báo -->
+    <plurals name="digest_due_today">
+        <item quantity="one">%s task due</item>
+        <item quantity="other">%s tasks due</item>
+    </plurals>
+    <plurals name="digest_overdue">
+        <item quantity="one">%s task overdue</item>
+        <item quantity="other">%s tasks overdue</item>
+    </plurals>
+    <plurals name="digest_my_day">
+        <item quantity="one">%s task in My Day</item>
+        <item quantity="other">%s tasks in My Day</item>
+    </plurals>
+    <string name="digest_title">Good morning! Here\'s your day</string>
+    <string name="weekly_review_ready">Your weekly review is ready</string>
+    <string name="weekly_review_ready_text">See what you got done this week and plan the next one</string>
+    <string name="focus_notif_focusing">🍅 Focusing</string>
+    <string name="focus_notif_break">☕ On a break</string>
+    <string name="focus_notif_stop">Stop</string>
+    <string name="focus_done_title">%s focus minutes done 🍅</string>
+    <string name="focus_break_over">Break\'s over</string>
+    <string name="focus_done_text">\"%1$s\" — take a %2$s-minute break, then keep going</string>
+    <string name="focus_next_ready">Ready for the next session: \"%s\"</string>
+    <string name="focus_notif_task_done">Task done</string>
+    <string name="habit_reminder_text">Time to keep up your habit</string>
+    <string name="snooze_reply_ok">Reminder set for %s</string>
+    <string name="snooze_reply_unknown">Didn\'t understand \"%s\" — snoozed for 1 hour</string>
+    <string name="channel_reminders">Task reminders</string>
+    <string name="channel_reminders_desc">Notifies you when tasks are due</string>
+    <string name="channel_digest">Summaries &amp; reviews</string>
+    <string name="channel_digest_desc">Morning summary of tasks and the weekly review</string>
+    <string name="channel_focus">Focus timer</string>
+    <string name="channel_focus_desc">Tells you when a focus session or break ends</string>
+    <string name="channel_focus_ongoing">Focusing</string>
+    <string name="channel_focus_ongoing_desc">Countdown of the running focus session</string>
+    <string name="channel_quick_add">Quick add</string>
+    <string name="channel_quick_add_desc">Persistent box for adding tasks in the notification shade</string>
+    <string name="channel_alarm">Important task alarms</string>
+    <string name="channel_alarm_desc">Rings full screen when a high priority task is due</string>
+    <string name="quick_add_notif_hint">e.g. Call the client tomorrow 9am !high</string>
+    <string name="quick_add_notif_text">Type a task right here</string>
+    <string name="reminder_default_title">Task due</string>
+    <string name="snooze_reply_label">Snooze until… (e.g. tomorrow 9am)</string>
+    <string-array name="snooze_reply_choices">
+        <item>30 min</item>
+        <item>1 hour</item>
+        <item>Tonight</item>
+        <item>Tomorrow morning</item>
+    </string-array>
+    <string name="reminder_nag_title">Reminder (#%s): task not done yet</string>
+    <string name="reminder_due_title">Task due</string>
+    <string name="reminder_snooze_more">Snooze…</string>
+
+    <!-- AI Coach áp dụng đề xuất, widget, ô Quick Settings -->
+    <plurals name="coach_subtasks_added">
+        <item quantity="one">Added %s subtask</item>
+        <item quantity="other">Added %s subtasks</item>
+    </plurals>
+    <string name="coach_task_created">Created: %s</string>
+    <string name="coach_priority_changed">Priority changed</string>
+    <plurals name="coach_my_day_added">
+        <item quantity="one">Added %s task to My Day</item>
+        <item quantity="other">Added %s tasks to My Day</item>
+    </plurals>
+    <string name="task_copy_title">%s (copy)</string>
+    <string name="tile_focus_running">Running · tap to stop</string>
+    <string name="widget_tasks_title">To do</string>
+    <string name="widget_no_tasks">🎉 Nothing left to do!</string>
+    <string name="widget_done_today">tasks done today</string>
+    <string name="widget_next">Next</string>
+    <string name="widget_nothing_left">Nothing left</string>
+    <string name="widget_config_title">Which tasks should the widget show?</string>
+    <string name="widget_source_all">📋 All tasks to do</string>
 </resources>

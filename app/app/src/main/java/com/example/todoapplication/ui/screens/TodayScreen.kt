@@ -40,6 +40,7 @@ import com.example.todoapplication.ui.navigation.QuickCreateRequest
 import com.example.todoapplication.ui.navigation.Screen
 import com.example.todoapplication.ui.theme.*
 import com.example.todoapplication.ui.utils.weekdayShort
+import com.example.todoapplication.ui.utils.shortDate
 import com.example.todoapplication.ui.viewmodel.TodayEvent
 import com.example.todoapplication.ui.viewmodel.TodayUiState
 import com.example.todoapplication.ui.viewmodel.TodayViewModel
@@ -47,6 +48,10 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.pluralStringResource
+import com.example.todoapplication.R
+import com.example.todoapplication.i18n.str
 
 /**
  * [TẦNG UI · MÀN HÌNH] Tab "Hôm nay" — nơi bắt đầu mỗi ngày:
@@ -67,7 +72,7 @@ fun TodayScreen(
     val snackbar = remember { SnackbarHostState() }
     // Lắc máy khi đang có thanh "Hoàn tác" → hoàn tác luôn (gia tốc kế)
     com.example.todoapplication.ui.components.ShakeEffect {
-        snackbar.currentSnackbarData?.takeIf { it.visuals.actionLabel == "Hoàn tác" }?.performAction()
+        snackbar.currentSnackbarData?.takeIf { it.visuals.actionLabel == str(R.string.action_undo) }?.performAction()
     }
     val scope = rememberCoroutineScope()
     val askNotificationPermission = rememberNotificationPermissionRequest()
@@ -92,16 +97,17 @@ fun TodayScreen(
             when (e) {
                 is TodayEvent.Message -> scope.launch { snackbar.showSnackbar(e.text) }
                 is TodayEvent.Completed -> scope.launch {
-                    val r = snackbar.showSnackbar("Đã hoàn thành: ${e.title}", actionLabel = "Hoàn tác", duration = SnackbarDuration.Short)
+                    val r = snackbar.showSnackbar(str(R.string.today_completed, e.title), actionLabel = str(R.string.action_undo), duration = SnackbarDuration.Short)
                     if (r == SnackbarResult.ActionPerformed) viewModel.reopen(e.taskId)
                 }
                 is TodayEvent.Postponed -> scope.launch {
-                    val label = "${com.example.todoapplication.ui.utils.weekdayShort(e.date)} ${e.date.dayOfMonth}/${e.date.monthValue}"
-                    val r = snackbar.showSnackbar("Đã hoãn sang $label", actionLabel = "Hoàn tác", duration = SnackbarDuration.Short)
+                    val r = snackbar.showSnackbar(
+                        str(R.string.today_postponed_to, com.example.todoapplication.ui.utils.shortDate(e.date)),
+                        actionLabel = str(R.string.action_undo), duration = SnackbarDuration.Short)
                     if (r == SnackbarResult.ActionPerformed) viewModel.undoPostpone(e.previous)
                 }
                 is TodayEvent.Duplicated -> scope.launch {
-                    val r = snackbar.showSnackbar("Đã nhân bản: ${e.title}", actionLabel = "Mở", duration = SnackbarDuration.Short)
+                    val r = snackbar.showSnackbar(str(R.string.today_duplicated, e.title), actionLabel = str(R.string.action_open), duration = SnackbarDuration.Short)
                     if (r == SnackbarResult.ActionPerformed) navController.navigate(Screen.TaskDetail.createRoute(e.taskId))
                 }
             }
@@ -116,7 +122,7 @@ fun TodayScreen(
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = MaterialTheme.colorScheme.onPrimary,
                 shape = CircleShape
-            ) { Icon(Icons.Default.Add, contentDescription = "Thêm việc cho hôm nay") }
+            ) { Icon(Icons.Default.Add, contentDescription = stringResource(R.string.today_add_task)) }
         },
         bottomBar = { BottomNavigationBar(navController, activeTab = 0) },
         containerColor = MaterialTheme.colorScheme.background
@@ -143,20 +149,19 @@ fun TodayScreen(
 
             // ── Lịch của máy hôm nay (CalendarContract) ──
             if (todayEvents.isNotEmpty()) {
-                item(key = "events-header") { SectionHeader("📆 Lịch hôm nay", todayEvents.size) }
+                item(key = "events-header") { SectionHeader(stringResource(R.string.today_device_events), todayEvents.size) }
                 items(todayEvents, key = { "ev-" + it.id + "-" + it.begin }) { DeviceEventRow(it) }
             }
 
             // ── Ngày của tôi ──
             item(key = "myday-header") {
-                SectionHeader("☀ Ngày của tôi", state.myDay.size - state.myDayDone)
+                SectionHeader(stringResource(R.string.today_my_day), state.myDay.size - state.myDayDone)
             }
             if (state.myDay.isEmpty()) {
                 item(key = "myday-empty") {
                     Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceVariant) {
                         Text(
-                            "Chọn vài việc bạn cam kết làm hôm nay — từ gợi ý bên dưới, hoặc nhấn + để thêm. " +
-                                "Danh sách tự làm mới mỗi sáng.",
+                            stringResource(R.string.today_my_day_empty),
                             modifier = Modifier.padding(16.dp),
                             fontSize = 13.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -191,9 +196,9 @@ fun TodayScreen(
             // ── Thói quen hôm nay ──
             if (habits.isNotEmpty()) {
                 item(key = "habits-header") {
-                    SectionHeader("🌱 Thói quen hôm nay", habits.count { !it.doneToday }, action = {
+                    SectionHeader(stringResource(R.string.today_habits), habits.count { !it.doneToday }, action = {
                         TextButton(onClick = { navController.navigate(Screen.Habits.route) }) {
-                            Text("Tất cả", color = MaterialTheme.colorScheme.primary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                            Text(stringResource(R.string.today_see_all), color = MaterialTheme.colorScheme.primary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                         }
                     })
                 }
@@ -210,9 +215,9 @@ fun TodayScreen(
             // ── Gợi ý ──
             if (state.suggestions.isNotEmpty()) {
                 item(key = "suggest-header") {
-                    SectionHeader("Gợi ý cho hôm nay", state.suggestions.size, action = {
+                    SectionHeader(stringResource(R.string.today_suggestions), state.suggestions.size, action = {
                         TextButton(onClick = { viewModel.addToMyDay(state.suggestions.map { it.task.id }) }) {
-                            Text("Thêm tất cả", color = MaterialTheme.colorScheme.primary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                            Text(stringResource(R.string.today_add_all), color = MaterialTheme.colorScheme.primary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                         }
                     })
                 }
@@ -269,7 +274,7 @@ fun TodayScreen(
             onDismiss = { quickCreateText = null },
             onCreate = { result ->
                 viewModel.createQuickTask(result)
-                if (result.draft.dueAt != null) askNotificationPermission("Bật thông báo để được nhắc khi việc đến hạn.")
+                if (result.draft.dueAt != null) askNotificationPermission(str(R.string.notif_rationale_due))
                 quickCreateText = null
             },
             onMoreDetails = { result ->
@@ -308,14 +313,14 @@ private fun TodayHeader(state: TodayUiState, onCoach: () -> Unit) {
             Row(verticalAlignment = Alignment.Top) {
                 Column(Modifier.weight(1f)) {
                     Text(
-                        "${weekdayShort(state.today)}, ${state.today.format(DateTimeFormatter.ofPattern("dd/MM"))}",
+                        shortDate(state.today),
                         color = Color.White.copy(alpha = 0.85f),
                         fontSize = 13.sp
                     )
                     Text(greeting(state.userName), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 21.sp)
                 }
                 IconButton(onClick = onCoach, modifier = Modifier.size(40.dp)) {
-                    Icon(Icons.Default.SmartToy, contentDescription = "AI Coach", tint = Color.White)
+                    Icon(Icons.Default.SmartToy, contentDescription = stringResource(R.string.coach_short_title), tint = Color.White)
                 }
             }
             state.goal?.let { goal ->
@@ -329,12 +334,12 @@ private fun TodayHeader(state: TodayUiState, onCoach: () -> Unit) {
 private fun greeting(name: String): String {
     val h = LocalTime.now().hour
     val part = when (h) {
-        in 5..10 -> "Chào buổi sáng"
-        in 11..13 -> "Chào buổi trưa"
-        in 14..17 -> "Chào buổi chiều"
-        else -> "Chào buổi tối"
+        in 5..10 -> R.string.greeting_morning
+        in 11..13 -> R.string.greeting_noon
+        in 14..17 -> R.string.greeting_afternoon
+        else -> R.string.greeting_evening
     }
-    return "$part, $name!"
+    return str(part, name)
 }
 
 @Composable
@@ -354,17 +359,17 @@ private fun GoalRow(goal: GoalProgress) {
         Column {
             Text(
                 when {
-                    goal.metToday -> "Đạt mục tiêu hôm nay! 🎉"
-                    goal.isDayOffToday -> "Hôm nay là ngày nghỉ — làm được gì cũng là thêm"
-                    else -> "Còn ${goal.remainingToday} việc để đạt mục tiêu"
+                    goal.metToday -> stringResource(R.string.today_goal_met)
+                    goal.isDayOffToday -> stringResource(R.string.today_day_off)
+                    else -> pluralStringResource(R.plurals.today_goal_remaining, goal.remainingToday, goal.remainingToday)
                 },
                 color = Color.White,
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 14.sp
             )
             Text(
-                if (goal.currentStreak > 0) "🔥 Chuỗi ${goal.currentStreak} ngày · kỷ lục ${goal.bestStreak}"
-                else "Đạt mục tiêu hôm nay để bắt đầu chuỗi 🔥",
+                if (goal.currentStreak > 0) pluralStringResource(R.plurals.today_streak, goal.currentStreak, goal.currentStreak, goal.bestStreak)
+                else stringResource(R.string.today_start_streak),
                 color = Color.White.copy(alpha = 0.85f),
                 fontSize = 12.sp
             )
@@ -392,14 +397,14 @@ private fun FocusMiniBar(state: FocusSession.State, onClick: () -> Unit) {
             Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f)) {
                 Text(
-                    if (state.phase == FocusSession.Phase.FOCUS) "Đang tập trung" else "Đang nghỉ",
+                    stringResource(if (state.phase == FocusSession.Phase.FOCUS) R.string.focus_focusing else R.string.focus_resting),
                     fontSize = 12.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(state.title, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onSurface)
             }
             Text(
-                if (remaining > 0) "%02d:%02d".format(remaining / 60, remaining % 60) else "Hết giờ",
+                if (remaining > 0) "%02d:%02d".format(remaining / 60, remaining % 60) else stringResource(R.string.focus_time_up),
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.tertiary
             )
@@ -423,7 +428,7 @@ private fun SuggestionRow(title: String, reason: String, accent: Color, onAdd: (
                 Text(reason, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             IconButton(onClick = onAdd) {
-                Icon(Icons.Outlined.WbSunny, contentDescription = "Thêm vào Ngày của tôi", tint = PriorityMediumColor)
+                Icon(Icons.Outlined.WbSunny, contentDescription = stringResource(R.string.today_add_to_my_day), tint = PriorityMediumColor)
             }
         }
     }
@@ -435,21 +440,21 @@ private fun SuggestionRow(title: String, reason: String, accent: Color, onAdd: (
 private fun PlanHeader(state: TodayUiState, onRegenerate: () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 8.dp)) {
-            Text("🗓 Lịch trình AI", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
+            Text(stringResource(R.string.plan_title), fontWeight = FontWeight.Bold, fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
             if (state.plan.isLoading || state.plan.isSaving) {
                 CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
             } else {
                 TextButton(onClick = onRegenerate, enabled = state.isOnline) {
                     Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(4.dp))
-                    Text(if (state.plan.plan?.planData.isNullOrEmpty()) "Xếp lịch" else "Xếp lại", fontSize = 13.sp)
+                    Text(stringResource(if (state.plan.plan?.planData.isNullOrEmpty()) R.string.plan_generate else R.string.plan_regenerate), fontSize = 13.sp)
                 }
             }
         }
         if (state.planIsStale && !state.plan.isLoading) {
             Surface(shape = RoundedCornerShape(12.dp), color = StatePostponed.copy(alpha = 0.13f), modifier = Modifier.fillMaxWidth().clickable(onClick = onRegenerate)) {
                 Text(
-                    "Danh sách việc đã thay đổi so với lịch — nhấn để xếp lại",
+                    stringResource(R.string.plan_stale),
                     color = StatePostponed,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Medium,
@@ -474,7 +479,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.planContent(
         if (!state.plan.isLoading && state.plan.error == null) {
             item(key = "plan-empty") {
                 Text(
-                    "Chưa có lịch. Chọn việc cho Ngày của tôi rồi nhấn \"Xếp lịch\" — AI sẽ xếp khung giờ theo thời lượng ước tính và thói quen của bạn.",
+                    stringResource(R.string.plan_empty),
                     fontSize = 13.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -547,7 +552,7 @@ private fun PlanSlotRow(
                             .clickable(onClick = onToggle),
                         contentAlignment = Alignment.Center
                     ) {
-                        if (isDone) Icon(Icons.Default.Check, contentDescription = "Mở lại", tint = Color.White, modifier = Modifier.size(14.dp))
+                        if (isDone) Icon(Icons.Default.Check, contentDescription = stringResource(R.string.history_reopen), tint = Color.White, modifier = Modifier.size(14.dp))
                     }
                 }
                 Column(Modifier.weight(1f).padding(start = 4.dp)) {
@@ -560,11 +565,11 @@ private fun PlanSlotRow(
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
-                    Text("${PlanLogic.minutes(slot)} phút", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(str(R.string.duration_minutes, PlanLogic.minutes(slot)), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 if (!isDone) {
                     IconButton(onClick = onFocus) {
-                        Icon(Icons.Default.PlayArrow, contentDescription = "Bắt đầu tập trung", tint = MaterialTheme.colorScheme.tertiary)
+                        Icon(Icons.Default.PlayArrow, contentDescription = stringResource(R.string.plan_start_focus), tint = MaterialTheme.colorScheme.tertiary)
                     }
                 }
             }
@@ -580,24 +585,24 @@ private fun SlotTimeDialog(slot: PlanSlot, onDismiss: () -> Unit, onConfirm: (Lo
     val pickerState = rememberTimePickerState(initialHour = start.hour, initialMinute = start.minute, is24Hour = true)
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Đổi giờ: ${slot.title}", maxLines = 2, overflow = TextOverflow.Ellipsis) },
+        title = { Text(stringResource(R.string.plan_change_time, slot.title), maxLines = 2, overflow = TextOverflow.Ellipsis) },
         text = {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 TimePicker(state = pickerState)
                 Text(
-                    "Các khung phía sau bị trùng sẽ được dời xuống.",
+                    stringResource(R.string.plan_shift_hint),
                     fontSize = 12.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         },
         confirmButton = {
-            TextButton(onClick = { onConfirm(LocalTime.of(pickerState.hour, pickerState.minute)) }) { Text("Lưu") }
+            TextButton(onClick = { onConfirm(LocalTime.of(pickerState.hour, pickerState.minute)) }) { Text(stringResource(R.string.action_save)) }
         },
         dismissButton = {
             Row {
-                TextButton(onClick = onRemove) { Text("Bỏ khỏi lịch", color = PriorityHighColor) }
-                TextButton(onClick = onDismiss) { Text("Hủy") }
+                TextButton(onClick = onRemove) { Text(stringResource(R.string.plan_remove_slot), color = PriorityHighColor) }
+                TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
             }
         }
     )

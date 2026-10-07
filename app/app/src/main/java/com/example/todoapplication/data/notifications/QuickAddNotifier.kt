@@ -15,6 +15,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import com.example.todoapplication.i18n.str
 
 /**
  * Thông báo cố định "Thêm việc nhanh": gõ ngay trên thanh thông báo (RemoteInput, như trả lời tin nhắn) —
@@ -35,22 +36,22 @@ object QuickAddNotifier {
         if (!Notifications.canPost(app)) return
 
         val remoteInput = RemoteInput.Builder(KEY_TEXT)
-            .setLabel("VD: Gọi khách hàng mai 9h !cao")
+            .setLabel(str(R.string.quick_add_notif_hint))
             .build()
         val reply = PendingIntent.getBroadcast(
             app, Notifications.ID_QUICK_ADD,
             Intent(app, QuickAddReceiver::class.java),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
         )
-        val action = NotificationCompat.Action.Builder(R.drawable.ic_shortcut_add, "Thêm việc", reply)
+        val action = NotificationCompat.Action.Builder(R.drawable.ic_shortcut_add, str(R.string.tile_quick_add), reply)
             .addRemoteInput(remoteInput)
             .setAllowGeneratedReplies(false)
             .build()
 
         val notification = NotificationCompat.Builder(app, Notifications.CHANNEL_QUICK_ADD)
             .setSmallIcon(R.drawable.ic_stat_task)
-            .setContentTitle("Thêm việc nhanh")
-            .setContentText(lastAdded?.let { "Đã thêm: $it" } ?: "Gõ việc cần làm ngay tại đây")
+            .setContentTitle(str(R.string.channel_quick_add))
+            .setContentText(lastAdded?.let { str(R.string.task_added, it) } ?: str(R.string.quick_add_notif_text))
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setShowWhen(false)

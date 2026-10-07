@@ -34,6 +34,8 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.ZoneId
+import com.example.todoapplication.R
+import com.example.todoapplication.i18n.str
 
 data class StatsUiState(
     val summary: StatsSummary? = null,
@@ -137,15 +139,15 @@ class StatsViewModel(
                     memoryState.update { it.copy(memories = memories, isExtracting = false) }
                     _events.emit(
                         when {
-                            res.extracted > 0 -> "Đã phân tích ${res.analyzed} hoạt động và rút ra ${res.extracted} thói quen mới."
-                            res.analyzed == 0 -> "Chưa có hoạt động nào trong 30 ngày để phân tích."
-                            else -> "Đã phân tích ${res.analyzed} hoạt động nhưng chưa rút ra thói quen mới."
+                            res.extracted > 0 -> str(R.string.memory_extracted, res.analyzed, res.extracted)
+                            res.analyzed == 0 -> str(R.string.memory_nothing_to_analyze)
+                            else -> str(R.string.memory_nothing_new, res.analyzed)
                         }
                     )
                 },
                 onFailure = { error ->
                     memoryState.update { it.copy(isExtracting = false) }
-                    _events.emit(error.aiFailureMessage("Phân tích thất bại"))
+                    _events.emit(error.aiFailureMessage(str(R.string.memory_analyze_failed)))
                 }
             )
         }
@@ -155,7 +157,7 @@ class StatsViewModel(
         viewModelScope.launch {
             if (aiRepository.deleteMemory(id)) {
                 memoryState.update { state -> state.copy(memories = state.memories.filter { it.id != id }) }
-                _events.emit("Đã xóa trí nhớ")
+                _events.emit(str(R.string.memory_deleted))
             }
         }
     }

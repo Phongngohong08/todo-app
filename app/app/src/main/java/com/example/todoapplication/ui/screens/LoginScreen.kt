@@ -29,6 +29,8 @@ import com.example.todoapplication.ui.components.AppLogo
 import com.example.todoapplication.ui.navigation.Screen
 import com.example.todoapplication.ui.viewmodel.AuthEvent
 import com.example.todoapplication.ui.viewmodel.LoginViewModel
+import androidx.compose.ui.res.stringResource
+import com.example.todoapplication.R
 
 /** [TẦNG UI · MÀN HÌNH] Đăng nhập — nhập email/mật khẩu, gọi LoginViewModel.login(), điều hướng khi thành công. */
 @Composable
@@ -99,7 +101,7 @@ fun LoginScreen(
                         letterSpacing = 1.sp
                     )
                     Text(
-                        "Quản lý công việc, thời gian và thói quen",
+                        stringResource(R.string.login_tagline),
                         color = Color.White.copy(alpha = 0.85f),
                         fontSize = 14.sp,
                         modifier = Modifier.padding(top = 8.dp)
@@ -122,13 +124,13 @@ fun LoginScreen(
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     Text(
-                        "Đăng nhập",
+                        stringResource(R.string.login_sign_in),
                         style = MaterialTheme.typography.headlineMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onBackground
                     )
                     Text(
-                        "Chào mừng quay trở lại! 👋",
+                        stringResource(R.string.login_welcome),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodyMedium
                     )
@@ -140,14 +142,14 @@ fun LoginScreen(
                     AppTextField(
                         value = email,
                         onValueChange = { email = it },   // it = chuỗi mới người dùng vừa gõ
-                        label = "Email",
+                        label = stringResource(R.string.field_email),
                         keyboardType = KeyboardType.Email,
                         modifier = Modifier.fillMaxWidth()
                     )
                     AppTextField(
                         value = password,
                         onValueChange = { password = it },
-                        label = "Mật khẩu",
+                        label = stringResource(R.string.field_password),
                         keyboardType = KeyboardType.Password,
                         visualTransformation = PasswordVisualTransformation(),
                         modifier = Modifier.fillMaxWidth()
@@ -180,7 +182,7 @@ fun LoginScreen(
                             )
                         } else {
                             Text(
-                                "Đăng nhập",
+                                stringResource(R.string.login_sign_in),
                                 color = Color.White,
                                 fontWeight = FontWeight.SemiBold,
                                 fontSize = 16.sp
@@ -194,13 +196,13 @@ fun LoginScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            "Chưa có tài khoản? ",
+                            stringResource(R.string.login_no_account),
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             style = MaterialTheme.typography.bodyMedium
                         )
                         TextButton(onClick = { navController.navigate(Screen.Register.route) }) {
                             Text(
-                                "Đăng ký ngay",
+                                stringResource(R.string.login_register_now),
                                 color = primary,
                                 fontWeight = FontWeight.SemiBold,
                                 style = MaterialTheme.typography.bodyMedium

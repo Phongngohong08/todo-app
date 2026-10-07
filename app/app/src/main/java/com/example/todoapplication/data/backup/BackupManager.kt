@@ -1,5 +1,8 @@
 package com.example.todoapplication.data.backup
 
+import com.example.todoapplication.ui.utils.categoryLabel
+import com.example.todoapplication.ui.utils.priorityLabel
+
 import android.content.Context
 import android.net.Uri
 import androidx.room.withTransaction
@@ -16,6 +19,8 @@ import com.google.gson.GsonBuilder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
+import com.example.todoapplication.R
+import com.example.todoapplication.i18n.str
 
 /** Nội dung tệp sao lưu (JSON). Tăng [version] khi đổi cấu trúc. */
 data class BackupFile(
@@ -65,7 +70,7 @@ class BackupManager(
     suspend fun exportJson(uri: Uri): Int = withContext(Dispatchers.IO) {
         val data = snapshot()
         context.contentResolver.openOutputStream(uri, "wt")?.bufferedWriter()?.use { gson.toJson(data, it) }
-            ?: error("Không mở được tệp để ghi")
+            ?: error(str(R.string.backup_cannot_write))
         data.tasks.size
     }
 
@@ -74,10 +79,10 @@ class BackupManager(
         val tasks = db.taskDao().getAllAlive().sortedBy { it.dueAt ?: Long.MAX_VALUE }
         context.contentResolver.openOutputStream(uri, "wt")?.bufferedWriter(Charsets.UTF_8)?.use { w ->
             w.write("﻿") // BOM để Excel đọc đúng tiếng Việt
-            w.write(BackupCsv.HEADER)
+            w.write(BackupCsv.header())
             w.newLine()
             tasks.forEach { w.write(BackupCsv.row(it)); w.newLine() }
-        } ?: error("Không mở được tệp để ghi")
+        } ?: error(str(R.string.backup_cannot_write))
         tasks.size
     }
 
@@ -92,8 +97,8 @@ class BackupManager(
     suspend fun restore(uri: Uri): RestoreResult = withContext(Dispatchers.IO) {
         val data = context.contentResolver.openInputStream(uri)?.bufferedReader()?.use {
             gson.fromJson(it, BackupFile::class.java)
-        } ?: error("Không đọc được tệp")
-        require(data.app == "TaskFlow AI" && data.version >= 1) { "Không phải tệp sao lưu của TaskFlow" }
+        } ?: error(str(R.string.backup_cannot_read))
+        require(data.app == "TaskFlow AI" && data.version >= 1) { str(R.string.backup_not_taskflow) }
         merge(data)
     }
 
@@ -139,13 +144,13 @@ class BackupManager(
 
 /** Định dạng CSV (tách riêng để unit test). */
 object BackupCsv {
-    const val HEADER = "Tiêu đề,Danh sách,Mục,Ưu tiên,Hạn,Cả ngày,Trạng thái,Nhãn,Thời lượng (phút),Mô tả"
+    fun header(): String = str(R.string.backup_csv_header)
 
     fun row(t: TaskEntity): String = listOf(
-        t.title, t.category, t.section, t.priority,
+        t.title, categoryLabel(t.category), t.section, priorityLabel(t.priority),
         t.dueAt?.let { toIsoString(it) }.orEmpty(),
         if (t.dueAllDay) "x" else "",
-        if (t.status == "COMPLETED") "Xong" else "Chưa xong",
+        str(if (t.status == "COMPLETED") R.string.backup_csv_done else R.string.backup_csv_not_done),
         t.tags.replace(",", " "),
         if (t.estimatedMinutes > 0) t.estimatedMinutes.toString() else "",
         t.description

@@ -29,6 +29,9 @@ import com.example.todoapplication.ui.components.AppLogo
 import com.example.todoapplication.ui.navigation.Screen
 import com.example.todoapplication.ui.viewmodel.AuthEvent
 import com.example.todoapplication.ui.viewmodel.RegisterViewModel
+import androidx.compose.ui.res.stringResource
+import com.example.todoapplication.R
+import com.example.todoapplication.i18n.str
 
 /** [TẦNG UI · MÀN HÌNH] Đăng ký tài khoản — gọi RegisterViewModel.register(), thành công thì về màn đăng nhập. */
 @Composable
@@ -88,13 +91,13 @@ fun RegisterScreen(
                     AppLogo(size = 88.dp)
                     Spacer(Modifier.height(20.dp))
                     Text(
-                        "Bắt đầu hành trình",
+                        stringResource(R.string.register_hero),
                         fontSize = 28.sp,
                         fontWeight = FontWeight.ExtraBold,
                         color = Color.White
                     )
                     Text(
-                        "Quản lý công việc thông minh hơn",
+                        stringResource(R.string.register_hero_sub),
                         color = Color.White.copy(alpha = 0.85f),
                         fontSize = 13.sp,
                         modifier = Modifier.padding(top = 8.dp)
@@ -117,13 +120,13 @@ fun RegisterScreen(
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     Text(
-                        "Tạo tài khoản",
+                        stringResource(R.string.register_create_account),
                         style = MaterialTheme.typography.headlineMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onBackground
                     )
                     Text(
-                        "Điền thông tin để bắt đầu ✨",
+                        stringResource(R.string.register_subtitle),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodyMedium
                     )
@@ -133,20 +136,20 @@ fun RegisterScreen(
                     AppTextField(
                         value = name,
                         onValueChange = { name = it },
-                        label = "Họ và tên",
+                        label = stringResource(R.string.field_full_name),
                         modifier = Modifier.fillMaxWidth()
                     )
                     AppTextField(
                         value = email,
                         onValueChange = { email = it },
-                        label = "Email",
+                        label = stringResource(R.string.field_email),
                         keyboardType = KeyboardType.Email,
                         modifier = Modifier.fillMaxWidth()
                     )
                     AppTextField(
                         value = password,
                         onValueChange = { password = it },
-                        label = "Mật khẩu (ít nhất 6 ký tự)",
+                        label = stringResource(R.string.field_password_min),
                         keyboardType = KeyboardType.Password,
                         visualTransformation = PasswordVisualTransformation(),
                         modifier = Modifier.fillMaxWidth()
@@ -169,7 +172,7 @@ fun RegisterScreen(
                             )
                             .clickable(enabled = !isLoading) {
                                 if (password.isNotBlank() && password.length < 6) {
-                                    Toast.makeText(context, "Mật khẩu phải dài ít nhất 6 ký tự", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, str(R.string.register_password_too_short), Toast.LENGTH_SHORT).show()
                                     return@clickable
                                 }
                                 registerViewModel.register(name, email, password)
@@ -184,7 +187,7 @@ fun RegisterScreen(
                             )
                         } else {
                             Text(
-                                "Tạo tài khoản",
+                                stringResource(R.string.register_create_account),
                                 color = Color.White,
                                 fontWeight = FontWeight.SemiBold,
                                 fontSize = 16.sp
@@ -198,13 +201,13 @@ fun RegisterScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            "Đã có tài khoản? ",
+                            stringResource(R.string.register_have_account),
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             style = MaterialTheme.typography.bodyMedium
                         )
                         TextButton(onClick = { navController.navigate(Screen.Login.route) }) {
                             Text(
-                                "Đăng nhập",
+                                stringResource(R.string.login_sign_in),
                                 color = primary,
                                 fontWeight = FontWeight.SemiBold,
                                 style = MaterialTheme.typography.bodyMedium

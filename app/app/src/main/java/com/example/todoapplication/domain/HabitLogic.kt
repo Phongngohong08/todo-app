@@ -1,10 +1,15 @@
 package com.example.todoapplication.domain
 
+import com.example.todoapplication.ui.utils.weekdayShortLabels
+
 import com.example.todoapplication.domain.model.Habit
 import com.example.todoapplication.domain.model.HabitFrequency
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.temporal.TemporalAdjusters
+import com.example.todoapplication.R
+import com.example.todoapplication.i18n.str
+import com.example.todoapplication.i18n.plural
 
 /**
  * Logic thói quen (thuần Kotlin, có unit test): hôm nay có cần làm không, chuỗi, tiến độ tuần.
@@ -66,8 +71,9 @@ object HabitLogic {
     fun streak(habit: Habit, done: Set<String>, today: LocalDate): Int =
         if (habit.frequency == HabitFrequency.WEEKLY) weeklyStreak(habit, done, today) else dailyStreak(habit, done, today)
 
-    /** Đơn vị của chuỗi để hiển thị. */
-    fun streakUnit(habit: Habit): String = if (habit.frequency == HabitFrequency.WEEKLY) "tuần" else "ngày"
+    /** Chuỗi để hiển thị: "5 ngày" / "2 tuần" (en: "5 days" / "2 weeks"). */
+    fun streakLabel(habit: Habit, streak: Int): String =
+        plural(if (habit.frequency == HabitFrequency.WEEKLY) R.plurals.habit_streak_weeks else R.plurals.habit_streak_days, streak)
 
     private fun dailyStreak(habit: Habit, done: Set<String>, today: LocalDate): Int {
         var day = if (today.toString() in done) today else today.minusDays(1)
@@ -114,10 +120,11 @@ object HabitLogic {
 
     /** Mô tả lịch: "Mỗi ngày", "T2, T4, T6", "3 lần/tuần". */
     fun describe(habit: Habit): String = when (habit.frequency) {
-        HabitFrequency.WEEKDAYS -> habit.weekdays.split(",").filter { it.isNotBlank() }
-            .joinToString(", ") { if (it == "SUN") "CN" else "T" + (CODES.indexOf(it) + 2) }
-        HabitFrequency.WEEKLY -> "${weeklyTarget(habit)} lần/tuần"
-        else -> "Mỗi ngày"
+        HabitFrequency.WEEKDAYS -> weekdayShortLabels().let { labels ->
+            habit.weekdays.split(",").filter { it.isNotBlank() }.joinToString(", ") { labels[it] ?: it }
+        }
+        HabitFrequency.WEEKLY -> plural(R.plurals.habit_times_per_week, weeklyTarget(habit))
+        else -> str(R.string.habit_every_day)
     }
 }
 

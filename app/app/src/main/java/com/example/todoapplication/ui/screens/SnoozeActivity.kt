@@ -1,6 +1,7 @@
 package com.example.todoapplication.ui.screens
 
 import android.content.Context
+import com.example.todoapplication.i18n.AppLanguage
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -19,12 +20,16 @@ import com.example.todoapplication.data.notifications.ReminderScheduler
 import com.example.todoapplication.domain.SnoozeOptions
 import com.example.todoapplication.ui.theme.TodoApplicationTheme
 import java.time.LocalDateTime
+import androidx.compose.ui.res.stringResource
+import com.example.todoapplication.R
 
 /**
  * Hộp chọn "Hoãn…" mở từ nút trên thông báo nhắc việc (Activity trong suốt, chỉ có hộp thoại).
  * Chọn một mốc → đặt lại nhắc việc, tắt thông báo, đóng ngay.
  */
 class SnoozeActivity : ComponentActivity() {
+
+    override fun attachBaseContext(newBase: Context) = super.attachBaseContext(AppLanguage.wrap(newBase))
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -37,7 +42,7 @@ class SnoozeActivity : ComponentActivity() {
                 val options = remember { SnoozeOptions.options(LocalDateTime.now()) }
                 AlertDialog(
                     onDismissRequest = { finish() },
-                    title = { Text("Nhắc lại sau") },
+                    title = { Text(stringResource(R.string.snooze_title)) },
                     text = {
                         Column {
                             if (title.isNotBlank()) {
@@ -57,7 +62,7 @@ class SnoozeActivity : ComponentActivity() {
                         }
                     },
                     confirmButton = {},
-                    dismissButton = { TextButton(onClick = { finish() }) { Text("Hủy") } }
+                    dismissButton = { TextButton(onClick = { finish() }) { Text(stringResource(R.string.action_cancel)) } }
                 )
             }
         }

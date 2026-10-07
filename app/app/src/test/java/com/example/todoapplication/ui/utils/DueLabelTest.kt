@@ -1,5 +1,6 @@
 package com.example.todoapplication.ui.utils
 
+import com.example.todoapplication.TestStrings
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import java.time.LocalDate
@@ -7,6 +8,9 @@ import java.time.ZoneId
 import java.time.ZonedDateTime
 
 class DueLabelTest {
+    // Chuỗi giao diện tiếng Việt từ values-vi/strings.xml (JVM không có Android Resources)
+    init { TestStrings.install() }
+
     private val zone = ZoneId.of("Asia/Ho_Chi_Minh")
     private val today = LocalDate.of(2026, 7, 8) // thứ Tư
 

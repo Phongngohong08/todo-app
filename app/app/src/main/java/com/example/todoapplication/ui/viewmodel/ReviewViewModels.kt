@@ -28,6 +28,9 @@ import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
+import com.example.todoapplication.R
+import com.example.todoapplication.i18n.str
+import com.example.todoapplication.i18n.plural
 
 /*
  * [TẦNG VIEWMODEL] Các màn "nhìn lại": Tổng kết tuần, Lịch sử hoàn thành, Thùng rác.
@@ -113,7 +116,7 @@ class TrashViewModel(
 
     fun restore(task: Task) {
         viewModelScope.launch {
-            if (repo.restore(task.id)) _messages.emit("Đã khôi phục: ${task.title}")
+            if (repo.restore(task.id)) _messages.emit(str(R.string.trash_restored, task.title))
         }
     }
 
@@ -124,8 +127,8 @@ class TrashViewModel(
             if (repo.pendingSyncCount() > 0) runCatching { sync.syncNow() }
             val left = repo.purgeFromTrash(ids)
             _messages.emit(
-                if (left == 0) "Đã xóa vĩnh viễn"
-                else "$left mục sẽ được xóa hẳn sau khi đồng bộ (đang offline)"
+                if (left == 0) str(R.string.trash_deleted_forever)
+                else plural(R.plurals.trash_pending_offline, left)
             )
         }
     }

@@ -17,6 +17,8 @@ import com.example.todoapplication.ui.screens.SnoozeActivity
 import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.ZoneId
+import com.example.todoapplication.i18n.str
+import com.example.todoapplication.i18n.strArray
 
 /**
  * Hiển thị một thông báo nhắc việc khi đến hạn (được WorkManager kích hoạt).
@@ -25,7 +27,7 @@ import java.time.ZoneId
 class ReminderWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
-        val title = inputData.getString(KEY_TITLE) ?: "Công việc đến hạn"
+        val title = inputData.getString(KEY_TITLE) ?: str(R.string.reminder_default_title)
         val taskId = inputData.getString(KEY_TASK_ID) ?: return Result.success()
         val attempt = inputData.getInt(KEY_ATTEMPT, 0)
         // Đã xong / đã xóa (vd trên thiết bị khác, vừa đồng bộ về) → không làm phiền nữa
@@ -77,8 +79,8 @@ class ReminderWorker(context: Context, params: WorkerParameters) : CoroutineWork
          */
         private fun snoozeReplyAction(context: Context, taskId: String, title: String, notifId: Int): NotificationCompat.Action {
             val remoteInput = RemoteInput.Builder(NotificationActionReceiver.KEY_REPLY)
-                .setLabel("Hoãn tới… (vd: mai 9h)")
-                .setChoices(arrayOf("30 phút", "1 giờ", "Tối nay", "Sáng mai"))
+                .setLabel(str(R.string.snooze_reply_label))
+                .setChoices(strArray(R.array.snooze_reply_choices).toTypedArray())
                 .build()
             val intent = Intent(context, NotificationActionReceiver::class.java).apply {
                 action = NotificationActionReceiver.ACTION_SNOOZE_REPLY
@@ -90,7 +92,7 @@ class ReminderWorker(context: Context, params: WorkerParameters) : CoroutineWork
                 context, notifId + 2, intent,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
             )
-            return NotificationCompat.Action.Builder(android.R.drawable.ic_menu_recent_history, "Hoãn", pending)
+            return NotificationCompat.Action.Builder(android.R.drawable.ic_menu_recent_history, str(R.string.task_swipe_postpone), pending)
                 .addRemoteInput(remoteInput)
                 .setAllowGeneratedReplies(false)
                 .build()
@@ -125,18 +127,18 @@ class ReminderWorker(context: Context, params: WorkerParameters) : CoroutineWork
 
             val notification = NotificationCompat.Builder(context, Notifications.CHANNEL_REMINDERS)
                 .setSmallIcon(R.drawable.ic_stat_task)
-                .setContentTitle(if (attempt > 0) "Nhắc lại (lần $attempt): việc chưa xong" else "Đến hạn công việc")
+                .setContentTitle(if (attempt > 0) str(R.string.reminder_nag_title, attempt) else str(R.string.reminder_due_title))
                 .setContentText(title)
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setCategory(NotificationCompat.CATEGORY_REMINDER)
                 .setAutoCancel(true)
                 .setContentIntent(Notifications.openApp(context, notifId, AppIntents.openTask(taskId)))
                 .addAction(
-                    android.R.drawable.ic_menu_save, "Hoàn thành",
+                    android.R.drawable.ic_menu_save, str(R.string.a11y_complete),
                     actionIntent(NotificationActionReceiver.ACTION_COMPLETE, 1)
                 )
                 .addAction(snoozeReplyAction(context, taskId, title, notifId))
-                .addAction(android.R.drawable.ic_menu_more, "Hoãn…", snoozeOptions)
+                .addAction(android.R.drawable.ic_menu_more, str(R.string.reminder_snooze_more), snoozeOptions)
                 .build()
 
             NotificationManagerCompat.from(context).notify(notifId, notification)

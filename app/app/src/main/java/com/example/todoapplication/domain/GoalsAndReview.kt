@@ -5,6 +5,9 @@ import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
+import com.example.todoapplication.R
+import com.example.todoapplication.i18n.str
+import com.example.todoapplication.i18n.plural
 
 /*
  * [TẦNG DOMAIN] Mục tiêu hằng ngày + chuỗi ngày (kiểu Todoist Karma) và Tổng kết tuần (kiểu "Weekly Review" của GTD).
@@ -143,12 +146,12 @@ object WeeklyReviewCalculator {
 
     /** Câu gửi AI Coach để nhờ lập kế hoạch tuần tới dựa trên số liệu tuần này. */
     fun coachPrompt(review: WeeklyReview, categoryLabel: (String) -> String): String = buildString {
-        append("Đây là tổng kết 7 ngày qua của tôi: hoàn thành ${review.completed} việc")
-        review.changePercent?.let { append(" (${if (it >= 0) "+" else ""}$it% so với tuần trước)") }
-        append(", đạt mục tiêu ngày ${review.goalDaysMet}/7 ngày")
-        if (review.completedLate > 0) append(", ${review.completedLate} việc xong trễ hạn")
-        if (review.overdueNow > 0) append(", hiện còn ${review.overdueNow} việc quá hạn")
-        review.mostNeglectedCategory?.let { append(", danh mục còn tồn nhiều nhất là \"${categoryLabel(it)}\"") }
-        append(". Hãy nhận xét ngắn gọn và giúp tôi lập kế hoạch cho tuần tới.")
+        append(plural(R.plurals.coach_review_completed, review.completed))
+        review.changePercent?.let { append(" ").append(str(R.string.coach_review_change, "${if (it >= 0) "+" else ""}$it%")) }
+        append(", ").append(str(R.string.coach_review_goal_days, review.goalDaysMet))
+        if (review.completedLate > 0) append(", ").append(plural(R.plurals.coach_review_late, review.completedLate))
+        if (review.overdueNow > 0) append(", ").append(plural(R.plurals.coach_review_overdue, review.overdueNow))
+        review.mostNeglectedCategory?.let { append(", ").append(str(R.string.coach_review_neglected, categoryLabel(it))) }
+        append(". ").append(str(R.string.coach_review_ask))
     }
 }

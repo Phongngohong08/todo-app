@@ -14,6 +14,8 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.ZoneOffset
+import com.example.todoapplication.R
+import com.example.todoapplication.i18n.str
 
 /** Một sự kiện trong lịch của máy (Google Calendar, Outlook… đã đồng bộ vào máy). */
 data class DeviceEvent(
@@ -67,7 +69,7 @@ object DeviceCalendar {
                 while (c.moveToNext()) {
                     out += DeviceEvent(
                         id = c.getLong(0),
-                        title = c.getString(1).orEmpty().ifBlank { "(Không tiêu đề)" },
+                        title = c.getString(1).orEmpty().ifBlank { str(R.string.calendar_untitled) },
                         begin = c.getLong(2),
                         end = c.getLong(3),
                         allDay = c.getInt(4) == 1,

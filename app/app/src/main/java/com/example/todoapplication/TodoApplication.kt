@@ -1,6 +1,11 @@
 package com.example.todoapplication
 
 import android.app.Application
+import android.content.Context
+import android.content.res.Configuration
+import com.example.todoapplication.i18n.AppLanguage
+import com.example.todoapplication.i18n.AppStrings
+import com.example.todoapplication.widget.WidgetUpdater
 import com.example.todoapplication.data.repository.ThemeController
 import com.example.todoapplication.data.notifications.DigestScheduler
 import com.example.todoapplication.data.notifications.FocusSession
@@ -25,8 +30,33 @@ class TodoApplication : Application() {
     /** Scope sống cùng tiến trình, cho các việc không thuộc về màn hình nào. */
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
+    // Ngôn ngữ riêng của app trên Android 10–12 (Android 13+ hệ thống tự áp cho cả tiến trình)
+    override fun attachBaseContext(base: Context) = super.attachBaseContext(AppLanguage.wrap(base))
+
+    private var lastLocales = ""
+
+    /** Đổi ngôn ngữ (của app hoặc của máy); bỏ qua các thay đổi cấu hình khác (xoay màn, chế độ tối). */
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        val tags = newConfig.locales.toLanguageTags()
+        if (tags != lastLocales) {
+            lastLocales = tags
+            onLanguageChanged()
+        }
+    }
+
+    /** Đặt lại tên kênh thông báo theo ngôn ngữ mới, vẽ lại widget và thông báo "Thêm việc nhanh". */
+    private fun onLanguageChanged() {
+        Notifications.ensureChannels(this)
+        WidgetUpdater.refresh(this)
+        if (ServiceLocator.sessionManager.isLoggedIn()) QuickAddNotifier.refresh(this)
+    }
+
     override fun onCreate() {
         super.onCreate()
+        AppStrings.init(this)
+        lastLocales = resources.configuration.locales.toLanguageTags()
+        AppLanguage.onChanged = ::onLanguageChanged
         ServiceLocator.init(this)
         ThemeController.init(this)
         Notifications.ensureChannels(this)

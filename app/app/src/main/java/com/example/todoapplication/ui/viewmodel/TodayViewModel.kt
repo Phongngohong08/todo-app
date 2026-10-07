@@ -51,6 +51,9 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
+import com.example.todoapplication.R
+import com.example.todoapplication.i18n.str
+import com.example.todoapplication.i18n.plural
 
 /** Lịch trình AI của hôm nay (chỉ có khi online). */
 data class PlanState(
@@ -111,7 +114,7 @@ class TodayViewModel(
     private val sentenceTasks: SentenceTasks? = null
 ) : ViewModel() {
 
-    private val userName = sessionManager.getUserName().ifBlank { "bạn" }
+    private val userName = sessionManager.getUserName().ifBlank { str(R.string.stats_default_name) }
     private val planState = MutableStateFlow(PlanState())
 
     private fun today(): LocalDate = Instant.ofEpochMilli(clock()).atZone(zone()).toLocalDate()
@@ -274,7 +277,7 @@ class TodayViewModel(
         val creator = sentenceTasks ?: return
         viewModelScope.launch {
             val created = creator.create(lines, myDay = today().toString())
-            _events.emit(TodayEvent.Message("Đã thêm ${created.size} việc từ ảnh vào Ngày của tôi 📷"))
+            _events.emit(TodayEvent.Message(plural(R.plurals.today_scan_added, created.size)))
         }
     }
 
@@ -282,7 +285,7 @@ class TodayViewModel(
         viewModelScope.launch {
             result.newCategory?.let { categoryRepository.add(it) }
             val created = repo.create(result.draft, myDay = if (result.addToMyDay) today().toString() else null)
-            _events.emit(TodayEvent.Message("Đã thêm: ${created.title}"))
+            _events.emit(TodayEvent.Message(str(R.string.task_added, created.title)))
         }
     }
 
@@ -297,7 +300,7 @@ class TodayViewModel(
             planState.update { current ->
                 result.fold(
                     onSuccess = { PlanState(plan = it) },
-                    onFailure = { current.copy(isLoading = false, error = it.aiFailureMessage("Không tải được lịch trình (cần mạng).")) }
+                    onFailure = { current.copy(isLoading = false, error = it.aiFailureMessage(str(R.string.plan_load_failed))) }
                 )
             }
         }
@@ -318,10 +321,10 @@ class TodayViewModel(
                 )
             }
             val msg = when {
-                result.isFailure -> result.exceptionOrNull()!!.aiFailureMessage("Tạo lịch trình thất bại. Kiểm tra kết nối rồi thử lại.")
+                result.isFailure -> result.exceptionOrNull()!!.aiFailureMessage(str(R.string.plan_generate_failed))
                 result.getOrNull()?.planData.isNullOrEmpty() ->
-                    "Chưa xếp được khung giờ nào — hãy thêm việc vào Ngày của tôi, hoặc nới giờ kết thúc trong Cài đặt."
-                else -> "Đã xếp lịch cho hôm nay"
+                    str(R.string.plan_no_slots)
+                else -> str(R.string.plan_generated)
             }
             _events.emit(TodayEvent.Message(msg))
         }
@@ -332,7 +335,7 @@ class TodayViewModel(
         val slots = planState.value.plan?.planData ?: return
         val updated = PlanLogic.moveSlot(slots, index, newStart)
         if (updated == null) {
-            viewModelScope.launch { _events.emit(TodayEvent.Message("Không đủ chỗ trong ngày cho giờ đó")) }
+            viewModelScope.launch { _events.emit(TodayEvent.Message(str(R.string.plan_no_room))) }
             return
         }
         savePlan(updated)
@@ -355,7 +358,7 @@ class TodayViewModel(
                     onFailure = { _ -> it.copy(plan = previous, isSaving = false) }
                 )
             }
-            if (result.isFailure) _events.emit(TodayEvent.Message("Không lưu được lịch trình (cần mạng)"))
+            if (result.isFailure) _events.emit(TodayEvent.Message(str(R.string.plan_save_failed)))
         }
     }
 

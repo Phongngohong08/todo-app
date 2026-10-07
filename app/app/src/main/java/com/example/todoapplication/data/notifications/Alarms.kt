@@ -19,6 +19,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import com.example.todoapplication.i18n.str
 
 /**
  * Báo thức cho việc ưu tiên cao (bật trong Thiết lập → Nhắc hẹn). Dùng AlarmManager thay vì WorkManager vì
@@ -107,15 +108,15 @@ object AlarmScheduler {
         )
         val notification = NotificationCompat.Builder(context, Notifications.CHANNEL_ALARM)
             .setSmallIcon(R.drawable.ic_stat_task)
-            .setContentTitle("⏰ Đến hạn việc quan trọng")
+            .setContentTitle(str(R.string.alarm_heading))
             .setContentText(title)
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setFullScreenIntent(fullScreen, true)
             .setContentIntent(fullScreen)
             .setOngoing(true)
-            .addAction(android.R.drawable.ic_menu_save, "Hoàn thành", complete)
-            .addAction(android.R.drawable.ic_menu_recent_history, "Hoãn $SNOOZE_MINUTES phút", snooze)
+            .addAction(android.R.drawable.ic_menu_save, str(R.string.a11y_complete), complete)
+            .addAction(android.R.drawable.ic_menu_recent_history, str(R.string.alarm_snooze, SNOOZE_MINUTES), snooze)
             .build()
             .apply { flags = flags or Notification.FLAG_INSISTENT } // chuông lặp tới khi tắt
         NotificationManagerCompat.from(context).notify(notifId, notification)

@@ -47,6 +47,7 @@ import com.example.todoapplication.ui.navigation.Screen
 import com.example.todoapplication.ui.theme.*
 import com.example.todoapplication.ui.utils.formatTime
 import com.example.todoapplication.ui.utils.weekdayShort
+import com.example.todoapplication.ui.utils.shortDate
 import com.example.todoapplication.ui.viewmodel.CalendarEntry
 import com.example.todoapplication.ui.viewmodel.CalendarEvent
 import com.example.todoapplication.ui.viewmodel.CalendarUiState
@@ -55,11 +56,17 @@ import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.temporal.TemporalAdjusters
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.stringArrayResource
+import androidx.annotation.StringRes
+import com.example.todoapplication.R
+import com.example.todoapplication.i18n.str
+import com.example.todoapplication.i18n.localizedFormatter
 
 /** Ba cách xem lịch. */
-private enum class CalendarMode(val label: String) { MONTH("Tháng"), WEEK("Tuần"), AGENDA("Lịch trình") }
-
-private val DAY_MONTH = DateTimeFormatter.ofPattern("dd/MM")
+private enum class CalendarMode(@StringRes val labelRes: Int) {
+    MONTH(R.string.calendar_mode_month), WEEK(R.string.calendar_mode_week), AGENDA(R.string.calendar_mode_agenda)
+}
 
 /** Số ngày tới hiển thị ở chế độ "Lịch trình". */
 private const val AGENDA_DAYS = 30L
@@ -86,7 +93,7 @@ fun CalendarScreen(
     val deviceEvents by calendarViewModel.deviceEvents.collectAsStateWithLifecycle()
     val calendarPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         calendarViewModel.setShowDeviceCalendar(granted, context)
-        if (!granted) android.widget.Toast.makeText(context, "Cần quyền đọc lịch để hiện sự kiện của máy", android.widget.Toast.LENGTH_SHORT).show()
+        if (!granted) android.widget.Toast.makeText(context, str(R.string.calendar_permission_needed), android.widget.Toast.LENGTH_SHORT).show()
     }
     // Quay lại app (có thể vừa thêm sự kiện ở app Lịch) → đọc lại
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { calendarViewModel.reloadDeviceEvents(context) }
@@ -96,8 +103,8 @@ fun CalendarScreen(
             when (event) {
                 is CalendarEvent.Moved -> {
                     val result = snackbarHostState.showSnackbar(
-                        "Đã dời sang ${weekdayShort(event.date)} ${event.date.format(DAY_MONTH)}",
-                        actionLabel = "Hoàn tác",
+                        str(R.string.calendar_moved_to, shortDate(event.date)),
+                        actionLabel = str(R.string.action_undo),
                         duration = SnackbarDuration.Short
                     )
                     if (result == SnackbarResult.ActionPerformed) calendarViewModel.undoMove(event.previous)
@@ -117,7 +124,7 @@ fun CalendarScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    "Lịch công việc",
+                    stringResource(R.string.calendar_title),
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface,
@@ -131,7 +138,7 @@ fun CalendarScreen(
                         else if (DeviceCalendar.hasPermission(context)) calendarViewModel.setShowDeviceCalendar(true, context)
                         else calendarPermission.launch(android.Manifest.permission.READ_CALENDAR)
                     },
-                    label = { Text("📆 Lịch của máy", fontSize = 12.sp) }
+                    label = { Text(stringResource(R.string.calendar_device_chip), fontSize = 12.sp) }
                 )
             }
             SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
@@ -140,7 +147,7 @@ fun CalendarScreen(
                         selected = mode == m,
                         onClick = { modeName = m.name },
                         shape = SegmentedButtonDefaults.itemShape(index, CalendarMode.entries.size)
-                    ) { Text(m.label, fontSize = 13.sp) }
+                    ) { Text(stringResource(m.labelRes), fontSize = 13.sp) }
                 }
             }
             Spacer(Modifier.height(4.dp))
@@ -174,11 +181,11 @@ private fun ColumnScope.MonthView(state: CalendarUiState, deviceEvents: Map<Stri
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         IconButton(onClick = { shown = month.minusMonths(1).toString() }) {
-            Icon(Icons.Default.KeyboardArrowLeft, contentDescription = "Tháng trước", tint = primary)
+            Icon(Icons.Default.KeyboardArrowLeft, contentDescription = stringResource(R.string.calendar_prev_month), tint = primary)
         }
-        Text("Tháng ${month.monthValue}, ${month.year}", fontWeight = FontWeight.Bold, fontSize = 17.sp, color = MaterialTheme.colorScheme.onSurface)
+        Text(month.format(localizedFormatter(R.string.fmt_month_year)), fontWeight = FontWeight.Bold, fontSize = 17.sp, color = MaterialTheme.colorScheme.onSurface)
         IconButton(onClick = { shown = month.plusMonths(1).toString() }) {
-            Icon(Icons.Default.KeyboardArrowRight, contentDescription = "Tháng sau", tint = primary)
+            Icon(Icons.Default.KeyboardArrowRight, contentDescription = stringResource(R.string.calendar_next_month), tint = primary)
         }
     }
 
@@ -256,7 +263,7 @@ private fun ColumnScope.MonthView(state: CalendarUiState, deviceEvents: Map<Stri
     val selected = state.entriesByDay[selectedDay].orEmpty()
     val selectedEvents = deviceEvents[selectedDay].orEmpty()
     Text(
-        "Công việc ${dayTitle(date, today)}",
+        stringResource(R.string.calendar_tasks_on, dayTitle(date, today)),
         fontWeight = FontWeight.Bold,
         fontSize = 14.sp,
         color = MaterialTheme.colorScheme.onSurface,
@@ -266,7 +273,7 @@ private fun ColumnScope.MonthView(state: CalendarUiState, deviceEvents: Map<Stri
         Box(modifier = Modifier.fillMaxWidth().padding(top = 24.dp), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text("📭", fontSize = 36.sp)
-                Text("Không có công việc nào", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp, modifier = Modifier.padding(top = 6.dp))
+                Text(stringResource(R.string.calendar_no_tasks), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp, modifier = Modifier.padding(top = 6.dp))
             }
         }
     } else {
@@ -286,7 +293,7 @@ private fun ColumnScope.MonthView(state: CalendarUiState, deviceEvents: Map<Stri
 @Composable
 private fun WeekdayHeader() {
     Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
-        listOf("T2", "T3", "T4", "T5", "T6", "T7", "CN").forEach { d ->
+        stringArrayResource(R.array.weekdays_short).forEach { d ->
             Text(d, modifier = Modifier.weight(1f), textAlign = TextAlign.Center, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Medium)
         }
     }
@@ -309,16 +316,16 @@ private fun ColumnScope.WeekView(state: CalendarUiState, deviceEvents: Map<Strin
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         IconButton(onClick = { weekStartKey = weekStart.minusWeeks(1).toString() }) {
-            Icon(Icons.Default.KeyboardArrowLeft, contentDescription = "Tuần trước", tint = primary)
+            Icon(Icons.Default.KeyboardArrowLeft, contentDescription = stringResource(R.string.calendar_prev_week), tint = primary)
         }
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
-                "${weekStart.format(DAY_MONTH)} – ${weekEnd.format(DAY_MONTH)}",
+                localizedFormatter(R.string.fmt_day_month).let { f -> "${weekStart.format(f)} – ${weekEnd.format(f)}" },
                 fontWeight = FontWeight.Bold, fontSize = 17.sp, color = MaterialTheme.colorScheme.onSurface
             )
             if (today !in weekStart..weekEnd) {
                 Text(
-                    "Về tuần này", fontSize = 12.sp, color = primary,
+                    stringResource(R.string.calendar_this_week), fontSize = 12.sp, color = primary,
                     modifier = Modifier.clickable {
                         weekStartKey = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)).toString()
                     }
@@ -326,11 +333,11 @@ private fun ColumnScope.WeekView(state: CalendarUiState, deviceEvents: Map<Strin
             }
         }
         IconButton(onClick = { weekStartKey = weekStart.plusWeeks(1).toString() }) {
-            Icon(Icons.Default.KeyboardArrowRight, contentDescription = "Tuần sau", tint = primary)
+            Icon(Icons.Default.KeyboardArrowRight, contentDescription = stringResource(R.string.calendar_next_week), tint = primary)
         }
     }
     Text(
-        "Nhấn giữ một việc rồi kéo sang ngày khác để dời hạn.",
+        stringResource(R.string.calendar_week_hint),
         fontSize = 12.sp,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.padding(horizontal = 20.dp)
@@ -368,11 +375,11 @@ private fun ColumnScope.WeekView(state: CalendarUiState, deviceEvents: Map<Strin
 private fun dayLoadMinutes(entries: List<CalendarEntry>): Int =
     entries.filter { !it.task.isCompleted }.sumOf { it.task.estimatedMinutes }
 
-/** "45p", "2g", "2g30". */
+/** "45p", "2g", "2g30" (en: "45m", "2h", "2h30"). */
 private fun compactDuration(minutes: Int): String = when {
-    minutes < 60 -> "${minutes}p"
-    minutes % 60 == 0 -> "${minutes / 60}g"
-    else -> "${minutes / 60}g${minutes % 60}"
+    minutes < 60 -> str(R.string.duration_compact_minutes, minutes)
+    minutes % 60 == 0 -> str(R.string.duration_compact_hours, minutes / 60)
+    else -> str(R.string.duration_compact_hours_minutes, minutes / 60, minutes % 60)
 }
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -475,7 +482,7 @@ private fun TaskChip(entry: CalendarEntry, modifier: Modifier, onClick: () -> Un
             Spacer(Modifier.width(5.dp))
             val time = task.dueAt?.takeIf { !task.dueAllDay }?.let { (task.startAt?.let { s -> formatTime(s) + "–" } ?: "") + formatTime(it) }
             Text(
-                listOfNotNull(time, task.title).joinToString(" ") + if (entry.isProjected) " · dự kiến" else "",
+                listOfNotNull(time, task.title).joinToString(" ") + if (entry.isProjected) " · " + stringResource(R.string.calendar_projected_short) else "",
                 fontSize = 12.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -501,7 +508,7 @@ private fun ColumnScope.AgendaView(state: CalendarUiState, deviceEvents: Map<Str
         Box(Modifier.fillMaxWidth().padding(top = 48.dp), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text("🗓️", fontSize = 36.sp)
-                Text("$AGENDA_DAYS ngày tới chưa có việc nào có hạn", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp, modifier = Modifier.padding(top = 6.dp))
+                Text(stringResource(R.string.calendar_agenda_empty, AGENDA_DAYS), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp, modifier = Modifier.padding(top = 6.dp))
             }
         }
         return
@@ -563,7 +570,7 @@ private fun EntryRow(entry: CalendarEntry, onClick: () -> Unit, onToggle: (() ->
                     textDecoration = if (task.isCompleted) TextDecoration.LineThrough else null
                 )
                 val time = task.dueAt?.takeIf { !task.dueAllDay }?.let { (task.startAt?.let { s -> formatTime(s) + "–" } ?: "") + formatTime(it) }
-                val meta = listOfNotNull(time ?: "Cả ngày", if (entry.isProjected) "Lần lặp dự kiến" else null)
+                val meta = listOfNotNull(time ?: stringResource(R.string.all_day), if (entry.isProjected) stringResource(R.string.calendar_projected) else null)
                 Text(meta.joinToString(" · "), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
@@ -571,10 +578,10 @@ private fun EntryRow(entry: CalendarEntry, onClick: () -> Unit, onToggle: (() ->
 }
 
 private fun dayTitle(date: LocalDate, today: LocalDate): String = when (date.toEpochDay() - today.toEpochDay()) {
-    0L -> "hôm nay"
-    1L -> "ngày mai"
-    -1L -> "hôm qua"
-    else -> "${weekdayShort(date)} ${date.format(DAY_MONTH)}"
+    0L -> str(R.string.day_today_lower)
+    1L -> str(R.string.day_tomorrow_lower)
+    -1L -> str(R.string.day_yesterday_lower)
+    else -> shortDate(date, today)
 }
 
 private fun priorityDotColor(entries: List<CalendarEntry>): Color {
@@ -588,7 +595,7 @@ private fun priorityDotColor(entries: List<CalendarEntry>): Color {
 // ─── Sự kiện của lịch máy ────────────────────────────────────────────────────
 
 private fun eventTime(e: DeviceEvent): String =
-    if (e.allDay) "Cả ngày" else formatTime(e.begin) + "–" + formatTime(e.end)
+    if (e.allDay) str(R.string.all_day) else formatTime(e.begin) + "–" + formatTime(e.end)
 
 /** Dòng sự kiện (chỉ xem — sửa trong app Lịch của máy; bấm để mở sự kiện đó). */
 @Composable

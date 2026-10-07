@@ -59,6 +59,10 @@ import com.example.todoapplication.ui.utils.priorityLabel
 import com.example.todoapplication.ui.utils.recurrenceDescription
 import java.time.LocalDate
 import java.time.LocalDateTime
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.pluralStringResource
+import com.example.todoapplication.R
+import com.example.todoapplication.i18n.str
 
 /*
  * [TẦNG UI · COMPONENT] Phần giao diện dùng chung cho màn "Hôm nay" và "Việc làm":
@@ -105,14 +109,14 @@ fun TaskCard(
         modifier = modifier.sharedTaskBounds(task.id)
             // Trợ năng: TalkBack đọc gọn cả thẻ và có menu hành động thay cho vuốt / nút nhỏ
             .semantics(mergeDescendants = true) {
-                stateDescription = if (isCompleted) "Đã xong" else if (isOverdue) "Quá hạn" else "Chưa xong"
+                stateDescription = str(if (isCompleted) R.string.task_state_done else if (isOverdue) R.string.task_state_overdue else R.string.task_state_open)
                 if (!selectionMode) customActions = buildList {
-                    add(CustomAccessibilityAction(if (isCompleted) "Mở lại" else "Hoàn thành") { onToggleComplete(); true })
-                    onPostpone?.let { add(CustomAccessibilityAction("Hoãn sang ngày khác") { it(); true }) }
-                    onToggleMyDay?.let { add(CustomAccessibilityAction(if (isInMyDay) "Bỏ khỏi Ngày của tôi" else "Thêm vào Ngày của tôi") { it(); true }) }
-                    onFocus?.let { add(CustomAccessibilityAction("Bắt đầu tập trung") { it(); true }) }
-                    onDuplicate?.let { add(CustomAccessibilityAction("Nhân bản") { it(); true }) }
-                    add(CustomAccessibilityAction("Xóa") { onDeleteClick(); true })
+                    add(CustomAccessibilityAction(str(if (isCompleted) R.string.history_reopen else R.string.a11y_complete)) { onToggleComplete(); true })
+                    onPostpone?.let { add(CustomAccessibilityAction(str(R.string.a11y_postpone)) { it(); true }) }
+                    onToggleMyDay?.let { add(CustomAccessibilityAction(str(if (isInMyDay) R.string.task_remove_from_my_day else R.string.today_add_to_my_day)) { it(); true }) }
+                    onFocus?.let { add(CustomAccessibilityAction(str(R.string.plan_start_focus)) { it(); true }) }
+                    onDuplicate?.let { add(CustomAccessibilityAction(str(R.string.task_duplicate)) { it(); true }) }
+                    add(CustomAccessibilityAction(str(R.string.action_delete)) { onDeleteClick(); true })
                 }
             }
             .fillMaxWidth()
@@ -135,7 +139,7 @@ fun TaskCard(
                 Text("⚡", fontSize = 11.sp)
                 Spacer(Modifier.width(4.dp))
                 Text(
-                    "Nên làm trước · $recommendation",
+                    stringResource(R.string.task_do_first, recommendation),
                     color = MaterialTheme.colorScheme.primary,
                     fontSize = 10.sp,
                     fontWeight = FontWeight.SemiBold,
@@ -156,7 +160,7 @@ fun TaskCard(
                     modifier = dragHandleModifier.width(28.dp).fillMaxHeight().padding(start = 6.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(Icons.Default.Menu, contentDescription = "Kéo", tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f), modifier = Modifier.size(16.dp))
+                    Icon(Icons.Default.Menu, contentDescription = stringResource(R.string.task_drag), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f), modifier = Modifier.size(16.dp))
                 }
             }
 
@@ -172,7 +176,7 @@ fun TaskCard(
                             .clickable(onClick = onCardClick),
                         contentAlignment = Alignment.Center
                     ) {
-                        if (selected) Icon(Icons.Default.Check, contentDescription = "Đã chọn", tint = Color.White, modifier = Modifier.size(16.dp))
+                        if (selected) Icon(Icons.Default.Check, contentDescription = stringResource(R.string.task_selected), tint = Color.White, modifier = Modifier.size(16.dp))
                     }
                 } else Box(
                     modifier = Modifier
@@ -184,7 +188,7 @@ fun TaskCard(
                     contentAlignment = Alignment.Center
                 ) {
                     if (isCompleted) {
-                        Icon(Icons.Default.Check, contentDescription = "Mở lại", tint = Color.White, modifier = Modifier.size(16.dp))
+                        Icon(Icons.Default.Check, contentDescription = stringResource(R.string.history_reopen), tint = Color.White, modifier = Modifier.size(16.dp))
                     }
                 }
             }
@@ -207,20 +211,20 @@ fun TaskCard(
                     )
                     if (isInMyDay) {
                         Spacer(Modifier.width(4.dp))
-                        Icon(Icons.Outlined.WbSunny, contentDescription = "Trong Ngày của tôi", modifier = Modifier.size(14.dp), tint = PriorityMediumColor)
+                        Icon(Icons.Outlined.WbSunny, contentDescription = stringResource(R.string.task_in_my_day), modifier = Modifier.size(14.dp), tint = PriorityMediumColor)
                     }
                     if (task.hasPendingSync) {
                         Spacer(Modifier.width(4.dp))
                         Icon(
                             Icons.Outlined.CloudUpload,
-                            contentDescription = "Chưa đồng bộ",
+                            contentDescription = stringResource(R.string.task_not_synced),
                             modifier = Modifier.size(14.dp),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                         )
                     }
                     if (task.isRecurring) {
                         Spacer(Modifier.width(4.dp))
-                        Icon(Icons.Default.Refresh, contentDescription = "Lặp lại", modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.tertiary)
+                        Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.templates_repeats), modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.tertiary)
                     }
                     // Đang chọn nhiều: ẩn menu từng thẻ, thao tác nằm ở thanh chọn phía trên
                     if (!selectionMode) {
@@ -262,7 +266,7 @@ fun TaskCard(
                         val color = if (isOverdue) StateOverdue else MaterialTheme.colorScheme.onSurfaceVariant
                         MetaChip(
                             formatDueLabel(due, task.dueAllDay, today) +
-                                (task.startAt?.takeIf { !task.dueAllDay }?.let { " (từ " + formatTime(it) + ")" } ?: ""),
+                                (task.startAt?.takeIf { !task.dueAllDay }?.let { " " + stringResource(R.string.task_from_time, formatTime(it)) } ?: ""),
                             color,
                             if (isOverdue) StateOverdue.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceVariant,
                             icon = Icons.Default.DateRange
@@ -319,7 +323,7 @@ private fun PriorityFlagMenu(accentColor: Color, onSetPriority: (String) -> Unit
     var expanded by remember { mutableStateOf(false) }
     Box {
         IconButton(onClick = { expanded = true }, modifier = Modifier.size(32.dp)) {
-            Icon(Icons.Default.Flag, contentDescription = "Đổi ưu tiên", modifier = Modifier.size(16.dp), tint = accentColor)
+            Icon(Icons.Default.Flag, contentDescription = stringResource(R.string.task_change_priority), modifier = Modifier.size(16.dp), tint = accentColor)
         }
         DropdownMenu(
             expanded = expanded,
@@ -350,7 +354,7 @@ private fun TaskOverflowMenu(
     var expanded by remember { mutableStateOf(false) }
     Box {
         IconButton(onClick = { expanded = true }, modifier = Modifier.size(32.dp)) {
-            Icon(Icons.Default.MoreVert, contentDescription = "Thêm", modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.action_more), modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         DropdownMenu(
             expanded = expanded,
@@ -359,32 +363,32 @@ private fun TaskOverflowMenu(
         ) {
             if (onToggleMyDay != null) {
                 DropdownMenuItem(
-                    text = { Text(if (isInMyDay) "Bỏ khỏi Ngày của tôi" else "Thêm vào Ngày của tôi", color = MaterialTheme.colorScheme.onSurface) },
+                    text = { Text(stringResource(if (isInMyDay) R.string.task_remove_from_my_day else R.string.today_add_to_my_day), color = MaterialTheme.colorScheme.onSurface) },
                     leadingIcon = { Icon(Icons.Outlined.WbSunny, contentDescription = null, tint = PriorityMediumColor) },
                     onClick = { expanded = false; onToggleMyDay() }
                 )
             }
             if (onFocus != null && !isCompleted) {
                 DropdownMenuItem(
-                    text = { Text("Bắt đầu tập trung 25'", color = MaterialTheme.colorScheme.onSurface) },
+                    text = { Text(stringResource(R.string.task_focus_25), color = MaterialTheme.colorScheme.onSurface) },
                     leadingIcon = { Icon(Icons.Default.Timer, contentDescription = null, tint = MaterialTheme.colorScheme.tertiary) },
                     onClick = { expanded = false; onFocus() }
                 )
             }
             DropdownMenuItem(
-                text = { Text("Chỉnh sửa", color = MaterialTheme.colorScheme.onSurface) },
+                text = { Text(stringResource(R.string.task_edit), color = MaterialTheme.colorScheme.onSurface) },
                 leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
                 onClick = { expanded = false; onEdit() }
             )
             if (onDuplicate != null) {
                 DropdownMenuItem(
-                    text = { Text("Nhân bản", color = MaterialTheme.colorScheme.onSurface) },
+                    text = { Text(stringResource(R.string.task_duplicate), color = MaterialTheme.colorScheme.onSurface) },
                     leadingIcon = { Icon(Icons.Default.ContentCopy, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
                     onClick = { expanded = false; onDuplicate() }
                 )
             }
             DropdownMenuItem(
-                text = { Text("Xóa", color = PriorityHighColor) },
+                text = { Text(stringResource(R.string.action_delete), color = PriorityHighColor) },
                 leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null, tint = PriorityHighColor) },
                 onClick = { expanded = false; onDelete() }
             )
@@ -461,7 +465,7 @@ fun SwipeToCompleteBox(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(if (postponing) Icons.Default.Schedule else Icons.Default.Check, contentDescription = null, tint = color)
                     Spacer(Modifier.width(8.dp))
-                    Text(if (postponing) "Hoãn" else "Hoàn thành", color = color, fontWeight = FontWeight.Bold)
+                    Text(stringResource(if (postponing) R.string.task_swipe_postpone else R.string.a11y_complete), color = color, fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -482,20 +486,20 @@ fun PostponeSheet(taskTitle: String, onDismiss: () -> Unit, onPick: (LocalDate) 
         shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
     ) {
         Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 28.dp)) {
-            Text("Hoãn sang…", fontWeight = FontWeight.Bold, fontSize = 17.sp, color = MaterialTheme.colorScheme.onSurface)
+            Text(stringResource(R.string.task_postpone_to), fontWeight = FontWeight.Bold, fontSize = 17.sp, color = MaterialTheme.colorScheme.onSurface)
             Text(taskTitle, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Spacer(Modifier.height(8.dp))
             com.example.todoapplication.domain.Reschedule.postponeOptions(today).forEach { option ->
                 ListItem(
                     headlineContent = { Text(option.label) },
-                    supportingContent = { Text(com.example.todoapplication.ui.utils.weekdayShort(option.date) + " " + option.date.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM"))) },
+                    supportingContent = { Text(com.example.todoapplication.ui.utils.shortDate(option.date)) },
                     leadingContent = { Icon(Icons.Default.Event, contentDescription = null, tint = PriorityMediumColor) },
                     modifier = Modifier.clickable { onPick(option.date) },
                     colors = ListItemDefaults.colors(containerColor = Color.Transparent)
                 )
             }
             ListItem(
-                headlineContent = { Text("Chọn ngày…") },
+                headlineContent = { Text(stringResource(R.string.task_pick_date)) },
                 leadingContent = { Icon(Icons.Default.DateRange, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                 modifier = Modifier.clickable { showPicker = true },
                 colors = ListItemDefaults.colors(containerColor = Color.Transparent)
@@ -514,9 +518,9 @@ fun PostponeSheet(taskTitle: String, onDismiss: () -> Unit, onPick: (LocalDate) 
                     state.selectedDateMillis?.let {
                         onPick(java.time.Instant.ofEpochMilli(it).atZone(java.time.ZoneOffset.UTC).toLocalDate())
                     }
-                }) { Text("Chọn") }
+                }) { Text(stringResource(R.string.action_choose)) }
             },
-            dismissButton = { TextButton(onClick = { showPicker = false }) { Text("Hủy") } }
+            dismissButton = { TextButton(onClick = { showPicker = false }) { Text(stringResource(R.string.action_cancel)) } }
         ) { DatePicker(state = state) }
     }
 }
@@ -542,17 +546,17 @@ fun SelectionBar(
     ) {
         Column(Modifier.padding(horizontal = 8.dp, vertical = 6.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onClose) { Icon(Icons.Default.Close, contentDescription = "Thoát chọn", tint = Color.White) }
-                Text("Đã chọn $count", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp, modifier = Modifier.weight(1f))
-                TextButton(onClick = onSelectAll) { Text("Chọn tất cả", color = Color.White) }
+                IconButton(onClick = onClose) { Icon(Icons.Default.Close, contentDescription = stringResource(R.string.selection_exit), tint = Color.White) }
+                Text(stringResource(R.string.selection_count, count), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp, modifier = Modifier.weight(1f))
+                TextButton(onClick = onSelectAll) { Text(stringResource(R.string.selection_all), color = Color.White) }
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                BulkAction(Icons.Default.Check, "Xong", count > 0, onComplete)
-                BulkAction(Icons.Outlined.WbSunny, "Hôm nay", count > 0, onMyDay)
-                BulkAction(Icons.Default.Schedule, "Dời", count > 0, onPostpone)
+                BulkAction(Icons.Default.Check, stringResource(R.string.action_done), count > 0, onComplete)
+                BulkAction(Icons.Outlined.WbSunny, stringResource(R.string.day_today), count > 0, onMyDay)
+                BulkAction(Icons.Default.Schedule, stringResource(R.string.selection_move), count > 0, onPostpone)
                 Box {
                     var open by remember { mutableStateOf(false) }
-                    BulkAction(Icons.Default.Flag, "Ưu tiên", count > 0) { open = true }
+                    BulkAction(Icons.Default.Flag, stringResource(R.string.sort_priority), count > 0) { open = true }
                     DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
                         listOf("HIGH", "MEDIUM", "LOW").forEach { p ->
                             DropdownMenuItem(
@@ -563,7 +567,7 @@ fun SelectionBar(
                         }
                     }
                 }
-                BulkAction(Icons.Default.Delete, "Xóa", count > 0, onDelete)
+                BulkAction(Icons.Default.Delete, stringResource(R.string.action_delete), count > 0, onDelete)
             }
         }
     }
@@ -588,9 +592,9 @@ private fun BulkAction(icon: androidx.compose.ui.graphics.vector.ImageVector, la
 fun SyncBanner(isOnline: Boolean, pendingSyncCount: Int, modifier: Modifier = Modifier) {
     val (icon, text) = when {
         !isOnline && pendingSyncCount > 0 ->
-            Icons.Outlined.CloudOff to "Đang offline — $pendingSyncCount thay đổi đã lưu trên máy, sẽ tự đồng bộ khi có mạng"
-        !isOnline -> Icons.Outlined.CloudOff to "Đang offline — bạn vẫn thêm/sửa công việc bình thường"
-        pendingSyncCount > 0 -> Icons.Outlined.CloudUpload to "Đang đồng bộ $pendingSyncCount thay đổi…"
+            Icons.Outlined.CloudOff to pluralStringResource(R.plurals.sync_offline_pending, pendingSyncCount, pendingSyncCount)
+        !isOnline -> Icons.Outlined.CloudOff to stringResource(R.string.sync_offline)
+        pendingSyncCount > 0 -> Icons.Outlined.CloudUpload to pluralStringResource(R.plurals.sync_pending, pendingSyncCount, pendingSyncCount)
         else -> return
     }
     Surface(shape = RoundedCornerShape(12.dp), color = StatePostponed.copy(alpha = 0.13f), modifier = modifier.fillMaxWidth()) {
@@ -629,15 +633,15 @@ fun BottomNavigationBar(navController: androidx.navigation.NavController, active
 data class QuickCreateResult(val draft: TaskDraft, val addToMyDay: Boolean, val newCategory: String?)
 
 // Mẫu nhiệm vụ gợi ý (emoji, tiêu đề, danh mục)
-private val QUICK_TEMPLATES = listOf(
-    Triple("💧", "Uống nước", "PERSONAL"),
-    Triple("🦷", "Đánh răng", "PERSONAL"),
-    Triple("😴", "Đi ngủ sớm", "PERSONAL"),
-    Triple("💊", "Uống thuốc", "PERSONAL"),
-    Triple("📚", "Học tập", "WORK"),
-    Triple("🏃", "Tập thể dục", "PERSONAL"),
-    Triple("📧", "Gửi email", "WORK"),
-    Triple("🛒", "Đi mua sắm", "OTHER")
+private fun quickTemplates() = listOf(
+    Triple("💧", str(R.string.tpl_drink_water), "PERSONAL"),
+    Triple("🦷", str(R.string.tpl_brush_teeth), "PERSONAL"),
+    Triple("😴", str(R.string.tpl_sleep_early), "PERSONAL"),
+    Triple("💊", str(R.string.tpl_take_medicine), "PERSONAL"),
+    Triple("📚", str(R.string.tpl_group_study), "WORK"),
+    Triple("🏃", str(R.string.tpl_exercise), "PERSONAL"),
+    Triple("📧", str(R.string.tpl_send_email), "WORK"),
+    Triple("🛒", str(R.string.tpl_shopping), "OTHER")
 )
 
 /**
@@ -646,7 +650,7 @@ private val QUICK_TEMPLATES = listOf(
  * Chip chọn tay vẫn dùng được khi câu không nói gì về ngày / danh mục / ưu tiên.
  */
 /**
- * Nút micro: mở trình nhận giọng nói của hệ thống (tiếng Việt), trả câu nói được về [onResult].
+ * Nút micro: mở trình nhận giọng nói của hệ thống (theo ngôn ngữ của app), trả câu nói được về [onResult].
  * Máy không có dịch vụ nhận giọng nói → báo bằng Toast thay vì crash.
  */
 @Composable
@@ -664,16 +668,16 @@ fun VoiceInputButton(onResult: (String) -> Unit) {
     IconButton(onClick = {
         val intent = android.content.Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL, android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-            putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE, "vi-VN")
-            putExtra(android.speech.RecognizerIntent.EXTRA_PROMPT, "Nói việc cần làm, vd: \"Gọi mẹ 8h tối mai\"")
+            putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE, java.util.Locale.getDefault().toLanguageTag())
+            putExtra(android.speech.RecognizerIntent.EXTRA_PROMPT, str(R.string.voice_prompt))
         }
         try {
             launcher.launch(intent)
         } catch (_: android.content.ActivityNotFoundException) {
-            android.widget.Toast.makeText(context, "Máy chưa có dịch vụ nhận giọng nói", android.widget.Toast.LENGTH_SHORT).show()
+            android.widget.Toast.makeText(context, str(R.string.voice_unavailable), android.widget.Toast.LENGTH_SHORT).show()
         }
     }) {
-        Icon(Icons.Default.Mic, contentDescription = "Nhập bằng giọng nói", tint = MaterialTheme.colorScheme.primary)
+        Icon(Icons.Default.Mic, contentDescription = stringResource(R.string.voice_input), tint = MaterialTheme.colorScheme.primary)
     }
 }
 
@@ -748,7 +752,7 @@ fun QuickCreateSheet(
             OutlinedTextField(
                 value = text,
                 onValueChange = { text = it },
-                placeholder = { Text("VD: Nộp báo cáo mai 3h chiều !cao #Công việc @gấp", color = MaterialTheme.colorScheme.onSurfaceVariant) },
+                placeholder = { Text(stringResource(R.string.quick_add_hint), color = MaterialTheme.colorScheme.onSurfaceVariant) },
                 modifier = Modifier.fillMaxWidth().focusRequester(focus),
                 shape = RoundedCornerShape(16.dp),
                 visualTransformation = transformation,
@@ -774,11 +778,11 @@ fun QuickCreateSheet(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("Hiểu là:", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(stringResource(R.string.quick_add_understood), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     parsed.dueAt?.let { PreviewChip("📅 " + formatDueLabel(it, parsed.allDay)) }
                     parsed.recurrence?.let { PreviewChip("🔁 " + recurrenceDescription(it, parsed.recurrenceDays, 1, "SCHEDULE")) }
                     parsed.priority?.let { PreviewChip("🚩 " + priorityLabel(it)) }
-                    parsed.category?.let { PreviewChip("🏷 " + categoryLabel(it) + if (it !in categories) " (mới)" else "") }
+                    parsed.category?.let { PreviewChip("🏷 " + categoryLabel(it) + if (it !in categories) " " + stringResource(R.string.quick_add_new_list) else "") }
                     parsed.tags.forEach { PreviewChip("@" + it) }
                 }
             } else if (text.isBlank()) {
@@ -786,7 +790,7 @@ fun QuickCreateSheet(
                     modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    QUICK_TEMPLATES.forEach { (emoji, tmplTitle, tmplCat) ->
+                    quickTemplates().forEach { (emoji, tmplTitle, tmplCat) ->
                         Surface(
                             shape = RoundedCornerShape(20.dp),
                             color = MaterialTheme.colorScheme.surfaceVariant,
@@ -810,8 +814,12 @@ fun QuickCreateSheet(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("Hạn", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    listOf(0 to "Hôm nay", 1 to "Ngày mai", 3 to "3 ngày sau", -2 to "Cuối tuần", -1 to "Không").forEach { (value, label) ->
+                    Text(stringResource(R.string.quick_add_due), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    listOf(
+                        0 to stringResource(R.string.day_today), 1 to stringResource(R.string.day_tomorrow),
+                        3 to stringResource(R.string.quick_add_in_3_days), -2 to stringResource(R.string.postpone_weekend),
+                        -1 to stringResource(R.string.quick_add_no_date)
+                    ).forEach { (value, label) ->
                         StatusFilterChip(text = label, selected = datePreset == value, onClick = { datePreset = value })
                     }
                 }
@@ -822,7 +830,7 @@ fun QuickCreateSheet(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("Danh mục", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(stringResource(R.string.quick_add_list), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     categories.forEach { c ->
                         StatusFilterChip(text = categoryLabel(c), selected = category == c, onClick = { category = c })
                     }
@@ -830,7 +838,7 @@ fun QuickCreateSheet(
             }
             if (parsed.priority == null) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text("Ưu tiên", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(stringResource(R.string.sort_priority), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     listOf("LOW", "MEDIUM", "HIGH").forEach { p ->
                         StatusFilterChip(text = priorityLabel(p), selected = priority == p, onClick = { priority = p })
                     }
@@ -839,26 +847,26 @@ fun QuickCreateSheet(
 
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { addToMyDay = !addToMyDay }) {
                 Checkbox(checked = addToMyDay, onCheckedChange = { addToMyDay = it })
-                Text("☀ Thêm vào Ngày của tôi", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface)
+                Text(stringResource(R.string.quick_add_my_day), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface)
             }
 
             Row(verticalAlignment = Alignment.CenterVertically) {
                 TextButton(onClick = onTemplates, contentPadding = PaddingValues(horizontal = 8.dp)) {
                     Icon(Icons.AutoMirrored.Filled.List, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(Modifier.width(4.dp))
-                    Text("Mẫu", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
+                    Text(stringResource(R.string.quick_add_templates), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
                 }
                 if (onScan != null) {
                     TextButton(onClick = onScan, contentPadding = PaddingValues(horizontal = 8.dp)) {
                         Icon(Icons.Default.DocumentScanner, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         Spacer(Modifier.width(4.dp))
-                        Text("Quét", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
+                        Text(stringResource(R.string.quick_add_scan), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
                     }
                 }
                 TextButton(onClick = { onMoreDetails(result()) }, contentPadding = PaddingValues(horizontal = 8.dp)) {
                     Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
                     Spacer(Modifier.width(4.dp))
-                    Text("Chi tiết", color = MaterialTheme.colorScheme.primary, fontSize = 13.sp)
+                    Text(stringResource(R.string.quick_add_details), color = MaterialTheme.colorScheme.primary, fontSize = 13.sp)
                 }
                 Spacer(Modifier.weight(1f))
                 TextButton(onClick = { onAiAdd(text) }, contentPadding = PaddingValues(horizontal = 8.dp)) {
@@ -876,7 +884,7 @@ fun QuickCreateSheet(
                     contentColor = Color.White,
                     shape = CircleShape
                 ) {
-                    Icon(Icons.Default.Check, contentDescription = "Thêm")
+                    Icon(Icons.Default.Check, contentDescription = stringResource(R.string.action_add))
                 }
             }
         }
@@ -953,15 +961,15 @@ fun AiQuickAddSheet(
                 }
                 Spacer(Modifier.width(10.dp))
                 Column {
-                    Text("Phân tích bằng AI", fontWeight = FontWeight.Bold, fontSize = 17.sp, color = MaterialTheme.colorScheme.onSurface)
-                    Text("Dành cho câu dài/phức tạp — cần mạng", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                    Text(stringResource(R.string.ai_parse_title), fontWeight = FontWeight.Bold, fontSize = 17.sp, color = MaterialTheme.colorScheme.onSurface)
+                    Text(stringResource(R.string.ai_parse_subtitle), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
                 }
             }
             OutlinedTextField(
                 value = text,
                 onValueChange = onTextChange,
                 placeholder = {
-                    Text("VD: Họp với sếp thứ 6 lúc 3h chiều, khoảng 1 tiếng", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(stringResource(R.string.ai_parse_hint), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
@@ -997,7 +1005,7 @@ fun AiQuickAddSheet(
                 if (isLoading) {
                     CircularProgressIndicator(color = Color.White, modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
                 } else {
-                    Text("Phân tích bằng AI", fontWeight = FontWeight.SemiBold, color = Color.White, fontSize = 15.sp)
+                    Text(stringResource(R.string.ai_parse_title), fontWeight = FontWeight.SemiBold, color = Color.White, fontSize = 15.sp)
                 }
             }
         }

@@ -1,7 +1,9 @@
 package com.example.todoapplication.widget
 
 import android.appwidget.AppWidgetManager
+import android.content.Context
 import android.content.Intent
+import com.example.todoapplication.i18n.AppLanguage
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -22,12 +24,16 @@ import com.example.todoapplication.di.ServiceLocator
 import com.example.todoapplication.ui.screens.listTitle
 import com.example.todoapplication.ui.theme.TodoApplicationTheme
 import kotlinx.coroutines.launch
+import androidx.compose.ui.res.stringResource
+import com.example.todoapplication.R
 
 /**
  * Màn cấu hình khi đặt (hoặc giữ để sửa) widget danh sách việc: chọn nguồn — Tất cả / Ngày của tôi / một danh sách.
  * Lựa chọn lưu vào state của RIÊNG widget đó, nên đặt được nhiều widget cho nhiều danh sách khác nhau.
  */
 class TasksWidgetConfigActivity : ComponentActivity() {
+
+    override fun attachBaseContext(newBase: Context) = super.attachBaseContext(AppLanguage.wrap(newBase))
 
     private val appWidgetId by lazy {
         intent?.extras?.getInt(AppWidgetManager.EXTRA_APPWIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID)
@@ -47,11 +53,11 @@ class TasksWidgetConfigActivity : ComponentActivity() {
                 val lists by ServiceLocator.categoryRepository.observeLists().collectAsState(initial = emptyList())
                 Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                     Column(Modifier.fillMaxSize().statusBarsPadding().padding(16.dp)) {
-                        Text("Widget hiển thị việc nào?", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                        Text(stringResource(R.string.widget_config_title), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                         Spacer(Modifier.height(12.dp))
                         LazyColumn(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            item { SourceRow("📋 Tất cả việc cần làm") { pick(WidgetSource.ALL) } }
-                            item { SourceRow("☀ Ngày của tôi") { pick(WidgetSource.MY_DAY) } }
+                            item { SourceRow(stringResource(R.string.widget_source_all)) { pick(WidgetSource.ALL) } }
+                            item { SourceRow(stringResource(R.string.today_my_day)) { pick(WidgetSource.MY_DAY) } }
                             items(lists, key = { it.name }) { info ->
                                 SourceRow(listTitle(info).ifBlank { info.name }) { pick(WidgetSource.list(info.name)) }
                             }

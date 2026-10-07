@@ -1,6 +1,8 @@
 package com.example.todoapplication
 
+import android.content.Context
 import android.content.Intent
+import com.example.todoapplication.i18n.AppLanguage
 import android.os.Bundle
 import android.view.animation.DecelerateInterpolator
 import androidx.activity.compose.setContent
@@ -55,12 +57,20 @@ import kotlinx.coroutines.flow.MutableStateFlow
 @OptIn(ExperimentalMaterial3WindowSizeClassApi::class, ExperimentalSharedTransitionApi::class)
 class MainActivity : FragmentActivity() {
 
+    // Ngôn ngữ riêng của app trên Android 10–12 (Android 13+ do LocaleManager của hệ thống lo)
+    override fun attachBaseContext(newBase: Context) = super.attachBaseContext(AppLanguage.wrap(newBase))
+
     /** Yêu cầu điều hướng từ Intent (onCreate / onNewIntent) chờ NavHost xử lý. */
     private val pendingLink = MutableStateFlow<PendingLink?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // Màn khởi động: phải gọi TRƯỚC super.onCreate. Hệ thống hiện nền thương hiệu + icon có animation
         // ngay khi bấm icon app (trước cả khi Compose vẽ khung hình đầu), rồi tự chuyển sang theme chính.
+        // Đổi ngôn ngữ → hệ thống tạo lại Activity nhưng GIỮ các ViewModel, kèm chữ chúng đã tạo bằng ngôn ngữ cũ
+        // (lý do gợi ý, thông báo…). Bỏ hết ViewModel cũ TRƯỚC super.onCreate để mọi màn tính lại; back stack vẫn giữ.
+        val language = resources.configuration.locales.toLanguageTags()
+        if (savedInstanceState != null && savedInstanceState.getString(KEY_LANGUAGE) != language) viewModelStore.clear()
+
         val splashScreen = installSplashScreen()
         super.onCreate(savedInstanceState)
         splashScreen.setOnExitAnimationListener { splash ->
@@ -232,7 +242,13 @@ class MainActivity : FragmentActivity() {
         }
     }
 
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putString(KEY_LANGUAGE, resources.configuration.locales.toLanguageTags())
+    }
+
     private companion object {
         const val SPLASH_EXIT_MS = 300L
+        const val KEY_LANGUAGE = "ui_language"
     }
 }

@@ -8,6 +8,10 @@ import java.time.OffsetDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.*
+import com.example.todoapplication.i18n.localizedFormatter
+import com.example.todoapplication.R
+import com.example.todoapplication.i18n.str
+import com.example.todoapplication.i18n.strArray
 
 /**
  * Parse thời gian backend trả về thành [Date].
@@ -59,7 +63,6 @@ fun parseIsoMillis(dateStr: String?): Long? = parseIso8601(dateStr)?.time
 /** Epoch millis → chuỗi RFC3339 UTC (vd "2026-07-08T02:00:00Z") để gửi lên server. */
 fun toIsoString(millis: Long): String = java.time.Instant.ofEpochMilli(millis).toString()
 
-private val DATE_TIME_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")
 private val TIME_FORMAT = DateTimeFormatter.ofPattern("HH:mm")
 
 /**
@@ -67,17 +70,20 @@ private val TIME_FORMAT = DateTimeFormatter.ofPattern("HH:mm")
  * rồi dùng lại (SimpleDateFormat thì không) — tránh tạo đối tượng mới mỗi lần vẽ lại danh sách.
  */
 fun formatDateTime(millis: Long, zone: ZoneId = ZoneId.systemDefault()): String =
-    DATE_TIME_FORMAT.format(java.time.Instant.ofEpochMilli(millis).atZone(zone))
+    localizedFormatter(R.string.fmt_date_time).format(java.time.Instant.ofEpochMilli(millis).atZone(zone))
 
 fun formatTime(millis: Long, zone: ZoneId = ZoneId.systemDefault()): String =
     TIME_FORMAT.format(java.time.Instant.ofEpochMilli(millis).atZone(zone))
 
-private val DAY_MONTH = DateTimeFormatter.ofPattern("dd/MM")
-private val DAY_MONTH_YEAR = DateTimeFormatter.ofPattern("dd/MM/yyyy")
+/** "T2".."T7", "CN" (vi) / "Mon".."Sun" (en). */
+fun weekdayShort(date: LocalDate): String = strArray(R.array.weekdays_short)[date.dayOfWeek.value - 1]
 
-/** "T2".."T7", "CN". */
-fun weekdayShort(date: LocalDate): String =
-    if (date.dayOfWeek == java.time.DayOfWeek.SUNDAY) "CN" else "T${date.dayOfWeek.value + 1}"
+/** "T6 10/07" (vi) / "Fri, Jul 10" (en); kèm năm nếu khác năm của [today]. */
+fun shortDate(date: LocalDate, today: LocalDate = LocalDate.now()): String =
+    str(
+        R.string.fmt_weekday_date, weekdayShort(date),
+        localizedFormatter(if (date.year == today.year) R.string.fmt_day_month else R.string.fmt_day_month_year).format(date)
+    )
 
 /**
  * Nhãn hạn chót gọn, dễ đọc: "Hôm nay", "Ngày mai 15:00", "Hôm qua", "T6 10/07", "T6 10/07/2027 09:00".
@@ -92,21 +98,21 @@ fun formatDueLabel(
     val dt = java.time.Instant.ofEpochMilli(dueAt).atZone(zone)
     val date = dt.toLocalDate()
     val day = when (date.toEpochDay() - today.toEpochDay()) {
-        0L -> "Hôm nay"
-        1L -> "Ngày mai"
-        -1L -> "Hôm qua"
-        else -> "${weekdayShort(date)} " + (if (date.year == today.year) DAY_MONTH else DAY_MONTH_YEAR).format(date)
+        0L -> str(R.string.day_today)
+        1L -> str(R.string.day_tomorrow)
+        -1L -> str(R.string.day_yesterday)
+        else -> shortDate(date, today)
     }
     return if (allDay) day else "$day ${TIME_FORMAT.format(dt)}"
 }
 
-/** Thời lượng ước tính: "25 phút", "1 giờ", "1 giờ 30 phút". */
+/** Thời lượng ước tính: "25 phút", "1 giờ", "1 giờ 30 phút" (en: "25 min", "1 h", "1 h 30 min"). */
 fun formatDuration(minutes: Int): String {
     val h = minutes / 60
     val m = minutes % 60
     return when {
-        h == 0 -> "$m phút"
-        m == 0 -> "$h giờ"
-        else -> "$h giờ $m phút"
+        h == 0 -> str(R.string.duration_minutes, m)
+        m == 0 -> str(R.string.duration_hours, h)
+        else -> str(R.string.duration_hours_minutes, h, m)
     }
 }

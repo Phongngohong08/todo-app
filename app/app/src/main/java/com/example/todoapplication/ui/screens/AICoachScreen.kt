@@ -31,7 +31,9 @@ import androidx.navigation.NavController
 import com.example.todoapplication.ui.theme.*
 import com.example.todoapplication.ui.viewmodel.AICoachViewModel
 import com.example.todoapplication.ui.viewmodel.ChatUIModel
-import com.example.todoapplication.ui.viewmodel.SUGGESTED_PROMPTS
+import com.example.todoapplication.ui.viewmodel.suggestedPrompts
+import androidx.compose.ui.res.stringResource
+import com.example.todoapplication.R
 
 /** [TẦNG UI · MÀN HÌNH] Chat với AI Coach — vẽ danh sách bong bóng tin nhắn từ AICoachViewModel. */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -81,7 +83,7 @@ fun AICoachScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Quay lại", tint = MaterialTheme.colorScheme.onSurface)
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.action_back), tint = MaterialTheme.colorScheme.onSurface)
                     }
                     // AI avatar
                     Box(
@@ -98,7 +100,7 @@ fun AICoachScreen(
                     Spacer(Modifier.width(12.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            "AI Coach cá nhân",
+                            stringResource(R.string.coach_title),
                             fontWeight = FontWeight.Bold,
                             fontSize = 16.sp,
                             color = MaterialTheme.colorScheme.onSurface
@@ -111,7 +113,7 @@ fun AICoachScreen(
                             )
                             Spacer(Modifier.width(5.dp))
                             Text(
-                                "Đang hoạt động",
+                                stringResource(R.string.coach_online),
                                 fontSize = 11.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -132,7 +134,7 @@ fun AICoachScreen(
                             .padding(horizontal = 12.dp, vertical = 6.dp),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        SUGGESTED_PROMPTS.forEach { prompt ->
+                        suggestedPrompts().forEach { prompt ->
                             Surface(
                                 shape = RoundedCornerShape(20.dp),
                                 color = MaterialTheme.colorScheme.primaryContainer,
@@ -167,7 +169,7 @@ fun AICoachScreen(
                             onValueChange = { messageText = it },
                             placeholder = {
                                 Text(
-                                    "Nhắn tin cho AI Coach...",
+                                    stringResource(R.string.coach_input_hint),
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     fontSize = 14.sp
                                 )
@@ -204,7 +206,7 @@ fun AICoachScreen(
                         ) {
                             Icon(
                                 Icons.AutoMirrored.Filled.Send,
-                                contentDescription = "Gửi",
+                                contentDescription = stringResource(R.string.coach_send),
                                 tint = if (canSend) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(20.dp)
                             )
@@ -267,7 +269,7 @@ fun AICoachScreen(
                                 )
                                 Spacer(Modifier.width(8.dp))
                                 Text(
-                                    "Đang suy nghĩ...",
+                                    stringResource(R.string.coach_thinking),
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     fontSize = 13.sp
                                 )
@@ -345,16 +347,16 @@ private fun CoachActionsCard(
         modifier = Modifier.fillMaxWidth().padding(start = 40.dp)
     ) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Đề xuất của AI", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+            Text(stringResource(R.string.coach_suggestions), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
             actions.forEach { action ->
                 val done = action.label in applied
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(action.label, modifier = Modifier.weight(1f), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface)
                     if (done) {
-                        Text("✓ Đã áp dụng", fontSize = 12.sp, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
+                        Text(stringResource(R.string.coach_applied), fontSize = 12.sp, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
                     } else {
                         FilledTonalButton(onClick = { onApply(action) }, contentPadding = PaddingValues(horizontal = 12.dp)) {
-                            Text("Áp dụng", fontSize = 12.sp)
+                            Text(stringResource(R.string.coach_apply), fontSize = 12.sp)
                         }
                     }
                 }

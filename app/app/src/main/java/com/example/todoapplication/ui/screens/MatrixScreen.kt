@@ -39,6 +39,9 @@ import com.example.todoapplication.ui.theme.*
 import com.example.todoapplication.ui.utils.formatDueLabel
 import com.example.todoapplication.ui.viewmodel.MatrixEvent
 import com.example.todoapplication.ui.viewmodel.MatrixViewModel
+import androidx.compose.ui.res.stringResource
+import com.example.todoapplication.R
+import com.example.todoapplication.i18n.str
 
 /**
  * [TẦNG UI · MÀN HÌNH] Ma trận Eisenhower: 4 ô Quan trọng × Gấp. Nhấn giữ một việc rồi kéo sang ô khác —
@@ -59,7 +62,7 @@ fun MatrixScreen(
             when (event) {
                 is MatrixEvent.Moved -> {
                     val result = snackbarHostState.showSnackbar(
-                        "Đã chuyển sang \"${event.target.title}\"", actionLabel = "Hoàn tác", duration = SnackbarDuration.Short
+                        str(R.string.matrix_moved, event.target.title), actionLabel = str(R.string.action_undo), duration = SnackbarDuration.Short
                     )
                     if (result == SnackbarResult.ActionPerformed) matrixViewModel.undo(event.task)
                 }
@@ -71,10 +74,10 @@ fun MatrixScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
-                title = { Text("Ma trận ưu tiên", fontWeight = FontWeight.Bold) },
+                title = { Text(stringResource(R.string.matrix_title), fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Quay lại")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.action_back))
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
@@ -89,7 +92,7 @@ fun MatrixScreen(
         ) {
             Column(Modifier.fillMaxSize().padding(horizontal = 12.dp)) {
                 Text(
-                    "Nhấn giữ một việc rồi kéo sang ô khác. Quan trọng = ưu tiên Cao · Gấp = hạn tới hết ngày mai.",
+                    stringResource(R.string.matrix_hint),
                     fontSize = 12.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp)
@@ -154,7 +157,7 @@ private fun QuadrantCell(
             Spacer(Modifier.height(6.dp))
             if (tasks.isEmpty()) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("Trống", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
+                    Text(stringResource(R.string.matrix_empty), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
                 }
             } else {
                 Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -193,9 +196,9 @@ private fun MatrixTaskRow(
         modifier = modifier.fillMaxWidth().clickable(onClick = onOpen)
             // Trợ năng: chuyển ô bằng menu hành động thay cho kéo thả
             .semantics(mergeDescendants = true) {
-                customActions = listOf(CustomAccessibilityAction("Hoàn thành") { onComplete(); true }) +
+                customActions = listOf(CustomAccessibilityAction(str(R.string.a11y_complete)) { onComplete(); true }) +
                     Eisenhower.Quadrant.entries.filter { it != current }.map { q ->
-                        CustomAccessibilityAction("Chuyển sang " + q.title) { onMoveTo(q); true }
+                        CustomAccessibilityAction(str(R.string.a11y_move_to, q.title)) { onMoveTo(q); true }
                     }
             }
     ) {

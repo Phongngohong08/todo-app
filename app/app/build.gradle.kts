@@ -43,6 +43,11 @@ android {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
+    // Song ngữ (values/ tiếng Anh, values-vi/ tiếng Việt) + đổi ngôn ngữ ngay trong app: App Bundle phải giữ
+    // đủ mọi ngôn ngữ trong APK cài về, không tách theo ngôn ngữ của máy (nếu không, chọn ngôn ngữ khác sẽ thiếu chuỗi)
+    bundle {
+        language { enableSplit = false }
+    }
     buildFeatures {
         compose = true
         buildConfig = true

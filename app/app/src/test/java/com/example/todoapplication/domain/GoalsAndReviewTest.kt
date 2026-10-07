@@ -1,5 +1,6 @@
 package com.example.todoapplication.domain
 
+import com.example.todoapplication.TestStrings
 import com.example.todoapplication.domain.model.Task
 import com.example.todoapplication.domain.model.TaskStatus
 import org.junit.Assert.assertEquals
@@ -12,6 +13,9 @@ import java.time.ZoneId
 import java.time.ZonedDateTime
 
 class GoalsAndReviewTest {
+    // Chuỗi giao diện tiếng Việt từ values-vi/strings.xml (JVM không có Android Resources)
+    init { TestStrings.install() }
+
 
     private val vn = ZoneId.of("Asia/Ho_Chi_Minh")
     /** Thứ Tư 08/07/2026. */

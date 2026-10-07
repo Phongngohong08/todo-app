@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Ngôn ngữ app hỗ trợ: Android 13+ hiện trong Cài đặt › Ứng dụng › TaskFlow AI › Ngôn ngữ (per-app language). -->
+<locale-config xmlns:android="http://schemas.android.com/apk/res/android">
+    <locale android:name="en" />
+    <locale android:name="vi" />
+</locale-config>

@@ -20,6 +20,8 @@ import java.time.LocalTime
 import java.time.ZoneId
 import java.time.temporal.TemporalAdjusters
 import java.util.concurrent.TimeUnit
+import com.example.todoapplication.i18n.str
+import com.example.todoapplication.i18n.plural
 
 /**
  * Thông báo định kỳ, đọc thẳng từ Room nên không cần mạng:
@@ -55,13 +57,13 @@ class DigestWorker(context: Context, params: WorkerParameters) : CoroutineWorker
         if (overdue == 0 && dueToday == 0 && myDay == 0) return // ngày trống → không làm phiền
 
         val parts = buildList {
-            if (dueToday > 0) add("$dueToday việc đến hạn")
-            if (overdue > 0) add("$overdue việc quá hạn")
-            if (myDay > 0) add("$myDay việc trong Ngày của tôi")
+            if (dueToday > 0) add(plural(R.plurals.digest_due_today, dueToday))
+            if (overdue > 0) add(plural(R.plurals.digest_overdue, overdue))
+            if (myDay > 0) add(plural(R.plurals.digest_my_day, myDay))
         }
         notify(
             ctx, Notifications.ID_DIGEST,
-            title = "Chào buổi sáng! Hôm nay của bạn",
+            title = str(R.string.digest_title),
             text = parts.joinToString(" · "),
             open = AppIntents.OPEN_TODAY
         )
@@ -70,8 +72,8 @@ class DigestWorker(context: Context, params: WorkerParameters) : CoroutineWorker
     private fun showWeeklyReview(ctx: Context) {
         notify(
             ctx, Notifications.ID_WEEKLY_REVIEW,
-            title = "Tổng kết tuần đã sẵn sàng",
-            text = "Xem tuần qua bạn làm được gì và lập kế hoạch cho tuần tới",
+            title = str(R.string.weekly_review_ready),
+            text = str(R.string.weekly_review_ready_text),
             open = AppIntents.OPEN_REVIEW
         )
     }

@@ -33,6 +33,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import java.util.UUID
 import kotlin.coroutines.resume
+import com.example.todoapplication.i18n.str
 
 /*
  * [TẦNG DATA · VỊ TRÍ] Nhắc việc theo địa điểm ("khi đến công ty", "khi rời nhà") bằng Geofencing API của
@@ -171,7 +172,7 @@ class GeofenceReceiver : BroadcastReceiver() {
                 ServiceLocator.database.placeDao().activeReminders()
                     .filter { it.trigger == trigger && (it.placeId + "|" + it.trigger) in ids }
                     .forEach { r ->
-                        notify(app, r.taskId, r.title, (if (trigger == LocationTrigger.ENTER) "📍 Đã đến " else "📍 Vừa rời ") + r.placeName)
+                        notify(app, r.taskId, r.title, str(if (trigger == LocationTrigger.ENTER) R.string.location_arrived else R.string.location_left, r.placeName))
                     }
             } finally {
                 pending.finish()

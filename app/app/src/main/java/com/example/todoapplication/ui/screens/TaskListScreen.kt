@@ -53,6 +53,11 @@ import sh.calvin.reorderable.rememberReorderableLazyListState
 import java.text.SimpleDateFormat
 import java.time.LocalDate
 import java.util.*
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.pluralStringResource
+import com.example.todoapplication.R
+import com.example.todoapplication.i18n.str
+import com.example.todoapplication.i18n.plural
 
 /**
  * [TẦNG UI · MÀN HÌNH] Tab "Việc làm": mọi công việc + tìm kiếm/lọc, tạo nhanh, kéo-thả, kéo-để-làm-mới.
@@ -69,7 +74,7 @@ fun TaskListScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     // Lắc máy khi đang có thanh "Hoàn tác" → hoàn tác luôn (gia tốc kế)
     com.example.todoapplication.ui.components.ShakeEffect {
-        snackbarHostState.currentSnackbarData?.takeIf { it.visuals.actionLabel == "Hoàn tác" }?.performAction()
+        snackbarHostState.currentSnackbarData?.takeIf { it.visuals.actionLabel == str(R.string.action_undo) }?.performAction()
     }
     val scope = rememberCoroutineScope()
     val askNotificationPermission = rememberNotificationPermissionRequest()
@@ -111,28 +116,28 @@ fun TaskListScreen(
             when (event) {
                 is TaskListEvent.Message -> scope.launch { snackbarHostState.showSnackbar(event.text) }
                 is TaskListEvent.Completed -> scope.launch {
-                    val text = if (event.spawnedNext) "Đã hoàn thành · đã tạo lần lặp kế tiếp" else "Đã hoàn thành: ${event.title}"
-                    val result = snackbarHostState.showSnackbar(text, actionLabel = "Hoàn tác", duration = SnackbarDuration.Short)
+                    val text = if (event.spawnedNext) str(R.string.tasks_completed_spawned) else str(R.string.today_completed, event.title)
+                    val result = snackbarHostState.showSnackbar(text, actionLabel = str(R.string.action_undo), duration = SnackbarDuration.Short)
                     if (result == SnackbarResult.ActionPerformed) taskListViewModel.reopenTask(event.taskId)
                 }
                 is TaskListEvent.Deleted -> scope.launch {
-                    val result = snackbarHostState.showSnackbar("Đã chuyển vào Thùng rác: ${event.title}", actionLabel = "Hoàn tác", duration = SnackbarDuration.Long)
+                    val result = snackbarHostState.showSnackbar(str(R.string.tasks_moved_to_trash, event.title), actionLabel = str(R.string.action_undo), duration = SnackbarDuration.Long)
                     if (result == SnackbarResult.ActionPerformed) taskListViewModel.undoDelete(event.taskId)
                 }
                 is TaskListEvent.Rescheduled -> scope.launch {
-                    val result = snackbarHostState.showSnackbar("Đã dời ${event.count} việc", actionLabel = "Hoàn tác", duration = SnackbarDuration.Long)
+                    val result = snackbarHostState.showSnackbar(plural(R.plurals.tasks_rescheduled, event.count), actionLabel = str(R.string.action_undo), duration = SnackbarDuration.Long)
                     if (result == SnackbarResult.ActionPerformed) taskListViewModel.undoReschedule(event.previous)
                 }
                 is TaskListEvent.BulkCompleted -> scope.launch {
-                    val result = snackbarHostState.showSnackbar("Đã hoàn thành ${event.ids.size} việc", actionLabel = "Hoàn tác", duration = SnackbarDuration.Long)
+                    val result = snackbarHostState.showSnackbar(plural(R.plurals.tasks_bulk_completed, event.ids.size), actionLabel = str(R.string.action_undo), duration = SnackbarDuration.Long)
                     if (result == SnackbarResult.ActionPerformed) taskListViewModel.undoBulkComplete(event.ids)
                 }
                 is TaskListEvent.BulkDeleted -> scope.launch {
-                    val result = snackbarHostState.showSnackbar("Đã chuyển ${event.ids.size} việc vào Thùng rác", actionLabel = "Hoàn tác", duration = SnackbarDuration.Long)
+                    val result = snackbarHostState.showSnackbar(plural(R.plurals.tasks_bulk_trashed, event.ids.size), actionLabel = str(R.string.action_undo), duration = SnackbarDuration.Long)
                     if (result == SnackbarResult.ActionPerformed) taskListViewModel.undoBulkDelete(event.ids)
                 }
                 is TaskListEvent.Duplicated -> scope.launch {
-                    val result = snackbarHostState.showSnackbar("Đã nhân bản: ${event.title}", actionLabel = "Mở", duration = SnackbarDuration.Short)
+                    val result = snackbarHostState.showSnackbar(str(R.string.today_duplicated, event.title), actionLabel = str(R.string.action_open), duration = SnackbarDuration.Short)
                     if (result == SnackbarResult.ActionPerformed) navController.navigate(Screen.TaskDetail.createRoute(event.taskId))
                 }
                 is TaskListEvent.QuickAddReady -> {
@@ -172,7 +177,7 @@ fun TaskListScreen(
                     contentColor = MaterialTheme.colorScheme.onPrimary,
                     shape = CircleShape
                 ) {
-                    Icon(Icons.Default.Add, contentDescription = "Thêm công việc")
+                    Icon(Icons.Default.Add, contentDescription = stringResource(R.string.tasks_add))
                 }
             }
         },
@@ -254,11 +259,11 @@ fun TaskListScreen(
                                 if (state.hasFilter) {
                                     AssistChip(
                                         onClick = { showSaveFilter = true },
-                                        label = { Text("💾 Lưu bộ lọc") }
+                                        label = { Text(stringResource(R.string.filter_save_chip)) }
                                     )
                                     AssistChip(
                                         onClick = { taskListViewModel.clearFilters(); searchText = "" },
-                                        label = { Text("✕ Bỏ lọc") }
+                                        label = { Text(stringResource(R.string.filter_clear_chip)) }
                                     )
                                 }
                             }
@@ -283,7 +288,7 @@ fun TaskListScreen(
                         ) {
                             (listOf(ALL_CATEGORIES) + state.categories).forEach { filterName ->
                                 StatusFilterChip(
-                                    text = if (filterName == ALL_CATEGORIES) "Mọi danh sách" else categoryLabel(filterName),
+                                    text = if (filterName == ALL_CATEGORIES) stringResource(R.string.filter_all_lists) else categoryLabel(filterName),
                                     selected = state.selectedCategory == filterName,
                                     onClick = { taskListViewModel.setCategory(filterName) }
                                 )
@@ -295,7 +300,7 @@ fun TaskListScreen(
                                 modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                StatusFilterChip(text = "Mọi nhãn", selected = state.selectedTag == null, onClick = { taskListViewModel.setTag(null) })
+                                StatusFilterChip(text = stringResource(R.string.filter_all_tags), selected = state.selectedTag == null, onClick = { taskListViewModel.setTag(null) })
                                 (listOfNotNull(state.selectedTag) + state.availableTags).distinct().forEach { t ->
                                     StatusFilterChip(text = "@$t", selected = state.selectedTag == t, onClick = {
                                         taskListViewModel.setTag(if (state.selectedTag == t) null else t)
@@ -318,9 +323,8 @@ fun TaskListScreen(
                         Box(modifier = Modifier.fillMaxWidth().padding(top = 40.dp), contentAlignment = Alignment.Center) {
                             EmptyState(
                                 emoji = "🗒️",
-                                title = if (state.hasFilter) "Không có công việc phù hợp" else "Chưa có công việc nào",
-                                subtitle = if (state.hasFilter) "Thử bộ lọc hoặc từ khóa khác nhé."
-                                else "Nhấn + rồi gõ tự nhiên, VD: \"Nộp báo cáo mai 3h chiều !cao\""
+                                title = stringResource(if (state.hasFilter) R.string.tasks_empty_filtered else R.string.tasks_empty),
+                                subtitle = stringResource(if (state.hasFilter) R.string.tasks_empty_filtered_sub else R.string.tasks_empty_sub)
                             )
                         }
                     }
@@ -331,10 +335,10 @@ fun TaskListScreen(
                                 modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 2.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text("☰  Giữ và kéo để sắp xếp thứ tự", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                                Text(stringResource(R.string.tasks_sort_hint), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
                                 Spacer(Modifier.weight(1f))
                                 TextButton(onClick = { sortMode = false; taskListViewModel.endSortMode() }) {
-                                    Text("Xong", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                                    Text(stringResource(R.string.action_done), color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                                 }
                             }
                         }
@@ -368,14 +372,14 @@ fun TaskListScreen(
                     else -> {
                         val onPostpone: (Task) -> Unit = { postponeTarget = it }
                         taskSection(
-                            "Quá hạn", state.sections.overdue, state, selectedIds, navController, openTask, taskListViewModel, onPostpone,
+                            str(R.string.filter_overdue), state.sections.overdue, state, selectedIds, navController, openTask, taskListViewModel, onPostpone,
                             titleColor = StateOverdue,
                             action = if (selectionMode) null else ({ RescheduleMenu(onPick = taskListViewModel::rescheduleOverdue) })
                         )
-                        taskSection("Hôm nay", state.sections.today, state, selectedIds, navController, openTask, taskListViewModel, onPostpone)
-                        taskSection("Sắp tới", state.sections.upcoming, state, selectedIds, navController, openTask, taskListViewModel, onPostpone)
-                        taskSection("Chưa có hạn", state.sections.noDate, state, selectedIds, navController, openTask, taskListViewModel, onPostpone)
-                        taskSection("Đã xong hôm nay", state.sections.completedToday, state, selectedIds, navController, openTask, taskListViewModel, onPostpone, swipeable = false)
+                        taskSection(str(R.string.day_today), state.sections.today, state, selectedIds, navController, openTask, taskListViewModel, onPostpone)
+                        taskSection(str(R.string.tasks_upcoming), state.sections.upcoming, state, selectedIds, navController, openTask, taskListViewModel, onPostpone)
+                        taskSection(str(R.string.filter_no_date), state.sections.noDate, state, selectedIds, navController, openTask, taskListViewModel, onPostpone)
+                        taskSection(str(R.string.tasks_done_today), state.sections.completedToday, state, selectedIds, navController, openTask, taskListViewModel, onPostpone, swipeable = false)
                     }
                 }
             }
@@ -386,7 +390,7 @@ fun TaskListScreen(
                 val paneId = paneTaskId
                 if (paneId == null) {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text("Chọn một việc để xem chi tiết", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(stringResource(R.string.tasks_pick_one), color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 } else key(paneId) {
                     TaskDetailScreen(
@@ -416,7 +420,7 @@ fun TaskListScreen(
     }
 
     if (showSaveFilter) {
-        TextPromptDialog("Lưu bộ lọc", "VD: Việc nhà gấp", "", onDismiss = { showSaveFilter = false }) {
+        TextPromptDialog(stringResource(R.string.filter_save), stringResource(R.string.filter_save_hint), "", onDismiss = { showSaveFilter = false }) {
             taskListViewModel.saveCurrentFilter(it)
             showSaveFilter = false
         }
@@ -424,13 +428,13 @@ fun TaskListScreen(
     deletingFilter?.let { name ->
         AlertDialog(
             onDismissRequest = { deletingFilter = null },
-            title = { Text("Xóa bộ lọc \"$name\"?") },
+            title = { Text(stringResource(R.string.filter_delete_title, name)) },
             confirmButton = {
                 TextButton(onClick = { taskListViewModel.deleteSavedFilter(name); deletingFilter = null }) {
-                    Text("Xóa", color = MaterialTheme.colorScheme.error)
+                    Text(stringResource(R.string.action_delete), color = MaterialTheme.colorScheme.error)
                 }
             },
-            dismissButton = { TextButton(onClick = { deletingFilter = null }) { Text("Hủy") } }
+            dismissButton = { TextButton(onClick = { deletingFilter = null }) { Text(stringResource(R.string.action_cancel)) } }
         )
     }
 
@@ -447,7 +451,7 @@ fun TaskListScreen(
 
     if (showBulkPostpone) {
         PostponeSheet(
-            taskTitle = "${selectedIds.size} việc đã chọn",
+            taskTitle = pluralStringResource(R.plurals.tasks_selected, selectedIds.size, selectedIds.size),
             onDismiss = { showBulkPostpone = false },
             onPick = { date ->
                 taskListViewModel.postponeSelected(date)
@@ -462,7 +466,7 @@ fun TaskListScreen(
             onDismiss = { showQuickCreate = false },
             onCreate = { result ->
                 taskListViewModel.createQuickTask(result)
-                if (result.draft.dueAt != null) askNotificationPermission("Bật thông báo để được nhắc khi việc đến hạn.")
+                if (result.draft.dueAt != null) askNotificationPermission(str(R.string.notif_rationale_due))
                 showQuickCreate = false
             },
             onMoreDetails = { result ->
@@ -551,11 +555,11 @@ private fun RescheduleMenu(onPick: (Int) -> Unit) {
         TextButton(onClick = { expanded = true }, contentPadding = PaddingValues(horizontal = 8.dp)) {
             Icon(Icons.Default.EventRepeat, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
             Spacer(Modifier.width(4.dp))
-            Text("Dời tất cả", color = MaterialTheme.colorScheme.primary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+            Text(stringResource(R.string.tasks_reschedule_all), color = MaterialTheme.colorScheme.primary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
         }
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }, modifier = Modifier.background(MaterialTheme.colorScheme.surface)) {
-            DropdownMenuItem(text = { Text("Sang hôm nay") }, onClick = { expanded = false; onPick(0) })
-            DropdownMenuItem(text = { Text("Sang ngày mai") }, onClick = { expanded = false; onPick(1) })
+            DropdownMenuItem(text = { Text(stringResource(R.string.tasks_to_today)) }, onClick = { expanded = false; onPick(0) })
+            DropdownMenuItem(text = { Text(stringResource(R.string.tasks_to_tomorrow)) }, onClick = { expanded = false; onPick(1) })
         }
     }
 }
@@ -565,14 +569,14 @@ private fun SearchField(value: String, onValueChange: (String) -> Unit) {
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
-        placeholder = { Text("Tìm công việc...", color = MaterialTheme.colorScheme.onSurfaceVariant) },
+        placeholder = { Text(stringResource(R.string.tasks_search), color = MaterialTheme.colorScheme.onSurfaceVariant) },
         leadingIcon = {
             Icon(Icons.Default.Search, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
         },
         trailingIcon = {
             if (value.isNotEmpty()) {
                 IconButton(onClick = { onValueChange("") }) {
-                    Icon(Icons.Default.Close, contentDescription = "Xóa", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Icon(Icons.Default.Close, contentDescription = stringResource(R.string.action_clear), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         },
@@ -607,7 +611,7 @@ private fun SortMenu(sortBy: String, onSelect: (String) -> Unit) {
                 ) {
                     Icon(Icons.AutoMirrored.Filled.List, contentDescription = null, modifier = Modifier.size(15.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(Modifier.width(5.dp))
-                    Text("Sắp xếp: ${sortLabel(sortBy)}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(stringResource(R.string.tasks_sort_by, sortLabel(sortBy)), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
             DropdownMenu(
@@ -654,22 +658,22 @@ private fun ListHeroCard(
         Column {
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("Tất cả việc của $userName", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 20.sp)
+                    Text(stringResource(R.string.tasks_hero_title, userName), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 20.sp)
                     Text(
-                        if (pendingCount > 0) "$pendingCount việc đang chờ" else "Không còn việc nào đang chờ 🎉",
+                        if (pendingCount > 0) pluralStringResource(R.plurals.tasks_pending, pendingCount, pendingCount) else stringResource(R.string.tasks_none_pending),
                         color = Color.White.copy(alpha = 0.85f),
                         fontSize = 13.sp,
                         modifier = Modifier.padding(top = 4.dp)
                     )
                 }
                 IconButton(onClick = onLists, modifier = Modifier.size(38.dp)) {
-                    Icon(Icons.Default.Folder, contentDescription = "Danh sách", modifier = Modifier.size(20.dp), tint = Color.White)
+                    Icon(Icons.Default.Folder, contentDescription = stringResource(R.string.lists_title), modifier = Modifier.size(20.dp), tint = Color.White)
                 }
                 IconButton(onClick = onMatrix, modifier = Modifier.size(38.dp)) {
-                    Icon(Icons.Default.GridView, contentDescription = "Ma trận Eisenhower", modifier = Modifier.size(20.dp), tint = Color.White)
+                    Icon(Icons.Default.GridView, contentDescription = stringResource(R.string.tasks_matrix), modifier = Modifier.size(20.dp), tint = Color.White)
                 }
                 IconButton(onClick = onAiAdd, modifier = Modifier.size(38.dp)) {
-                    Icon(Icons.Default.AutoAwesome, contentDescription = "Thêm bằng AI", modifier = Modifier.size(20.dp), tint = Color.White)
+                    Icon(Icons.Default.AutoAwesome, contentDescription = stringResource(R.string.tasks_ai_add), modifier = Modifier.size(20.dp), tint = Color.White)
                 }
                 IconButton(onClick = onSortToggle, modifier = Modifier.size(38.dp)) {
                     Box(
@@ -680,7 +684,7 @@ private fun ListHeroCard(
                     ) {
                         Icon(
                             Icons.Default.Menu,
-                            contentDescription = "Sắp xếp thủ công",
+                            contentDescription = stringResource(R.string.tasks_manual_sort),
                             modifier = Modifier.size(14.dp),
                             tint = if (sortMode) MaterialTheme.colorScheme.primary else Color.White
                         )
@@ -689,10 +693,10 @@ private fun ListHeroCard(
             }
             Spacer(Modifier.height(16.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                HeroStatChip(value = completedCount.toString(), label = "Hoàn thành", valueColor = StateCompleted)
-                HeroStatChip(value = pendingCount.toString(), label = "Đang chờ", valueColor = Color.White)
+                HeroStatChip(value = completedCount.toString(), label = stringResource(R.string.stats_completed), valueColor = StateCompleted)
+                HeroStatChip(value = pendingCount.toString(), label = stringResource(R.string.stats_pending), valueColor = Color.White)
                 if (overdueCount > 0) {
-                    HeroStatChip(value = overdueCount.toString(), label = "Quá hạn", valueColor = StateOverdue)
+                    HeroStatChip(value = overdueCount.toString(), label = stringResource(R.string.filter_overdue), valueColor = StateOverdue)
                 }
             }
         }

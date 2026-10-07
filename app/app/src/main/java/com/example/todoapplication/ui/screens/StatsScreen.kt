@@ -42,6 +42,11 @@ import com.example.todoapplication.ui.viewmodel.StatsViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import java.util.*
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringArrayResource
+import com.example.todoapplication.R
+import com.example.todoapplication.i18n.str
 
 /** [TẦNG UI · MÀN HÌNH] Thống kê — biểu đồ tuần, bản đồ nhiệt cả năm, và khu Trí nhớ AI (StatsViewModel). */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -55,7 +60,7 @@ fun StatsScreen(
     val focusStats by statsViewModel.focusStats.collectAsStateWithLifecycle()
 
     var selectedTab by remember { mutableStateOf(0) }   // tab đang chọn (0/1/2) — state cục bộ của màn
-    val tabTitles = listOf("📊 Thống kê", "📈 Biểu đồ", "🧠 Trí nhớ AI")
+    val tabTitles = stringArrayResource(R.array.stats_tabs)
 
     val statsSummary = state.summary
     val isLoadingStats = state.isLoadingStats
@@ -97,7 +102,7 @@ fun StatsScreen(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
-                    "Của tôi",
+                    stringResource(R.string.stats_title),
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
@@ -105,7 +110,7 @@ fun StatsScreen(
                 IconButton(onClick = { navController.navigate(Screen.Settings.route) }) {
                     Icon(
                         Icons.Default.Settings,
-                        contentDescription = "Thiết lập",
+                        contentDescription = stringResource(R.string.settings_title),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
@@ -174,7 +179,7 @@ fun StatsScreen(
                         ) {
                             // Header hồ sơ
                             item {
-                                val userName = remember { ServiceLocator.sessionManager.getUserName().ifBlank { "bạn" } }
+                                val userName = remember { ServiceLocator.sessionManager.getUserName().ifBlank { str(R.string.stats_default_name) } }
                                 Row(
                                     modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
                                     verticalAlignment = Alignment.CenterVertically
@@ -191,7 +196,7 @@ fun StatsScreen(
                                     Spacer(Modifier.width(12.dp))
                                     Column {
                                         Text(userName, fontWeight = FontWeight.Bold, fontSize = 17.sp, color = MaterialTheme.colorScheme.onSurface)
-                                        Text("Bạn đang đi đúng kế hoạch! 🎯", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                                        Text(stringResource(R.string.stats_on_track), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
                                     }
                                 }
                             }
@@ -204,12 +209,12 @@ fun StatsScreen(
                             // Lối tắt: nhìn lại & trợ lý
                             item {
                                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    ShortcutRow("🌱", "Thói quen", "Đánh dấu mỗi ngày, giữ chuỗi") { navController.navigate(Screen.Habits.route) }
-                                    ShortcutRow("🗂️", "Danh sách", "Màu, biểu tượng, mục & bảng Kanban") { navController.navigate(Screen.Lists.route) }
-                                    ShortcutRow("📅", "Tổng kết tuần", "So với tuần trước, lập kế hoạch tuần tới") { navController.navigate(Screen.WeeklyReview.route) }
-                                    ShortcutRow("🤖", "AI Coach", "Hỏi cách sắp xếp, vượt trì hoãn") { navController.navigate(Screen.AICoach.createRoute()) }
-                                    ShortcutRow("✅", "Đã hoàn thành", "Lịch sử việc đã xong") { navController.navigate(Screen.History.route) }
-                                    ShortcutRow("🗑️", "Thùng rác", "Khôi phục việc đã xóa trong 30 ngày") { navController.navigate(Screen.Trash.route) }
+                                    ShortcutRow("🌱", stringResource(R.string.habits_title), stringResource(R.string.shortcut_habits_sub)) { navController.navigate(Screen.Habits.route) }
+                                    ShortcutRow("🗂️", stringResource(R.string.lists_title), stringResource(R.string.shortcut_lists_sub)) { navController.navigate(Screen.Lists.route) }
+                                    ShortcutRow("📅", stringResource(R.string.review_title), stringResource(R.string.shortcut_review_sub)) { navController.navigate(Screen.WeeklyReview.route) }
+                                    ShortcutRow("🤖", stringResource(R.string.coach_short_title), stringResource(R.string.shortcut_coach_sub)) { navController.navigate(Screen.AICoach.createRoute()) }
+                                    ShortcutRow("✅", stringResource(R.string.history_title), stringResource(R.string.shortcut_history_sub)) { navController.navigate(Screen.History.route) }
+                                    ShortcutRow("🗑️", stringResource(R.string.trash_title), stringResource(R.string.shortcut_trash_sub)) { navController.navigate(Screen.Trash.route) }
                                 }
                             }
 
@@ -234,19 +239,19 @@ fun StatsScreen(
                                     ) {
                                         BigMetric(
                                             value = "${statsSummary?.completedTasks ?: 0}",
-                                            label = "Hoàn thành",
+                                            label = stringResource(R.string.stats_completed),
                                             color = StateCompleted
                                         )
                                         VerticalDivider()
                                         BigMetric(
                                             value = "${statsSummary?.pendingTasks ?: 0}",
-                                            label = "Đang chờ",
+                                            label = stringResource(R.string.stats_pending),
                                             color = primary
                                         )
                                         VerticalDivider()
                                         BigMetric(
                                             value = "${state.perfectDays}",
-                                            label = "Ngày đạt mục tiêu",
+                                            label = stringResource(R.string.review_goal_days),
                                             color = tertiary
                                         )
                                     }
@@ -256,7 +261,7 @@ fun StatsScreen(
                             // Bản đồ nhiệt hằng năm
                             item {
                                 Text(
-                                    "Bản đồ nhiệt ${java.util.Calendar.getInstance().get(java.util.Calendar.YEAR)}",
+                                    stringResource(R.string.stats_heatmap_title, java.util.Calendar.getInstance().get(java.util.Calendar.YEAR)),
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 15.sp,
                                     color = MaterialTheme.colorScheme.onSurface,
@@ -283,7 +288,7 @@ fun StatsScreen(
                             if (byCategory.isNotEmpty()) {
                                 item {
                                     Text(
-                                        "Việc đang chờ theo danh mục",
+                                        stringResource(R.string.stats_pending_by_list),
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 15.sp,
                                         color = MaterialTheme.colorScheme.onSurface,
@@ -322,7 +327,7 @@ fun StatsScreen(
                                                 color = primary.copy(alpha = 0.12f)
                                             ) {
                                                 Text(
-                                                    "$count việc",
+                                                    pluralStringResource(R.plurals.count_tasks, count, count),
                                                     color = primary,
                                                     fontSize = 12.sp,
                                                     fontWeight = FontWeight.Bold,
@@ -343,7 +348,7 @@ fun StatsScreen(
                                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                             Text("🎉", fontSize = 44.sp)
                                             Text(
-                                                "Không còn việc nào đang chờ!",
+                                                stringResource(R.string.stats_nothing_pending),
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                 modifier = Modifier.padding(top = 8.dp)
                                             )
@@ -398,7 +403,7 @@ fun StatsScreen(
                                             )
                                             Spacer(Modifier.width(8.dp))
                                             Text(
-                                                "Phân tích thói quen bằng AI",
+                                                stringResource(R.string.stats_analyze_ai),
                                                 color = Color.White,
                                                 fontWeight = FontWeight.Bold,
                                                 fontSize = 15.sp
@@ -410,7 +415,7 @@ fun StatsScreen(
 
                             item {
                                 Text(
-                                    "Quan sát của AI về bạn",
+                                    stringResource(R.string.stats_ai_observations),
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 15.sp,
                                     color = MaterialTheme.colorScheme.onSurface,
@@ -429,12 +434,12 @@ fun StatsScreen(
                                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                             Text("🤔", fontSize = 44.sp)
                                             Text(
-                                                "AI chưa ghi nhận thói quen nào.",
+                                                stringResource(R.string.stats_no_memories),
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                 modifier = Modifier.padding(top = 8.dp)
                                             )
                                             Text(
-                                                "Nhấn phân tích để bắt đầu.",
+                                                stringResource(R.string.stats_tap_analyze),
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                 fontSize = 12.sp,
                                                 modifier = Modifier.padding(top = 4.dp)
@@ -484,7 +489,7 @@ fun StatsScreen(
                                             ) {
                                                 Icon(
                                                     Icons.Default.Delete,
-                                                    contentDescription = "Xóa",
+                                                    contentDescription = stringResource(R.string.action_delete),
                                                     tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                                                     modifier = Modifier.size(16.dp)
                                                 )
@@ -537,20 +542,20 @@ private fun WeeklyProductivityChart(
             Surface(shape = RoundedCornerShape(12.dp), color = primaryColor.copy(alpha = 0.1f)) {
                 Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                     Text("$totalCompleted", color = primaryColor, fontWeight = FontWeight.ExtraBold, fontSize = 22.sp)
-                    Text("Hoàn thành tuần", color = primaryColor.copy(alpha = 0.7f), fontSize = 10.sp)
+                    Text(stringResource(R.string.stats_week_completed), color = primaryColor.copy(alpha = 0.7f), fontSize = 10.sp)
                 }
             }
             if (bestDay >= 0 && weeklyData[bestDay] > 0) {
                 Surface(shape = RoundedCornerShape(12.dp), color = tertiaryColor.copy(alpha = 0.1f)) {
                     Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(last7Days.getOrElse(bestDay) { "?" }, color = tertiaryColor, fontWeight = FontWeight.ExtraBold, fontSize = 22.sp)
-                        Text("Ngày năng suất nhất", color = tertiaryColor.copy(alpha = 0.7f), fontSize = 10.sp)
+                        Text(stringResource(R.string.stats_best_day), color = tertiaryColor.copy(alpha = 0.7f), fontSize = 10.sp)
                     }
                 }
             }
         }
 
-        Text("Công việc hoàn thành 7 ngày qua", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurface)
+        Text(stringResource(R.string.stats_completed_7_days), fontWeight = FontWeight.Bold, fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurface)
         Spacer(Modifier.height(16.dp))
 
         // Bar chart
@@ -625,7 +630,7 @@ private fun WeeklyProductivityChart(
         Spacer(Modifier.height(16.dp))
 
         // Per-day breakdown
-        Text("Chi tiết từng ngày", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurface)
+        Text(stringResource(R.string.stats_per_day), fontWeight = FontWeight.Bold, fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurface)
         Spacer(Modifier.height(8.dp))
         last7Days.forEachIndexed { i, dayLabel ->
             val count = weeklyData.getOrElse(i) { 0 }
@@ -685,8 +690,9 @@ private fun YearHeatmap(data: Map<String, Int>, baseColor: Color, modifier: Modi
         list
     }
 
-    val dayLabels = listOf("CN", "T2", "T3", "T4", "T5", "T6", "T7")
-    val monthShort = listOf("Th1", "Th2", "Th3", "Th4", "Th5", "Th6", "Th7", "Th8", "Th9", "Th10", "Th11", "Th12")
+    // Hàng của bản đồ nhiệt bắt đầu từ Chủ nhật
+    val dayLabels = stringArrayResource(R.array.weekdays_short).let { listOf(it[6]) + it.take(6) }
+    val monthShort = stringArrayResource(R.array.months_short)
     var lastMonth = -1
 
     Column(modifier) {
@@ -741,13 +747,13 @@ private fun YearHeatmap(data: Map<String, Int>, baseColor: Color, modifier: Modi
         Spacer(Modifier.height(8.dp))
         // Chú thích
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("Ít", fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(stringResource(R.string.stats_less), fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.width(4.dp))
             listOf(0.35f, 0.55f, 0.75f, 1f).forEach { a ->
                 Box(modifier = Modifier.size(11.dp).clip(RoundedCornerShape(3.dp)).background(baseColor.copy(alpha = a)))
                 Spacer(Modifier.width(3.dp))
             }
-            Text("Nhiều", fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(stringResource(R.string.stats_more), fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
@@ -790,15 +796,15 @@ private fun GoalCard(goal: com.example.todoapplication.domain.GoalProgress, onEd
             }
             Spacer(Modifier.width(16.dp))
             Column(Modifier.weight(1f)) {
-                Text("🔥 Chuỗi ${goal.currentStreak} ngày", fontWeight = FontWeight.Bold, fontSize = 17.sp, color = MaterialTheme.colorScheme.onSurface)
-                Text("Kỷ lục: ${goal.bestStreak} ngày", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(pluralStringResource(R.plurals.goal_streak, goal.currentStreak, goal.currentStreak), fontWeight = FontWeight.Bold, fontSize = 17.sp, color = MaterialTheme.colorScheme.onSurface)
+                Text(pluralStringResource(R.plurals.goal_best_streak, goal.bestStreak, goal.bestStreak), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text(
-                    if (goal.metToday) "Hôm nay đã đạt mục tiêu 🎉" else "Còn ${goal.remainingToday} việc để đạt mục tiêu hôm nay",
+                    if (goal.metToday) stringResource(R.string.goal_met_today) else pluralStringResource(R.plurals.goal_remaining_today, goal.remainingToday, goal.remainingToday),
                     fontSize = 12.sp,
                     color = MaterialTheme.colorScheme.primary
                 )
             }
-            Text("Sửa", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(stringResource(R.string.action_edit), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
@@ -829,10 +835,14 @@ private fun FocusStatsCard(stats: com.example.todoapplication.domain.FocusStats)
     val accent = MaterialTheme.colorScheme.tertiary
     Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surface, shadowElevation = 2.dp, modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp)) {
-            Text("🍅 Tập trung", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurface)
+            Text(stringResource(R.string.stats_focus_title), fontWeight = FontWeight.Bold, fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurface)
             Text(
-                "Hôm nay ${if (stats.todayMinutes > 0) formatDuration(stats.todayMinutes) else "0 phút"} · " +
-                    "7 ngày ${formatDuration(stats.weekMinutes)} (${stats.weekSessions} phiên)",
+                stringResource(
+                    R.string.stats_focus_summary,
+                    formatDuration(stats.todayMinutes),
+                    formatDuration(stats.weekMinutes),
+                    pluralStringResource(R.plurals.focus_sessions_done, stats.weekSessions, stats.weekSessions)
+                ),
                 fontSize = 12.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 2.dp, bottom = 12.dp)

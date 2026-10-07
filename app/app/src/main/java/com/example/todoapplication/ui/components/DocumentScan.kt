@@ -29,6 +29,10 @@ import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.pluralStringResource
+import com.example.todoapplication.R
+import com.example.todoapplication.i18n.str
 
 /*
  * [TẦNG UI · CAMERA + ML] Quét tài liệu bằng ML Kit Document Scanner (giao diện chụp của Google Play services:
@@ -74,7 +78,7 @@ fun rememberDocumentScanner(pageLimit: Int = 5, onPages: (List<Uri>) -> Unit): (
         {
             val activity = context.findActivity()
             if (activity == null) {
-                Toast.makeText(context, "Không mở được trình quét", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, str(R.string.scan_cannot_open), Toast.LENGTH_SHORT).show()
             } else {
                 val options = GmsDocumentScannerOptions.Builder()
                     .setGalleryImportAllowed(true)
@@ -85,7 +89,7 @@ fun rememberDocumentScanner(pageLimit: Int = 5, onPages: (List<Uri>) -> Unit): (
                 GmsDocumentScanning.getClient(options).getStartScanIntent(activity)
                     .addOnSuccessListener { launcher.launch(IntentSenderRequest.Builder(it).build()) }
                     .addOnFailureListener {
-                        Toast.makeText(context, "Máy chưa hỗ trợ quét tài liệu (cần Google Play services)", Toast.LENGTH_LONG).show()
+                        Toast.makeText(context, str(R.string.scan_unsupported), Toast.LENGTH_LONG).show()
                     }
             }
         }
@@ -109,7 +113,7 @@ fun rememberScanToTasks(onCreate: (List<String>) -> Unit): () -> Unit {
             val text = pages.map { recognizeText(context, it) }.joinToString("\n")
             busy = false
             val found = ScanTextParser.taskLines(text)
-            if (found.isEmpty()) Toast.makeText(context, "Không tìm thấy chữ nào trong ảnh", Toast.LENGTH_SHORT).show()
+            if (found.isEmpty()) Toast.makeText(context, str(R.string.scan_no_text), Toast.LENGTH_SHORT).show()
             else lines = found
         }
     }
@@ -118,18 +122,18 @@ fun rememberScanToTasks(onCreate: (List<String>) -> Unit): () -> Unit {
         AlertDialog(
             onDismissRequest = {},
             confirmButton = {},
-            title = { Text("Đang nhận chữ…") },
-            text = { Row(verticalAlignment = Alignment.CenterVertically) { CircularProgressIndicator(Modifier.size(24.dp)); Spacer(Modifier.width(12.dp)); Text("Chạy trên máy, không cần mạng") } }
+            title = { Text(stringResource(R.string.scan_recognizing)) },
+            text = { Row(verticalAlignment = Alignment.CenterVertically) { CircularProgressIndicator(Modifier.size(24.dp)); Spacer(Modifier.width(12.dp)); Text(stringResource(R.string.scan_on_device)) } }
         )
     }
     lines?.let { found ->
         val checked = remember(found) { mutableStateListOf<Boolean>().apply { addAll(found.map { true }) } }
         AlertDialog(
             onDismissRequest = { lines = null },
-            title = { Text("Tạo ${checked.count { it }} việc từ ảnh") },
+            title = { Text(pluralStringResource(R.plurals.scan_create_title, checked.count { it }, checked.count { it })) },
             text = {
                 Column(Modifier.verticalScroll(rememberScrollState())) {
-                    Text("Mỗi dòng thành một việc; ngày giờ, !ưu tiên, #danh sách trong dòng vẫn được hiểu.", fontSize = 12.sp)
+                    Text(stringResource(R.string.scan_hint), fontSize = 12.sp)
                     found.forEachIndexed { i, line ->
                         Row(Modifier.fillMaxWidth().clickable { checked[i] = !checked[i] }, verticalAlignment = Alignment.CenterVertically) {
                             Checkbox(checked = checked[i], onCheckedChange = { checked[i] = it })
@@ -142,9 +146,9 @@ fun rememberScanToTasks(onCreate: (List<String>) -> Unit): () -> Unit {
                 TextButton(enabled = checked.any { it }, onClick = {
                     onCreate(found.filterIndexed { i, _ -> checked[i] })
                     lines = null
-                }) { Text("Tạo việc") }
+                }) { Text(stringResource(R.string.scan_create_tasks)) }
             },
-            dismissButton = { TextButton(onClick = { lines = null }) { Text("Hủy") } }
+            dismissButton = { TextButton(onClick = { lines = null }) { Text(stringResource(R.string.action_cancel)) } }
         )
     }
     return scan

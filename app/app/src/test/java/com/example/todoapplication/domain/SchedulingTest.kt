@@ -1,5 +1,6 @@
 package com.example.todoapplication.domain
 
+import com.example.todoapplication.TestStrings
 import com.example.todoapplication.domain.Eisenhower.Quadrant
 import com.example.todoapplication.domain.model.Task
 import com.example.todoapplication.domain.model.TaskStatus
@@ -15,6 +16,9 @@ import java.time.ZoneId
 import java.time.ZonedDateTime
 
 class SchedulingTest {
+    // Chuỗi giao diện tiếng Việt từ values-vi/strings.xml (JVM không có Android Resources)
+    init { TestStrings.install() }
+
     private val zone = ZoneId.of("Asia/Ho_Chi_Minh")
     /** Thứ Tư 08/07/2026. */
     private val today = LocalDate.of(2026, 7, 8)

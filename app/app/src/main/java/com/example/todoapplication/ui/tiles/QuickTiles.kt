@@ -10,6 +10,7 @@ import android.service.quicksettings.TileService
 import com.example.todoapplication.R
 import com.example.todoapplication.data.notifications.FocusSession
 import com.example.todoapplication.ui.navigation.AppIntents
+import com.example.todoapplication.i18n.str
 
 /*
  * [TẦNG UI · QUICK SETTINGS] Hai ô trong bảng cài đặt nhanh (kéo thanh thông báo xuống):
@@ -41,8 +42,8 @@ class FocusTileService : TileService() {
         val running = FocusSession.state.value?.let { it.endAt > System.currentTimeMillis() } == true
         qsTile?.apply {
             state = if (running) Tile.STATE_ACTIVE else Tile.STATE_INACTIVE
-            label = "Tập trung"
-            if (Build.VERSION.SDK_INT >= 29) subtitle = if (running) "Đang chạy · bấm để dừng" else "25 phút"
+            label = str(R.string.tile_focus)
+            if (Build.VERSION.SDK_INT >= 29) subtitle = if (running) str(R.string.tile_focus_running) else str(R.string.duration_minutes, FocusSession.FOCUS_MINUTES)
             icon = Icon.createWithResource(this@FocusTileService, R.drawable.ic_shortcut_focus)
             updateTile()
         }
@@ -71,7 +72,7 @@ class QuickAddTileService : TileService() {
         super.onStartListening()
         qsTile?.apply {
             state = Tile.STATE_INACTIVE
-            label = "Thêm việc"
+            label = str(R.string.tile_quick_add)
             icon = Icon.createWithResource(this@QuickAddTileService, R.drawable.ic_shortcut_add)
             updateTile()
         }

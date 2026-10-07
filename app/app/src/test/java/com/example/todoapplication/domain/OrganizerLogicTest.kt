@@ -1,5 +1,6 @@
 package com.example.todoapplication.domain
 
+import com.example.todoapplication.TestStrings
 import com.example.todoapplication.domain.model.FocusRecord
 import com.example.todoapplication.domain.model.Habit
 import com.example.todoapplication.domain.model.HabitFrequency
@@ -14,6 +15,9 @@ import java.time.LocalDateTime
 import java.time.ZoneId
 
 class OrganizerLogicTest {
+    // Chuỗi giao diện tiếng Việt từ values-vi/strings.xml (JVM không có Android Resources)
+    init { TestStrings.install() }
+
 
     private val zone: ZoneId = ZoneId.of("Asia/Ho_Chi_Minh")
 
@@ -82,7 +86,7 @@ class OrganizerLogicTest {
         val full = done + wed.minusDays(2).toString()
         assertFalse(HabitLogic.isDueToday(habit, full, wed))
         assertEquals(3, HabitLogic.streak(habit, full, wed))
-        assertEquals("tuần", HabitLogic.streakUnit(habit))
+        assertEquals("3 tuần", HabitLogic.streakLabel(habit, 3))
     }
 
     @Test

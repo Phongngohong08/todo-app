@@ -24,6 +24,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.example.todoapplication.R
+import com.example.todoapplication.i18n.str
 
 /** Một liên kết nhận ra trong mô tả việc. */
 data class DetectedLink(val kind: Kind, val label: String, val uri: Uri) {
@@ -80,7 +82,7 @@ fun LinkChips(text: String, modifier: Modifier = Modifier) {
                     try {
                         context.startActivity(Intent(action, link.uri))
                     } catch (_: ActivityNotFoundException) {
-                        Toast.makeText(context, "Không có ứng dụng để mở liên kết này", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, str(R.string.link_no_app), Toast.LENGTH_SHORT).show()
                     }
                 },
                 label = { Text(link.label, maxLines = 1, overflow = TextOverflow.Ellipsis) },

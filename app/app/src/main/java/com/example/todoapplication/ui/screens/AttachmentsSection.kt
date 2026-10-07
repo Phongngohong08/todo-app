@@ -39,6 +39,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import androidx.compose.ui.res.stringResource
+import com.example.todoapplication.R
+import com.example.todoapplication.i18n.str
 
 /**
  * Mục "📎 Đính kèm" của màn chi tiết: ảnh / trang tài liệu quét (ML Kit), chọn ảnh bằng Photo Picker của hệ thống
@@ -64,7 +67,7 @@ fun AttachmentsSection(
     }
 
     if (!enabled) {
-        Text("Lưu việc trước để đính kèm ảnh hoặc tài liệu.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(stringResource(R.string.attach_save_first), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         return
     }
 
@@ -82,7 +85,7 @@ fun AttachmentsSection(
                                 try {
                                     context.startActivity(intent)
                                 } catch (_: ActivityNotFoundException) {
-                                    Toast.makeText(context, "Không có ứng dụng để mở tệp này", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, str(R.string.attach_no_app), Toast.LENGTH_SHORT).show()
                                 }
                             },
                             onLongClick = { menuFor = att }
@@ -90,19 +93,19 @@ fun AttachmentsSection(
                     )
                     DropdownMenu(expanded = menuFor?.id == att.id, onDismissRequest = { menuFor = null }) {
                         if (att.isImage) {
-                            DropdownMenuItem(text = { Text("Nhận chữ → thêm vào mô tả") }, onClick = {
+                            DropdownMenuItem(text = { Text(stringResource(R.string.attach_recognize_text)) }, onClick = {
                                 menuFor = null
                                 recognizing = true
                                 scope.launch {
                                     val text = recognizeText(context, Uri.fromFile(att.file))
                                     recognizing = false
-                                    if (text.isBlank()) Toast.makeText(context, "Không thấy chữ trong ảnh", Toast.LENGTH_SHORT).show()
+                                    if (text.isBlank()) Toast.makeText(context, str(R.string.attach_no_text), Toast.LENGTH_SHORT).show()
                                     else onTextRecognized(text.trim())
                                 }
                             })
                         }
                         DropdownMenuItem(
-                            text = { Text("Xóa đính kèm", color = MaterialTheme.colorScheme.error) },
+                            text = { Text(stringResource(R.string.attach_delete), color = MaterialTheme.colorScheme.error) },
                             onClick = { menuFor = null; onDelete(att) }
                         )
                     }
@@ -117,19 +120,19 @@ fun AttachmentsSection(
         OutlinedButton(onClick = scan) {
             Icon(Icons.Default.DocumentScanner, contentDescription = null, modifier = Modifier.size(16.dp))
             Spacer(Modifier.width(6.dp))
-            Text("Quét tài liệu", fontSize = 13.sp)
+            Text(stringResource(R.string.attach_scan), fontSize = 13.sp)
         }
         OutlinedButton(onClick = {
             pickImages.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
         }) {
             Icon(Icons.Default.Image, contentDescription = null, modifier = Modifier.size(16.dp))
             Spacer(Modifier.width(6.dp))
-            Text("Chọn ảnh", fontSize = 13.sp)
+            Text(stringResource(R.string.attach_pick_photo), fontSize = 13.sp)
         }
     }
     if (attachments.isNotEmpty()) {
         Text(
-            "Bấm để mở · giữ để nhận chữ hoặc xóa · chỉ lưu trên máy này",
+            stringResource(R.string.attach_hint),
             fontSize = 11.sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 6.dp)
@@ -148,8 +151,8 @@ private fun AttachmentThumb(att: Attachment, modifier: Modifier) {
         contentAlignment = Alignment.Center
     ) {
         val b = bitmap
-        if (b != null) Image(b, contentDescription = "Ảnh đính kèm", contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-        else Icon(Icons.Default.Description, contentDescription = "Tệp đính kèm", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (b != null) Image(b, contentDescription = stringResource(R.string.attach_image), contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+        else Icon(Icons.Default.Description, contentDescription = stringResource(R.string.attach_file), tint = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 

@@ -26,6 +26,7 @@
 
     <application
         android:enableOnBackInvokedCallback="true"
+        android:localeConfig="@xml/locales_config"
         android:name=".TodoApplication"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
@@ -192,7 +193,7 @@
             android:name=".ui.tiles.FocusTileService"
             android:exported="true"
             android:icon="@drawable/ic_shortcut_focus"
-            android:label="Tập trung"
+            android:label="@string/tile_focus"
             android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
             <intent-filter>
                 <action android:name="android.service.quicksettings.action.QS_TILE" />
@@ -202,7 +203,7 @@
             android:name=".ui.tiles.QuickAddTileService"
             android:exported="true"
             android:icon="@drawable/ic_shortcut_add"
-            android:label="Thêm việc"
+            android:label="@string/tile_quick_add"
             android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
             <intent-filter>
                 <action android:name="android.service.quicksettings.action.QS_TILE" />

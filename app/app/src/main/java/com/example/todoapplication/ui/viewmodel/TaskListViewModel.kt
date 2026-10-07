@@ -46,6 +46,9 @@ import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
+import com.example.todoapplication.R
+import com.example.todoapplication.i18n.str
+import com.example.todoapplication.i18n.plural
 
 const val ALL_CATEGORIES = "ALL"
 
@@ -121,7 +124,7 @@ class TaskListViewModel(
 ) : ViewModel() {
 
     /** Tên người dùng để hiển thị lời chào — đọc một lần từ phiên đăng nhập. */
-    val userName: String = sessionManager.getUserName().ifBlank { "bạn" }
+    val userName: String = sessionManager.getUserName().ifBlank { str(R.string.stats_default_name) }
 
     private val category = MutableStateFlow(ALL_CATEGORIES)
     private val smartFilter = MutableStateFlow(SmartFilter.NONE)
@@ -232,7 +235,7 @@ class TaskListViewModel(
         if (clean.isEmpty()) return
         val f = SavedFilter(clean, smartFilter.value, category.value, tag.value, query.value)
         prefs.setSavedFilters(listOf(f) + prefs.savedFilters.value.filter { !it.name.equals(clean, ignoreCase = true) })
-        viewModelScope.launch { emit(TaskListEvent.Message("Đã lưu bộ lọc \"$clean\"")) }
+        viewModelScope.launch { emit(TaskListEvent.Message(str(R.string.filter_saved, clean))) }
     }
 
     /** Áp dụng bộ lọc đã lưu. Trả về từ khóa để màn đổ vào ô tìm kiếm. */
@@ -266,8 +269,8 @@ class TaskListViewModel(
             transient.update { it.copy(isRefreshing = false) }
             when (result) {
                 SyncResult.Success, SyncResult.NotLoggedIn, SyncResult.AuthError -> Unit
-                SyncResult.NetworkError -> emit(TaskListEvent.Message("Không có mạng — thay đổi sẽ tự đồng bộ khi có mạng"))
-                is SyncResult.ServerError -> emit(TaskListEvent.Message("Máy chủ đang bận, sẽ thử đồng bộ lại sau"))
+                SyncResult.NetworkError -> emit(TaskListEvent.Message(str(R.string.sync_no_network)))
+                is SyncResult.ServerError -> emit(TaskListEvent.Message(str(R.string.sync_server_busy)))
             }
         }
     }
@@ -307,7 +310,7 @@ class TaskListViewModel(
         viewModelScope.launch {
             val adding = task.myDay != today
             repo.setMyDay(listOf(task.id), if (adding) today else null)
-            emit(TaskListEvent.Message(if (adding) "Đã thêm vào Ngày của tôi ☀" else "Đã bỏ khỏi Ngày của tôi"))
+            emit(TaskListEvent.Message(str(if (adding) R.string.my_day_added else R.string.my_day_removed)))
         }
     }
 
@@ -408,7 +411,7 @@ class TaskListViewModel(
         clearSelection()
         viewModelScope.launch {
             repo.setMyDay(ids, todayKey())
-            emit(TaskListEvent.Message("Đã thêm ${ids.size} việc vào Ngày của tôi ☀"))
+            emit(TaskListEvent.Message(plural(R.plurals.my_day_added_count, ids.size)))
         }
     }
 
@@ -417,7 +420,7 @@ class TaskListViewModel(
         clearSelection()
         viewModelScope.launch {
             repo.setPriority(ids, priority)
-            emit(TaskListEvent.Message("Đã đổi ưu tiên ${ids.size} việc"))
+            emit(TaskListEvent.Message(plural(R.plurals.priority_changed_count, ids.size)))
         }
     }
 
@@ -432,7 +435,7 @@ class TaskListViewModel(
         val creator = sentenceTasks ?: return
         viewModelScope.launch {
             val created = creator.create(lines)
-            emit(TaskListEvent.Message("Đã tạo ${created.size} việc từ ảnh 📷"))
+            emit(TaskListEvent.Message(plural(R.plurals.scan_created_count, created.size)))
         }
     }
 
@@ -441,7 +444,7 @@ class TaskListViewModel(
         viewModelScope.launch {
             result.newCategory?.let { categoryRepository.add(it) }
             val created = repo.create(result.draft, myDay = if (result.addToMyDay) todayKey() else null)
-            emit(TaskListEvent.Message("Đã thêm: ${created.title}"))
+            emit(TaskListEvent.Message(str(R.string.task_added, created.title)))
         }
     }
 
@@ -487,7 +490,7 @@ class TaskListViewModel(
             result.fold(
                 onSuccess = { emit(TaskListEvent.QuickAddReady(it)) },
                 onFailure = {
-                    emit(TaskListEvent.Message(it.aiFailureMessage("Không phân tích được. Hãy thử mô tả rõ hơn.")))
+                    emit(TaskListEvent.Message(it.aiFailureMessage(str(R.string.ai_parse_failed))))
                 }
             )
         }

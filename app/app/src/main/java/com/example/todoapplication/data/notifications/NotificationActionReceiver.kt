@@ -13,6 +13,8 @@ import com.example.todoapplication.di.ServiceLocator
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import com.example.todoapplication.R
+import com.example.todoapplication.i18n.str
 
 /**
  * Nhận sự kiện khi người dùng bấm nút trên thông báo nhắc việc:
@@ -52,10 +54,10 @@ class NotificationActionReceiver : BroadcastReceiver() {
                 val at = SnoozeText.parse(reply, LocalDateTime.now())
                 if (at != null) {
                     ReminderScheduler.snoozeUntil(appContext, taskId, title, at)
-                    Toast.makeText(appContext, "Sẽ nhắc lại lúc " + formatDueLabel(at, allDay = false), Toast.LENGTH_SHORT).show()
+                    Toast.makeText(appContext, str(R.string.snooze_reply_ok, formatDueLabel(at, allDay = false)), Toast.LENGTH_SHORT).show()
                 } else {
                     ReminderScheduler.snooze(appContext, taskId, title, 60)
-                    Toast.makeText(appContext, "Không hiểu \"" + reply + "\" — hoãn 1 giờ", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(appContext, str(R.string.snooze_reply_unknown, reply), Toast.LENGTH_SHORT).show()
                 }
                 NotificationManagerCompat.from(appContext).cancel(notifId)
             }

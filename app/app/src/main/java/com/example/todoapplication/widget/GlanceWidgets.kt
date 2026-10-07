@@ -62,6 +62,7 @@ import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
+import com.example.todoapplication.i18n.str
 
 /*
  * [TẦNG UI · WIDGET] Widget màn hình chính viết bằng Jetpack Glance (Compose cho widget):
@@ -129,11 +130,11 @@ class TasksWidget : GlanceAppWidget() {
             else -> dao.getForWidget(today, MAX_ROWS)
         }
         val title = when {
-            source == WidgetSource.MY_DAY -> "☀ Ngày của tôi"
+            source == WidgetSource.MY_DAY -> str(R.string.today_my_day)
             listName != null -> ServiceLocator.categoryRepository.getList(listName).let {
                 (if (it.emoji.isNotBlank()) it.emoji + " " else "") + categoryLabel(listName)
             }
-            else -> "Việc cần làm"
+            else -> str(R.string.widget_tasks_title)
         }
         provideContent {
             GlanceTheme { TasksContent(context, title, tasks, today) }
@@ -164,7 +165,7 @@ private fun TasksContent(context: Context, title: String, tasks: List<TaskEntity
         Spacer(GlanceModifier.height(8.dp))
         if (tasks.isEmpty()) {
             Box(GlanceModifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("🎉 Không còn việc nào!", style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 13.sp))
+                Text(str(R.string.widget_no_tasks), style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 13.sp))
             }
         } else {
             LazyColumn {
@@ -255,13 +256,13 @@ class CompactWidget : GlanceAppWidget() {
                             modifier = GlanceModifier.defaultWeight()
                         )
                         Image(
-                            ImageProvider(R.drawable.ic_shortcut_add), contentDescription = "Thêm việc",
+                            ImageProvider(R.drawable.ic_shortcut_add), contentDescription = str(R.string.tile_quick_add),
                             colorFilter = ColorFilter.tint(GlanceTheme.colors.primary),
                             modifier = GlanceModifier.size(28.dp).clickable(actionStartActivity(openApp(context, AppIntents.OPEN_ADD)))
                         )
                     }
                     Text(
-                        if (done >= goal) "Đạt mục tiêu hôm nay 🎉" else "việc xong hôm nay",
+                        if (done >= goal) str(R.string.goal_met_today) else str(R.string.widget_done_today),
                         style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 11.sp)
                     )
                     Spacer(GlanceModifier.height(6.dp))
@@ -275,7 +276,7 @@ class CompactWidget : GlanceAppWidget() {
                     if (next != null) {
                         Column(GlanceModifier.clickable(actionStartActivity(openApp(context, AppIntents.openTask(next.id))))) {
                             Text(
-                                next.dueAt?.let { formatDueLabel(it, next.dueAllDay, today, zone) } ?: "Tiếp theo",
+                                next.dueAt?.let { formatDueLabel(it, next.dueAllDay, today, zone) } ?: str(R.string.widget_next),
                                 style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 11.sp)
                             )
                             Text(
@@ -285,7 +286,7 @@ class CompactWidget : GlanceAppWidget() {
                             )
                         }
                     } else {
-                        Text("Không còn việc nào", style = TextStyle(color = GlanceTheme.colors.onSurface, fontSize = 14.sp))
+                        Text(str(R.string.widget_nothing_left), style = TextStyle(color = GlanceTheme.colors.onSurface, fontSize = 14.sp))
                     }
                 }
             }
@@ -319,13 +320,13 @@ class HabitsWidget : GlanceAppWidget() {
                     GlanceModifier.fillMaxSize().background(GlanceTheme.colors.widgetBackground).cornerRadius(20.dp).padding(12.dp)
                 ) {
                     Text(
-                        "🌱 Thói quen hôm nay  ${items.count { it.doneToday }}/${items.size}",
+                        str(R.string.today_habits) + "  ${items.count { it.doneToday }}/${items.size}",
                         style = TextStyle(color = GlanceTheme.colors.onSurface, fontSize = 15.sp, fontWeight = FontWeight.Bold),
                         modifier = GlanceModifier.clickable(actionStartActivity(openApp(context, AppIntents.OPEN_HABITS)))
                     )
                     Spacer(GlanceModifier.height(8.dp))
                     if (items.isEmpty()) {
-                        Text("Không có thói quen nào cần làm hôm nay", style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 13.sp))
+                        Text(str(R.string.habits_none_today), style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 13.sp))
                     } else {
                         LazyColumn {
                             items(items, itemId = { it.habit.id.hashCode().toLong() }) { s ->

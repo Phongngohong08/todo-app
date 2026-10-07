@@ -20,22 +20,19 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.OffsetDateTime
+import com.example.todoapplication.R
+import com.example.todoapplication.i18n.str
+import com.example.todoapplication.i18n.strArray
 
 /** Một bong bóng chat. isUser=true → tin của người dùng (bên phải); false → câu trả lời của AI (bên trái). */
 data class ChatUIModel(val text: String, val isUser: Boolean, val isPending: Boolean = false)
 
-const val COACH_GREETING =
-    "Xin chào! Tôi là AI Coach của bạn. Tôi có thể giúp bạn sắp xếp kế hoạch, tìm động lực hoặc phân tích thói quen trì hoãn. Hôm nay bạn muốn chia sẻ điều gì?"
+fun coachGreeting(): String = str(R.string.coach_greeting)
 
-val SUGGESTED_PROMPTS = listOf(
-    "Giúp tôi sắp xếp hôm nay",
-    "Tôi hay trì hoãn, sao khắc phục?",
-    "Lời khuyên giữ tập trung",
-    "Phân tích thói quen của tôi"
-)
+fun suggestedPrompts(): List<String> = strArray(R.array.coach_suggested_prompts)
 
 data class AICoachUiState(
-    val messages: List<ChatUIModel> = listOf(ChatUIModel(COACH_GREETING, isUser = false)),
+    val messages: List<ChatUIModel> = listOf(ChatUIModel(coachGreeting(), isUser = false)),
     val isThinking: Boolean = false,         // true khi đang chờ AI trả lời → hiện "..."
     /** Hành động AI vừa đề xuất (kèm câu trả lời mới nhất) — hiện thành nút xác nhận. */
     val actions: List<CoachAction> = emptyList(),
@@ -68,7 +65,7 @@ class AICoachViewModel(
             val bubbles = stored.map { ChatUIModel(it.content, isUser = it.role == "user", isPending = it.isPending) }
             AICoachUiState(
                 // Lời chào luôn đứng đầu, không phải một tin nhắn thật
-                messages = listOf(ChatUIModel(COACH_GREETING, isUser = false)) + bubbles +
+                messages = listOf(ChatUIModel(coachGreeting(), isUser = false)) + bubbles +
                     listOfNotNull(error?.let { ChatUIModel(it, isUser = false) }),
                 isThinking = thinking,
                 actions = acts,
@@ -95,7 +92,7 @@ class AICoachViewModel(
                 actions.value = response.actions.orEmpty()
             }.onFailure { error ->
                 lastError.update {
-                    error.aiFailureMessage("Tôi gặp sự cố kết nối tới máy chủ AI. Vui lòng thử lại sau.")
+                    error.aiFailureMessage(str(R.string.coach_connection_error))
                 }
             }
             isThinking.value = false
@@ -108,7 +105,7 @@ class AICoachViewModel(
         viewModelScope.launch {
             val msg = applier.apply(action)
             if (msg != null) applied.update { it + action.label }
-            _messages.emit(msg ?: "Không áp dụng được đề xuất này (việc có thể đã bị xóa)")
+            _messages.emit(msg ?: str(R.string.coach_apply_failed))
         }
     }
 

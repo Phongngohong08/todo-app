@@ -1,11 +1,15 @@
 package com.example.todoapplication.domain
 
+import com.example.todoapplication.TestStrings
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import java.time.LocalDateTime
 import java.time.ZoneId
 
 class SnoozeOptionsTest {
+    // Chuỗi giao diện tiếng Việt từ values-vi/strings.xml (JVM không có Android Resources)
+    init { TestStrings.install() }
+
     private val zone = ZoneId.of("Asia/Ho_Chi_Minh")
 
     @Test

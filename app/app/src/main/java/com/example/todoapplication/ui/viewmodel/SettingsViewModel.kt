@@ -15,7 +15,7 @@ import com.example.todoapplication.data.repository.PreferencesRepository
 import com.example.todoapplication.data.repository.TaskRepository
 import com.example.todoapplication.data.sync.SyncController
 import com.example.todoapplication.di.ServiceLocator
-import com.example.todoapplication.ui.utils.WEEKDAY_SHORT
+import com.example.todoapplication.ui.utils.WEEKDAY_CODES
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -27,6 +27,8 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
+import com.example.todoapplication.R
+import com.example.todoapplication.i18n.str
 
 /*
  * [TẦNG VIEWMODEL] Màn Cài đặt:
@@ -125,7 +127,7 @@ class SettingsViewModel(
         val s = _uiState.value
         _uiState.update { it.copy(isSaving = true) }
         viewModelScope.launch {
-            val daysOff = WEEKDAY_SHORT.keys.filter { it in s.daysOff }.joinToString(",")
+            val daysOff = WEEKDAY_CODES.filter { it in s.daysOff }.joinToString(",")
             val result = repo.update(
                 UserPreferences(
                     userId = "",     // server tự gán theo token; client để trống
@@ -146,11 +148,11 @@ class SettingsViewModel(
             _events.emit(
                 SettingsEvent.Message(
                     when {
-                        error == null -> "Đã lưu thiết lập!"
+                        error == null -> str(R.string.settings_saved)
                         // Server kiểm tra: giờ dạng HH:mm, giờ kết thúc sau giờ bắt đầu, thời lượng 15–480 phút
                         (error as? ApiException)?.code == 400 ->
-                            "Thiết lập chưa hợp lệ: giờ dạng HH:mm, giờ kết thúc sau giờ bắt đầu, thời lượng 15–480 phút."
-                        else -> "Chưa lưu được lên máy chủ (mục tiêu vẫn áp dụng trên máy này)"
+                            str(R.string.settings_invalid)
+                        else -> str(R.string.settings_save_offline)
                     }
                 )
             )

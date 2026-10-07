@@ -34,6 +34,9 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.util.UUID
+import com.example.todoapplication.R
+import com.example.todoapplication.i18n.str
+import com.example.todoapplication.i18n.plural
 
 /** Sự kiện một lần của màn chi tiết: đã tải xong task (kèm dữ liệu) / đã lưu / có lỗi. */
 sealed interface TaskDetailEvent {
@@ -111,7 +114,7 @@ class TaskDetailViewModel(
         if (isNew) return
         viewModelScope.launch {
             val added = uris.count { attachmentRepo.add(taskId, it) != null }
-            if (added < uris.size) _events.emit(TaskDetailEvent.Error("Không chép được ${uris.size - added} tệp"))
+            if (added < uris.size) _events.emit(TaskDetailEvent.Error(plural(R.plurals.attach_copy_failed, uris.size - added)))
         }
     }
 
@@ -137,7 +140,7 @@ class TaskDetailViewModel(
         viewModelScope.launch {
             val task = repo.getTask(taskId)
             if (task != null) _events.emit(TaskDetailEvent.Loaded(task))
-            else _events.emit(TaskDetailEvent.Error("Công việc không còn tồn tại (có thể đã bị xóa trên thiết bị khác)"))
+            else _events.emit(TaskDetailEvent.Error(str(R.string.detail_task_gone)))
         }
     }
 
@@ -205,7 +208,7 @@ class TaskDetailViewModel(
             _isBusy.value = false
             _events.emit(
                 if (ok) TaskDetailEvent.Saved
-                else TaskDetailEvent.Error("Không thể lưu: công việc đã bị xóa trên thiết bị khác")
+                else TaskDetailEvent.Error(str(R.string.detail_save_gone))
             )
         }
     }
@@ -217,11 +220,11 @@ class TaskDetailViewModel(
             val msg = when (repo.skipOccurrence(taskId)) {
                 SkipResult.SKIPPED -> {
                     repo.getTask(taskId)?.let { _events.emit(TaskDetailEvent.Loaded(it)) } // cập nhật hạn trên form
-                    "Đã bỏ qua lần này — chuyển sang lần kế tiếp"
+                    str(R.string.detail_skipped)
                 }
-                SkipResult.SERIES_ENDED -> "Đây là lần lặp cuối cùng (đã tới ngày kết thúc)"
-                SkipResult.NOT_RECURRING -> "Chỉ bỏ qua được việc lặp lại có hạn chót"
-                SkipResult.NOT_FOUND -> "Công việc không còn tồn tại"
+                SkipResult.SERIES_ENDED -> str(R.string.detail_series_ended)
+                SkipResult.NOT_RECURRING -> str(R.string.detail_skip_needs_recurring)
+                SkipResult.NOT_FOUND -> str(R.string.detail_task_gone_short)
             }
             _events.emit(TaskDetailEvent.Info(msg))
         }
@@ -242,10 +245,10 @@ class TaskDetailViewModel(
                 onSuccess = { r ->
                     val existing = subtasks.value.map { it.title.lowercase() }.toSet()
                     val steps = r.subtasks.orEmpty().filter { it.isNotBlank() && it.lowercase() !in existing }
-                    if (steps.isEmpty()) TaskDetailEvent.Info("AI chưa nghĩ ra bước nào mới — thử viết mô tả rõ hơn")
+                    if (steps.isEmpty()) TaskDetailEvent.Info(str(R.string.detail_ai_no_steps))
                     else TaskDetailEvent.BreakdownReady(steps, r.estimatedMinutes)
                 },
-                onFailure = { TaskDetailEvent.Error(it.aiFailureMessage("Không nhờ AI chia nhỏ được, thử lại sau")) }
+                onFailure = { TaskDetailEvent.Error(it.aiFailureMessage(str(R.string.detail_ai_breakdown_failed))) }
             )
         }
     }
@@ -255,9 +258,9 @@ class TaskDetailViewModel(
             aiRepository.estimate(title.trim(), description.trim()).fold(
                 onSuccess = { minutes ->
                     if (minutes > 0) TaskDetailEvent.EstimateReady(minutes)
-                    else TaskDetailEvent.Info("AI chưa ước tính được việc này")
+                    else TaskDetailEvent.Info(str(R.string.detail_ai_no_estimate))
                 },
-                onFailure = { TaskDetailEvent.Error(it.aiFailureMessage("Không lấy được gợi ý thời lượng")) }
+                onFailure = { TaskDetailEvent.Error(it.aiFailureMessage(str(R.string.detail_ai_estimate_failed))) }
             )
         }
     }
@@ -265,7 +268,7 @@ class TaskDetailViewModel(
     private fun runAi(job: AiJob, title: String, block: suspend () -> TaskDetailEvent) {
         if (_aiWorking.value != null) return
         if (title.isBlank()) {
-            viewModelScope.launch { _events.emit(TaskDetailEvent.Info("Nhập tiêu đề trước để AI hiểu việc cần làm")) }
+            viewModelScope.launch { _events.emit(TaskDetailEvent.Info(str(R.string.detail_ai_needs_title))) }
             return
         }
         _aiWorking.value = job

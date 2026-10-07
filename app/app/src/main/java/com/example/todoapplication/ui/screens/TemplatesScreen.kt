@@ -20,6 +20,9 @@ import androidx.navigation.NavController
 import com.example.todoapplication.domain.model.TaskDraft
 import com.example.todoapplication.data.repository.QuickAddDraft
 import com.example.todoapplication.ui.navigation.Screen
+import androidx.compose.ui.res.stringResource
+import com.example.todoapplication.R
+import com.example.todoapplication.i18n.str
 
 /** Một mẫu nhiệm vụ gợi ý sẵn. */
 data class TaskTemplate(
@@ -32,47 +35,47 @@ data class TaskTemplate(
 data class TemplateGroup(val name: String, val items: List<TaskTemplate>)
 
 /** Danh sách mẫu nhiệm vụ theo nhóm — giống màn "Mẫu nhiệm vụ" của app tham khảo. */
-val TEMPLATE_GROUPS = listOf(
+fun templateGroups(): List<TemplateGroup> = listOf(
     TemplateGroup(
-        "Sức khỏe",
+        str(R.string.tpl_group_health),
         listOf(
-            TaskTemplate("💧", "Uống nước", "PERSONAL", "DAILY"),
-            TaskTemplate("🦷", "Đánh răng", "PERSONAL", "DAILY"),
-            TaskTemplate("🚿", "Tắm", "PERSONAL", "DAILY"),
-            TaskTemplate("😴", "Đi ngủ sớm", "PERSONAL", "DAILY"),
-            TaskTemplate("🌅", "Dậy sớm", "PERSONAL", "DAILY"),
-            TaskTemplate("💊", "Uống thuốc", "PERSONAL", "DAILY"),
-            TaskTemplate("☕", "Nghỉ ngơi một lát", "PERSONAL"),
-            TaskTemplate("🍎", "Ăn trái cây", "PERSONAL"),
-            TaskTemplate("🏃", "Tập thể dục", "PERSONAL", "DAILY")
+            TaskTemplate("💧", str(R.string.tpl_drink_water), "PERSONAL", "DAILY"),
+            TaskTemplate("🦷", str(R.string.tpl_brush_teeth), "PERSONAL", "DAILY"),
+            TaskTemplate("🚿", str(R.string.tpl_shower), "PERSONAL", "DAILY"),
+            TaskTemplate("😴", str(R.string.tpl_sleep_early), "PERSONAL", "DAILY"),
+            TaskTemplate("🌅", str(R.string.tpl_wake_early), "PERSONAL", "DAILY"),
+            TaskTemplate("💊", str(R.string.tpl_take_medicine), "PERSONAL", "DAILY"),
+            TaskTemplate("☕", str(R.string.tpl_take_break), "PERSONAL"),
+            TaskTemplate("🍎", str(R.string.tpl_eat_fruit), "PERSONAL"),
+            TaskTemplate("🏃", str(R.string.tpl_exercise), "PERSONAL", "DAILY")
         )
     ),
     TemplateGroup(
-        "Cuộc sống",
+        str(R.string.tpl_group_life),
         listOf(
-            TaskTemplate("🛒", "Đi mua sắm", "OTHER"),
-            TaskTemplate("🧹", "Dọn dẹp nhà", "OTHER", "WEEKLY"),
-            TaskTemplate("🍳", "Nấu ăn", "OTHER"),
-            TaskTemplate("📞", "Gọi điện gia đình", "PERSONAL"),
-            TaskTemplate("🐶", "Cho thú cưng ăn", "OTHER", "DAILY"),
-            TaskTemplate("🎂", "Sinh nhật", "PERSONAL", "MONTHLY")
+            TaskTemplate("🛒", str(R.string.tpl_shopping), "OTHER"),
+            TaskTemplate("🧹", str(R.string.tpl_clean_house), "OTHER", "WEEKLY"),
+            TaskTemplate("🍳", str(R.string.tpl_cook), "OTHER"),
+            TaskTemplate("📞", str(R.string.tpl_call_family), "PERSONAL"),
+            TaskTemplate("🐶", str(R.string.tpl_feed_pet), "OTHER", "DAILY"),
+            TaskTemplate("🎂", str(R.string.tpl_birthday), "PERSONAL", "MONTHLY")
         )
     ),
     TemplateGroup(
-        "Công việc",
+        str(R.string.tpl_group_work),
         listOf(
-            TaskTemplate("📧", "Gửi email", "WORK"),
-            TaskTemplate("📝", "Viết báo cáo", "WORK"),
-            TaskTemplate("🤝", "Họp nhóm", "WORK"),
-            TaskTemplate("📅", "Lập kế hoạch ngày", "WORK", "DAILY")
+            TaskTemplate("📧", str(R.string.tpl_send_email), "WORK"),
+            TaskTemplate("📝", str(R.string.tpl_write_report), "WORK"),
+            TaskTemplate("🤝", str(R.string.tpl_team_meeting), "WORK"),
+            TaskTemplate("📅", str(R.string.tpl_plan_day), "WORK", "DAILY")
         )
     ),
     TemplateGroup(
-        "Học tập",
+        str(R.string.tpl_group_study),
         listOf(
-            TaskTemplate("📖", "Đọc sách", "WORK"),
-            TaskTemplate("🌐", "Học ngoại ngữ", "WORK", "DAILY"),
-            TaskTemplate("✏️", "Làm bài tập", "WORK")
+            TaskTemplate("📖", str(R.string.tpl_read_book), "WORK"),
+            TaskTemplate("🌐", str(R.string.tpl_learn_language), "WORK", "DAILY"),
+            TaskTemplate("✏️", str(R.string.tpl_homework), "WORK")
         )
     )
 )
@@ -92,9 +95,9 @@ fun TemplatesScreen(navController: NavController) {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Quay lại", tint = MaterialTheme.colorScheme.onSurface)
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.action_back), tint = MaterialTheme.colorScheme.onSurface)
                     }
-                    Text("Mẫu nhiệm vụ", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = MaterialTheme.colorScheme.onSurface)
+                    Text(stringResource(R.string.templates_title), fontWeight = FontWeight.Bold, fontSize = 18.sp, color = MaterialTheme.colorScheme.onSurface)
                 }
             }
         },
@@ -107,7 +110,7 @@ fun TemplatesScreen(navController: NavController) {
             contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            TEMPLATE_GROUPS.forEach { group ->
+            templateGroups().forEach { group ->
                 item(key = "h_${group.name}") {
                     Text(
                         group.name,
@@ -139,7 +142,7 @@ fun TemplatesScreen(navController: NavController) {
                             Spacer(Modifier.width(14.dp))
                             Text(t.title, fontSize = 15.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
                             if (t.recurrence != "NONE") {
-                                Icon(Icons.Default.Refresh, contentDescription = "Lặp lại", modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.tertiary)
+                                Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.templates_repeats), modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.tertiary)
                                 Spacer(Modifier.width(8.dp))
                             }
                             Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)

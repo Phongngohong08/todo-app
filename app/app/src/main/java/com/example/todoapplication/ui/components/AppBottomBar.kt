@@ -22,6 +22,8 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import com.example.todoapplication.ui.navigation.Screen
+import androidx.compose.ui.res.stringResource
+import com.example.todoapplication.R
 
 /** Thanh điều hướng floating pill — lấy màu từ theme. [activeTab]: 0 Hôm nay · 1 Việc làm · 2 Lịch · 3 Tôi. */
 @Composable
@@ -31,10 +33,10 @@ fun AppBottomBar(navController: NavController, activeTab: Int) {
     data class NavItem(val route: String, val icon: ImageVector, val label: String)
 
     val items = listOf(
-        NavItem(Screen.Today.route, Icons.Default.WbSunny, "Hôm nay"),
-        NavItem(Screen.TaskList.route, Icons.Default.Checklist, "Việc làm"),
-        NavItem(Screen.Calendar.route, Icons.Default.DateRange, "Lịch"),
-        NavItem(Screen.Stats.route, Icons.Default.Person, "Tôi")
+        NavItem(Screen.Today.route, Icons.Default.WbSunny, stringResource(R.string.tab_today)),
+        NavItem(Screen.TaskList.route, Icons.Default.Checklist, stringResource(R.string.tab_tasks)),
+        NavItem(Screen.Calendar.route, Icons.Default.DateRange, stringResource(R.string.tab_calendar)),
+        NavItem(Screen.Stats.route, Icons.Default.Person, stringResource(R.string.tab_me))
     )
 
     Box(

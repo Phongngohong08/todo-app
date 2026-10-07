@@ -124,12 +124,14 @@ app/src/main/java/com/example/todoapplication/
   data/calendar/ · data/location/ · data/backup/  # Lịch của máy (CalendarContract) · Geofencing · sao lưu SAF
   ui/tiles/                      # Quick Settings Tile: Tập trung, Thêm việc
   di/ServiceLocator.kt           # Manual DI — đồ thị phụ thuộc ghi trong file
+  i18n/                          # Song ngữ: AppStrings (str/plural ngoài Compose), AppLanguage (ngôn ngữ riêng của app)
   ui/
     viewmodel/                   # ViewModel của từng màn (Today, TaskList, TaskDetail, Review/History/Trash, ...)
     screens/                     # Màn hình Compose + TaskComponents (thẻ việc, thanh tạo nhanh dùng chung) + SnoozeActivity, AlarmActivity, AppLock (khóa ứng dụng)
     components/DragDrop.kt       # Kéo-thả giữa các vùng (lịch tuần, ma trận) theo tọa độ gốc màn hình
     components/, theme/, navigation/, utils/
 app/schemas/                     # Schema Room đã export (4.json … 8.json) — dùng cho MigrationTest
+app/src/main/res/values/ · values-vi/  # strings.xml tiếng Anh (mặc định) · tiếng Việt — cùng bộ khóa (LocalizationTest kiểm tra)
 ```
 
 ---
@@ -181,6 +183,7 @@ app/schemas/                     # Schema Room đã export (4.json … 8.json) �
 - **Giao diện thích ứng** — `WindowSizeClass` → `NavigationRail` (Medium / Expanded) và tab Việc làm chia đôi danh sách | chi tiết (Expanded); màn chi tiết nhúng vào khung phải bằng ViewModel tạo từ `CreationExtras`.
 - **Shared element + Predictive Back** — `SharedTransitionLayout` bọc NavHost, thẻ việc ↔ màn chi tiết dùng chung `sharedBounds`; `enableOnBackInvokedCallback`.
 - **Sao lưu SAF** — `BackupManager`: JSON / CSV ra tệp người dùng chọn (`CreateDocument`), khôi phục kiểu gộp (`OpenDocument`), gửi qua bảng Chia sẻ (`FileProvider`).
+- **Song ngữ Việt – Anh** — mọi chữ hiển thị nằm trong `res/values/strings.xml` (tiếng Anh, mặc định) và `res/values-vi/strings.xml` (tiếng Việt), có `plurals` và mẫu ngày theo ngôn ngữ; ngoài Compose đọc qua `i18n/AppStrings.kt` (`str()`, `plural()`). Chọn ngôn ngữ riêng cho app ở Thiết lập: Android 13+ dùng `LocaleManager` + `res/xml/locales_config.xml`, Android 10–12 bọc Context trong `attachBaseContext` (`i18n/AppLanguage.kt`). Đổi ngôn ngữ thì ViewModel cũ được bỏ để mọi chữ tính lại; kênh thông báo, widget, thông báo cố định làm mới theo. Thêm nhanh hiểu cả câu tiếng Việt lẫn tiếng Anh.
 - **Trợ năng** — mọi cử chỉ (vuốt hoàn thành / hoãn, kéo giữa cột Kanban / ô ma trận) có `CustomAccessibilityAction` tương đương; `stateDescription`, `heading()`, mô tả ô ngày của thói quen.
 - **DataStore + Paging 3** — `LocalPrefs` trên DataStore (tự chuyển từ SharedPreferences cũ); Lịch sử dùng `PagingSource` của Room + `insertSeparators`.
 - **Baseline Profile + Macrobenchmark** — module `:macrobenchmark` đo khởi động lạnh / cuộn và sinh `app/src/main/baseline-prof.txt` (ProfileInstaller cài khi cài app).
@@ -229,13 +232,15 @@ Chạy với backend trên máy tính: đổi thành `http://10.0.2.2:8080/api/v
 
 | Bộ test | Nội dung |
 | :--- | :--- |
-| `domain/*Test` | Nhóm việc (quá hạn / hôm nay / sắp tới / chưa có hạn), việc cả ngày, lý do gợi ý, gợi ý Ngày của tôi, **bộ phân tích câu tiếng Việt**, quy tắc lặp (mỗi N, theo ngày hoàn thành, ngày kết thúc, bỏ qua — cùng vector với test Go), chuỗi ngày + ngày nghỉ, tổng kết tuần, chỉnh lịch trình, lựa chọn hoãn |
+| `domain/*Test` | Nhóm việc (quá hạn / hôm nay / sắp tới / chưa có hạn), việc cả ngày, lý do gợi ý, gợi ý Ngày của tôi, **bộ phân tích câu tiếng Việt và tiếng Anh**, quy tắc lặp (mỗi N, theo ngày hoàn thành, ngày kết thúc, bỏ qua — cùng vector với test Go), chuỗi ngày + ngày nghỉ, tổng kết tuần, chỉnh lịch trình, lựa chọn hoãn |
 | `CoachActionApplierTest` | Áp dụng hành động AI Coach: hạn cả ngày, Ngày của tôi, tạo việc, bỏ qua đề xuất sai |
 | `TaskListViewModelTest` · `SettingsViewModelTest` | Luồng state từ Room, bộ lọc thông minh, debounce, hoàn thành/xóa + Hoàn tác, dời việc quá hạn + Hoàn tác, tạo nhanh vào Ngày của tôi, kéo-thả · đăng xuất máy này/mọi thiết bị khi còn thay đổi chưa đồng bộ |
 | `MigrationTest` (androidTest) | Dựng DB v4…v7 từ schema JSON, chạy từng migration tới v8, kiểm tra schema khớp và dữ liệu được giữ (cột mới có giá trị mặc định) |
 | `SyncEngineTest` (androidTest) | Room thật + server giả: tạo khi offline, mất mạng, thay đổi từ máy khác, hoàn tác xóa sau đồng bộ, việc lặp offline, sửa khi đang gửi, thói quen + check-in hai chiều, server cũ không có API thói quen |
-| `ComponentsUiTest` (androidTest, Compose UI) | Thẻ việc + hành động TalkBack, thanh chọn nhiều, thẻ thói quen, phân tích câu khi gõ |
+| `ComponentsUiTest` (androidTest, Compose UI) | Thẻ việc + hành động TalkBack, thanh chọn nhiều, thẻ thói quen, phân tích câu khi gõ (so với chuỗi tài nguyên → đúng ở mọi ngôn ngữ máy) |
 | `PlatformFeaturesLogicTest` · `OrganizerLogicTest` | Tách dòng từ ảnh, câu hoãn trên thông báo, CSV, ngày của sự kiện lịch · nhãn, lời nhắc, thói quen, Kanban, bộ lọc đã lưu, thống kê tập trung |
+| `LocalizationTest` · `EnglishQuickAddTest` | Hai file chuỗi cùng khóa + cùng số tham số, nhãn ngày giờ / số nhiều tiếng Anh, câu thêm nhanh và câu hoãn tiếng Anh, chữ tiếng Việt viết tắt không bị hiểu nhầm |
+| `AppLanguageTest` (androidTest) | Đổi ngôn ngữ riêng của app (vi ↔ en) bằng `LocaleManager` → chuỗi ngoài Compose đổi theo |
 
 CI: [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) chạy Go vet + test, unit test + build debug / release, và test trên giả lập.
 

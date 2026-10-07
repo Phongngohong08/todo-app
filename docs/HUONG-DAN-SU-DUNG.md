@@ -84,7 +84,7 @@ Nếu bạn có [thói quen](#thói-quen), tab Hôm nay hiện các thói quen *
 
 ## 4. Thêm việc nhanh (gõ câu tự nhiên)
 
-Nhấn nút **+** (ở tab Hôm nay hoặc Việc làm) rồi **gõ như nói chuyện** — hoặc bấm **🎤** trong ô nhập để **nói** (tiếng Việt, dùng dịch vụ nhận giọng nói của máy). App hiểu ngay khi bạn gõ — **không cần mạng** — và tô màu phần đã hiểu, kèm dòng **"Hiểu là: …"** để bạn kiểm tra:
+Nhấn nút **+** (ở tab Hôm nay hoặc Việc làm) rồi **gõ như nói chuyện** — hoặc bấm **🎤** trong ô nhập để **nói** (theo ngôn ngữ của app, dùng dịch vụ nhận giọng nói của máy). App hiểu ngay khi bạn gõ — **không cần mạng** — và tô màu phần đã hiểu, kèm dòng **"Hiểu là: …"** để bạn kiểm tra:
 
 ```
 Nộp báo cáo mai 3h chiều !cao #Công việc @khách-hàng
@@ -107,6 +107,7 @@ Việc không chọn danh sách sẽ vào **📥 Hộp thư đến** (trước �
 | `hằng ngày`, `mỗi tuần`, `mỗi tháng`, `mỗi thứ 2 và thứ 5` | Việc lặp lại |
 
 - Gõ **không dấu** cũng được (`nop bao cao mai 3h chieu`).
+- Gõ **tiếng Anh** cũng được, dù app đang để ngôn ngữ nào: `Submit report tomorrow 3pm !high #Work`, `Call mom next friday`, `Water plants every monday and thursday`, `in 3 days`, `tonight`, `oct 15`, `!low`. Tên danh sách có sẵn khớp ở cả hai ngôn ngữ (`#Work` = `#Công việc`).
 - Chỉ có ngày mà không có giờ → việc **cả ngày**: chỉ tính là quá hạn khi sang ngày hôm sau.
 - Phần app không nhận ra thì chọn bằng chip bên dưới (**Hạn**, **Danh mục**, **Ưu tiên**).
 - **Chi tiết**: mở form đầy đủ với nội dung đã điền. **Mẫu**: thư viện việc làm sẵn. **AI**: gửi câu dài/phức tạp cho AI phân tích (cần mạng).
@@ -306,6 +307,7 @@ Trong trình duyệt, Zalo, ghi chú… chọn **Chia sẻ → Thêm vào TaskFl
 
 Mở **Tôi → ⚙**:
 - **🌗 Giao diện**: Sáng / Tối / Theo hệ thống.
+- **🌐 Ngôn ngữ**: *Theo máy* / *Tiếng Việt* / *English* — đổi ngay, không cần mở lại app, áp dụng cho cả thông báo và widget. Android 13+ còn đổi được trong *Cài đặt hệ thống › Ứng dụng › TaskFlow AI › Ngôn ngữ*. AI Coach và các gợi ý AI trả lời theo ngôn ngữ bạn viết.
 - **🕐 Nhịp sinh hoạt**: giờ bắt đầu buổi sáng, kết thúc buổi tối, thời lượng phiên làm việc mặc định (15–480 phút) — AI dùng để xếp lịch trình.
 - **🎯 Mục tiêu hằng ngày**: số việc muốn hoàn thành mỗi ngày (1–50) và **ngày nghỉ** (ví dụ T7, CN — không làm đứt chuỗi).
 - **🏷️ Danh mục**: thêm / xóa danh mục tự tạo (3 danh mục mặc định không xóa được). Đổi tên danh sách ở *Tôi → Danh sách → ✎* (các việc chuyển theo).

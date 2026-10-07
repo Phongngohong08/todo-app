@@ -36,7 +36,8 @@ Tài liệu liệt kê các công nghệ, thư viện và **kỹ thuật lập t
 | Thẻ việc "nở" thành màn chi tiết, cử chỉ quay lại xem trước | Shared element transition (`SharedTransitionLayout`, `sharedBounds`), Predictive Back (`enableOnBackInvokedCallback`) |
 | Sao lưu / xuất CSV / khôi phục | Storage Access Framework + `FileProvider` + bảng Chia sẻ |
 | Hỗ trợ TalkBack | Semantics: `customActions` thay cho vuốt / kéo thả, `stateDescription`, `heading`, `contentDescription` |
-| Nhập bằng giọng nói | `RecognizerIntent` (tiếng Việt) qua Activity Result API |
+| Nhập bằng giọng nói | `RecognizerIntent` (theo ngôn ngữ của app) qua Activity Result API |
+| Song ngữ Việt – Anh, đổi ngôn ngữ ngay trong app | String resources (`values/` tiếng Anh, `values-vi/` tiếng Việt, `plurals`, `string-array`), **per-app language**: `LocaleManager` (Android 13+, kèm `locales_config.xml` → hiện trong Cài đặt hệ thống) và `createConfigurationContext` trong `attachBaseContext` (Android 10–12) |
 | Khởi động nhanh | Baseline Profile + ProfileInstaller, đo bằng Macrobenchmark |
 
 ---
@@ -74,6 +75,7 @@ Tài liệu liệt kê các công nghệ, thư viện và **kỹ thuật lập t
 - **Cử chỉ**: vuốt phải hoàn thành, vuốt trái hoãn, nhấn giữ chọn nhiều, kéo thả, lắc máy để hoàn tác.
 - **Undo pattern**: thao tác thực hiện ngay + Snackbar "Hoàn tác".
 - **LazyColumn tối ưu**: `key` ổn định + `contentType`; tính toán nặng trong ViewModel trên `Dispatchers.Default`.
+- **Song ngữ (i18n)**: không còn chữ hiển thị nào viết cứng trong code. Composable dùng `stringResource` / `pluralStringResource` / `stringArrayResource`; code ngoài Compose (ViewModel, Worker, thông báo, widget, logic tạo nhãn) dùng `str()` / `plural()` trong `i18n/AppStrings.kt` (đọc tài nguyên qua Context của Application). Ngày tháng định dạng theo mẫu lấy từ tài nguyên (`T6 10/07` ↔ `Fri, Jul 10`), số nhiều đúng ngữ pháp tiếng Anh (`1 task` / `3 tasks`). Đổi ngôn ngữ → Activity được tạo lại và **bỏ các ViewModel cũ** (`viewModelStore.clear()` trước `super.onCreate`) để chữ ViewModel đã tính sẵn cũng đổi theo; kênh thông báo, widget và thông báo cố định được làm mới. Bộ phân tích thêm nhanh hiểu cả câu tiếng Việt lẫn tiếng Anh ("mai 3h chiều !cao" / "tomorrow 3pm !high"). App Bundle tắt tách gói theo ngôn ngữ để đổi ngôn ngữ trong app luôn đủ chuỗi.
 - **Trợ năng**: mọi thao tác cử chỉ đều có `CustomAccessibilityAction` tương đương (Hoàn thành, Hoãn, Chuyển sang mục / ô khác…); tiêu đề nhóm có `heading()`.
 
 ---
@@ -210,10 +212,11 @@ Không cần quyền camera / bộ nhớ: Document Scanner, Photo Picker và Sto
 
 | Loại | Công cụ | Nội dung |
 | :--- | :--- | :--- |
-| **Unit test (JVM)** | JUnit 4, Mockito-Kotlin, coroutines-test | Domain (lặp, phân tích câu, thói quen, Kanban, nhãn, bộ lọc, quét chữ, câu hoãn, CSV, ngày của sự kiện lịch…), ViewModel (Hoàn tác, chọn nhiều, debounce, kéo thả) — 116 test |
+| **Unit test (JVM)** | JUnit 4, Mockito-Kotlin, coroutines-test | Domain (lặp, phân tích câu, thói quen, Kanban, nhãn, bộ lọc, quét chữ, câu hoãn, CSV, ngày của sự kiện lịch…), ViewModel (Hoàn tác, chọn nhiều, debounce, kéo thả), song ngữ (hai file chuỗi cùng khóa và cùng số tham số, nhãn tiếng Anh, câu thêm nhanh tiếng Anh) — 125 test. Test nạp thẳng `values-vi/strings.xml` (`TestStrings`) vì JVM không có Android Resources |
 | **Instrumented test** | AndroidJUnit4 + Room in-memory + `FakeServer : ApiService` | Giao thức đồng bộ: offline, mất mạng giữa chừng, máy khác sửa, thói quen, server cũ không có API |
 | **Migration test** | `MigrationTestHelper` | Từng bước 4→5→6→7→8 trên SQLite thật |
-| **Compose UI test** | `createComposeRule` | Thẻ việc + hành động TalkBack, thanh chọn nhiều, thẻ thói quen, phân tích câu khi gõ |
+| **Compose UI test** | `createComposeRule` | Thẻ việc + hành động TalkBack, thanh chọn nhiều, thẻ thói quen, phân tích câu khi gõ (so với chuỗi tài nguyên → chạy đúng ở mọi ngôn ngữ máy) |
+| **Ngôn ngữ riêng của app** | `LocaleManager` trên máy thật / giả lập | Đổi vi ↔ en → chuỗi đọc ngoài Compose đổi theo |
 | **Macrobenchmark** | `:macrobenchmark` | Khởi động lạnh có / không Baseline Profile, độ mượt khi cuộn; `BaselineProfileGenerator` sinh `app/src/main/baseline-prof.txt` |
 | **CI** | GitHub Actions (`.github/workflows/ci.yml`) | Go vet + test; unit test + build debug/release; test trên giả lập (android-emulator-runner) |
 
